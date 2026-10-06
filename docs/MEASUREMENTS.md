@@ -1,5 +1,75 @@
 # Measurement protocol
 
+## v2: matched F16 KV and the best measured CPU baseline
+
+The v2 tools write only under `results/v2`; the original results and the archived protocol below are unchanged. This is still single-stream decode on one pinned Qwen2.5-0.5B-Instruct model, not prompt processing, batched serving or a downstream-task benchmark. Native and llama.cpp use F16 K/V and native CPU Release builds. The baseline is the verified Q8_0 GGUF and commit in `results/llama-preparation.json`, converted from the same BF16 snapshot as the native artifact. Formats need not be numerically identical: native group size/scale dtype and quality are recorded separately.
+
+### Fixed settings and sampling
+
+Freeze native kernel, weight artifact, group size, scale dtype, scheduler, attention and RoPE **before** the final run. `freeze` verifies model/config/GGUF hashes, exact source-manifest equality, Release/native build settings, executable hashes and shared-library identities. It saves a digest-addressed `protocol.json`; subsequent windows reject changed artifacts. The full matrix is threads **1, 2, 4, 6, 12** × initial contexts **128, 1024, 4096**. Defaults are **64 measured tokens per repeat, five repeats per run request, two rounds and one untimed native warmup step**. Final aggregation rejects shorter sampling or development protocols.
+
+Each cell tries flash attention **on, off, auto** × **pinned, unpinned**, with repacking enabled and upstream poll=50. `freeze --polls 0,50` can add a poll choice, but the candidate list must be fixed before the final run and every candidate must be sampled. Unpinned means the upstream default mask `0x0`, strict=false, within the externally allowed CPU set; it does not mean escape from a container's affinity. Pinned uses `--cpu-mask HEX --cpu-strict 1`. The mask is built from the first N entries of the identical native CPU order.
+
+`--cpu-order` explicitly preserves the supplied fast-physical-first order; on the development machine that is `0,1,4,2,3,5,6,7,10,8,9,11` (six physical cores, then their SMT siblings). Do not reuse those IDs blindly elsewhere: omit the override to use `cpu-decode cpus`'s `allowed_cpu_ids` and `preferred_cpu_ids` topology/frequency metadata. The runner rejects duplicate, unavailable or insufficient IDs. Native workers use `--cpu-set` with exactly the selected N entries.
+
+### Interleaved windows without repeated native prefill
+
+`window --candidate all` runs one cell per externally scheduled benchmark window. It starts `cpu-decode bench --interactive 1` once, builds the native prefix once, warms once, and waits for `ready:true`. For **each** baseline candidate it requests native A (five repeats), launches baseline B (five repeats), requests A again, then launches B again: **A B A B**. Native rewinds to the original fixed cache length and seed for every repeat; it does not rebuild the prefix per token or copy KV. One cell with six candidates therefore has 12 native requests / **60 native samples**, plus 12 baseline processes / **10 samples per baseline configuration**. Native remains idle while B runs. Loading, depth fill and prefill are outside decode timing.
+
+The baseline winner is the configuration with the **highest median of its ten measured tokens/s samples**, not the upstream default and not a weaker convenient baseline. Ties use candidate ID for deterministic output. The comparison uses **only the ten native samples interleaved with that winning configuration**: equal run-request/process counts and equal sample counts. All other native samples, candidates, commands and logs remain visible, and their total sample count is reported. Selection and reporting use the same samples, not an independent holdout; selection optimism favors the baseline. The two native rounds reuse one warmed process; the two baseline rounds each load their model and run the upstream one-step warmup. That cache-residency asymmetry is disclosed rather than treated as identical initialization.
+
+Each window has a 1,740-second deadline including setup and all candidates, leaving a minute below 30 minutes. Timeout, nonzero exit, malformed output, missing candidate, mismatched settings or incomplete ABAB sequence is retained as unsuccessful evidence, never counted as a successful timing sample. If a shared native process exits unsuccessfully, all its emitted results are invalidated. Files are not silently overwritten, and duplicate candidates are rejected rather than choosing the better rerun. A failed candidate prevents a complete-final-matrix claim. Run heavy/timing commands through your external resource scheduler when needed; public tools do not start or nest a scheduler.
+
+### Commands
+
+Set `$INT8_V2`, `$LLAMA_BENCH` and `$Q8_GGUF` to your prepared artifacts. Use the Python environment from the project lockfile. After choosing the native configuration:
+
+```sh
+nice -n 19 python -m tools.measure_v2 freeze --model "$INT8_V2" --model-manifest results/v2/quantized-manifest.json --llama "$LLAMA_BENCH" --gguf "$Q8_GGUF" --kernel vnni
+nice -n 19 python -m tools.measure_v2 window --model "$INT8_V2" --llama "$LLAMA_BENCH" --gguf "$Q8_GGUF" --threads 6 --contexts 4096 --candidate all
+nice -n 19 python -m tools.measure_v2 bandwidth --threads 6
+```
+
+The second and third lines are individual timing windows, not the entire matrix. Invoke the second separately for every matrix cell and the third for every thread count; acquire external exclusivity separately per command, not around a potentially hours-long shell loop. `--candidate ID` can split a cell if a slower machine needs shorter windows; use every frozen ID once. That split loads the native prefix once per candidate and is distinguishable in raw process records.
+
+For development only, freeze with `--development --steps 16 --repeats 3 --output results/v2/development`, then measure cells **2/128** and **6/4096** with the same output option. This cannot be aggregated into final data. To regenerate final artifacts:
+
+```sh
+nice -n 19 python -m tools.summarize_v2
+nice -n 19 python -m tools.figure_v2
+```
+
+For development use `summarize_v2 --input results/v2/development --output results/v2/development/summary.json --allow-partial`, and point `figure_v2 --input`/`--output` there.
+
+### Format-specific read ceiling and ablations
+
+The existing 256 MiB read-only probe is pinned with `taskset -c` to the **same selected core set** as native and pinned baseline. Ordered `OMP_PLACES`, binding and dynamic=false control the probe's OpenMP workers. SIMD256 and SIMD512 are both measured; the greater median bandwidth is used, and both raw results remain. Probe priority, core sets, samples and bytes/elapsed-time rates are checked.
+
+For each compared native sample use its actual `bytes_per_token`, including its selected matrix format and scale storage, norm/bias, embedding, unique-KV-head reads and KV writes. `total_min` must equal their sum; LM-head subfields are already included and must not be counted again. Independently check KV bytes against the frozen model geometry and selected F16/F32 dtype. With geometry L layers, H KV heads and D head dimensions, cache storage per position is `L × H × D × 2 × sizeof(KV)`. The mean read length for context C and S measured steps is `C + (S+1)/2`, including the current position. No v1 FP32-KV or full-row-FP32-scale byte constant is reused. The ceiling is median read GB/s × 1e9 / actual mean minimum bytes/token; percentage is native median / ceiling × 100. This is an **EXT storage/read-bandwidth bound**, not a physical DRAM counter, and ignores activation traffic, write allocation, cache reuse, arithmetic and synchronization.
+
+`ablation` collects two native run requests using the same sampling protocol, restricted to **2/128** and **6/4096**. The fixed ordered labels are `per-row-scalar`, `simd256`, `simd512x4`, `blocked`, `f16-kv`, `pool`, `grouped`, `vnni`: respectively per-row int8 scalar/OpenMP/scalar-attention/F32-KV; SIMD256; SIMD512x4; blocked attention; F16 KV; persistent pool; grouped32/F16 scales; VNNI. Keep unchanged settings identical at adjacent rungs and identify changed weight artifacts. Example rung:
+
+```sh
+nice -n 19 python -m tools.measure_v2 ablation --model "$INT8_V2" --llama "$LLAMA_BENCH" --gguf "$Q8_GGUF" --threads 6 --contexts 4096 --label vnni --kernel vnni --kv f16 --attention blocked --scheduler pool
+```
+
+Every rung records its weight hash, observed group size/scale dtype, flags, rates and profile bytes. `ablation_ladders` lists measured rungs and missing labels at each fixed cell; `complete_ablation_ladder` is separate from matrix completeness. The summarizer does not invent missing measurements or causal contributions.
+
+### Output definitions and limits
+
+- `protocol.json`: frozen native settings, sampling/candidate list, CPU ordering, model geometry, source/quantized/GGUF identities, binary/library hashes, build cache settings, compiler/platform/CPU observations and environment aliases.
+- `window-tT-cC-*.json`: process readiness/exit status, cell, candidates, ordered run requests, portable full commands, parsed raw native/upstream output, and paths to stdout/stderr. `--verbose` baseline stderr retains runtime CPU features, attention and tensor/repack messages; a requested repack flag is not proof that Q8_0 tensors were repacked.
+- `bandwidth-tT.json` and `ablation-tT-cC-*.json`: full observations for same-core-set read probes and explicitly labeled fixed-cell rungs.
+- `summary.json`: per-cell native and **best measured** baseline median/min/max/sample count/spread, actual winning parameters and flags, all candidates/raw-log references, actual byte counts, read ceiling, percentage, ratios, ablation observations, failed records, missing cells/candidates and noisy cells.
+- `complete_final_matrix` requires all 15 cells, every frozen candidate and matched bandwidth with no failures. `targets_all_cells` is false for incomplete/development data. Default target predicates are native/best-baseline ≥1 and ceiling percentage ≥50; optional `--target-ratio` and `--target-ceiling-percent` are written into the summary, not silently changed.
+- Spreads are `100 × (max − min) / median`. **Every spread >5% is disclosed**, including losing baseline candidates. Samples are never discarded for noise. `decode.svg` is generated only from summary values, with native/best-baseline/estimated-ceiling curves, min–max bars and noise markers.
+
+Artifacts replace local directories with portable aliases (`$INT8`, `$GGUF`, `$ENGINE`, `$LLAMA_BENCH`, `$LLAMA_ROOT`, `$BANDWIDTH`, `$HOME`, `$PYTHON`). Numeric CPU IDs, flags, hashes and observations are preserved. Nice 19 and exclusive scheduled benchmarking do not isolate the desktop, fix temperature/clocks or disable boost. Matched shapes still are not identical token trajectories: native uses the fixed seed sequence and greedy argmax, upstream uses synthetic tokens and excludes sampling. Operation instrumentation remains included in native timing.
+
+## Archived v1 protocol
+
+Everything below describes the unchanged original runs, including their shorter sampling, FP32 native KV and full-row scale storage; it does not define v2 settings.
+
 The experiment asks about single-stream CPU decoding, not batched serving or prompt-processing speed. One model, one machine, and one quantization format are measured. Timings exclude model loading, tokenization and prompt prefill. Greedy selection is included in the small engine and eager measurements; llama-bench omits sampling, a small favorable difference for the baseline. llama-bench uses its synthetic tokens; the other paths use a repeated fixed token-ID sequence. These are matched shapes, not identical workloads.
 
 ## Machine and scheduling

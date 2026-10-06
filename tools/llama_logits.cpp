@@ -52,9 +52,9 @@ struct Backend {
 };
 
 void usage() {
-    std::cout << "llama-logits --model GGUF --tokens ID,ID,... --output PREFIX --threads N\n"
+    std::cout << "llama-logits --model GGUF --tokens ID,ID,... --output PREFIX --threads N [--logits-start N]\n"
                  "CPU-only Q8_0, float16 K/V cache, flash attention AUTO.\n"
-                 "Writes PREFIX.bin little-endian float32 [positions,vocab] and PREFIX.json.\n";
+                 "Writes PREFIX.bin little-endian float32 [scored positions,vocab] and PREFIX.json.\n";
 }
 }
 
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
             usage();
             return argc < 2 ? 1 : 0;
         }
-        const std::set<std::string> known{"--model", "--tokens", "--output", "--threads"};
+        const std::set<std::string> known{"--model", "--tokens", "--output", "--threads", "--logits-start"};
         std::map<std::string, std::string> options;
         for (int i = 1; i < argc; i += 2) {
             const std::string key = argv[i];
@@ -82,6 +82,8 @@ int main(int argc, char** argv) {
         auto tokens = parse_tokens(required("--tokens"));
         const int32_t threads = number(required("--threads"));
         if (threads < 1 || threads > 1024) throw std::runtime_error("threads must be 1..1024");
+        const size_t logits_start = options.count("--logits-start") ? size_t(number(options.at("--logits-start"))) : 0;
+        if (logits_start >= tokens.size()) throw std::runtime_error("logits-start must precede the last input token");
 
         Backend backend;
         auto model_params = llama_model_default_params();
@@ -128,7 +130,9 @@ int main(int argc, char** argv) {
         // The common little-endian path writes llama's buffer directly, without copying.
         std::vector<uint32_t> swapped(little_endian ? 0 : size_t(n_vocab));
         std::vector<llama_token> argmax;
-        argmax.reserve(tokens.size());
+        argmax.reserve(tokens.size() - logits_start);
+        std::vector<size_t> logit_positions;
+        logit_positions.reserve(tokens.size() - logits_start);
         const auto parent = std::filesystem::path(prefix).parent_path();
         if (!parent.empty()) std::filesystem::create_directories(parent);
         std::ofstream binary(prefix + ".bin", std::ios::binary);
@@ -148,10 +152,12 @@ int main(int argc, char** argv) {
         for (size_t i = 0; i < tokens.size(); ++i) {
             position = llama_pos(i);
             batch.token = &tokens[i];
+            output_logits = i >= logits_start ? 1 : 0;
             const int32_t status = llama_decode(context.get(), batch);
             if (status != 0)
                 throw std::runtime_error("llama_decode failed at position " + std::to_string(i) +
                                          " with status " + std::to_string(status));
+            if (i < logits_start) continue;
             const float* logits = llama_get_logits_ith(context.get(), 0);
             if (!logits) throw std::runtime_error("missing logits at position " + std::to_string(i));
             llama_token best = 0;
@@ -167,6 +173,7 @@ int main(int argc, char** argv) {
                 }
             }
             argmax.push_back(best);
+            logit_positions.push_back(i);
             const auto* bytes = little_endian ? reinterpret_cast<const char*>(logits) :
                                                reinterpret_cast<const char*>(swapped.data());
             if (!binary.write(bytes, std::streamsize(row_bytes)))
@@ -175,7 +182,9 @@ int main(int argc, char** argv) {
         binary.close();
         if (!binary) throw std::runtime_error("cannot close logits output: " + prefix + ".bin");
         const Json metadata{
-            {"shape", {tokens.size(), size_t(n_vocab)}},
+            {"shape", {tokens.size() - logits_start, size_t(n_vocab)}},
+            {"logits_start", logits_start},
+            {"logit_positions", logit_positions},
             {"tokens", tokens},
             {"argmax", argmax},
             {"threads", threads},
