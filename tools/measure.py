@@ -53,7 +53,7 @@ def main() -> None:
     contexts = [int(x) for x in args.contexts.split(",")]
     kernels = args.kernels.split(",")
     args.output.mkdir(parents=True, exist_ok=True)
-    locations = {}
+    locations = {args.output.resolve(): "$OUTPUT"}
     if args.model is not None:
         locations[args.model.resolve()] = "$MODEL"
     if args.llama is not None:
@@ -91,7 +91,7 @@ def main() -> None:
                                "--model", str(args.model), "--threads", str(thread), "--context", str(context),
                                "--steps", str(args.steps), "--repeats", str(args.repeats), "--tokens", args.tokens]
                 data = execute(command, path, locations)
-                records.append({"name": name, "command": command, "file": str(path.relative_to(ROOT)), "data": data})
+                records.append({"name": name, "command": command, "file": str(path), "data": data})
                 print(name, flush=True)
     environment_name = f"environment-{args.stage}-t{args.threads}-c{args.contexts}-k{args.kernels}-rope{args.rope}.json"
     (args.output / environment_name).write_text(
