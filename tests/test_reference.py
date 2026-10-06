@@ -2,7 +2,7 @@
 
 Full integration after download/build:
   CPU_DECODE_MODEL=/snapshot CPU_DECODE_QUANT_MODEL=/int8-dir \
-    PP_MEM=2000M pp-run heavy uv run pytest -q tests/test_reference.py
+    nice -n 19 uv run pytest -q tests/test_reference.py
 Full-model integration is strictly opt-in: CPU_DECODE_MODEL must be set.
 The quantized integration requires CPU_DECODE_QUANT_MODEL explicitly.
 """

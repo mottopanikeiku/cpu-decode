@@ -1,7 +1,7 @@
 """Produce and identify the engine's offline per-row int8 weight file.
 
-Run this entire command through pp-run heavy. Existing output is verified
-against its recorded identity; it is never silently overwritten.
+Existing output is verified against its recorded identity; it is never
+silently overwritten.
 """
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 from tools.download_model import file_hash, verify_snapshot
+from tools.portable import portable
 
 
 def main() -> None:
@@ -38,6 +39,13 @@ def main() -> None:
                     "weights": {"path": str(weights.resolve()), "bytes": weights.stat().st_size, "sha256": file_hash(weights)},
                     "config_sha256": file_hash(args.output / "config.json")}
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    locations = {args.source.resolve(): "$MODEL", args.output.resolve(): "$INT8", args.engine.resolve(): "build/cpu-decode"}
+    for flag, name in [("--model", "$MODEL"), ("--output", "$INT8")]:
+        locations[manifest["command"][manifest["command"].index(flag) + 1]] = name
+    locations[manifest["command"][0]] = "build/cpu-decode"
+    manifest["source"] = source
+    manifest["weights"]["path"] = "model.safetensors"
+    manifest = portable(manifest, locations)
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps(manifest, indent=2))

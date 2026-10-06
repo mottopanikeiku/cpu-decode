@@ -1,10 +1,12 @@
 {
   "checked_on": "2026-10-06",
-  "recording": "Outcomes observed in the local command outputs; not a benchmark timing file",
+  "recording": "Observed command outcomes; published commands replace local directories and omit the external resource wrapper. Not benchmark timings.",
   "build": {
     "command": "nice -n 19 make build",
-    "inner_commands": ["cmake -S . -B build -DCMAKE_BUILD_TYPE=Release", "cmake --build build -j4"],
-    "wrapper": "pp-run heavy for each command",
+    "inner_commands": [
+      "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release",
+      "cmake --build build -j4"
+    ],
     "result": "passed"
   },
   "native_fast": {
@@ -15,14 +17,14 @@
   },
   "python_fast": {
     "command": "nice -n 19 uv run pytest -q tests",
-    "passed": 11,
+    "passed": 13,
     "skipped": 2,
     "skip_reason": "Real model integrations require explicit CPU_DECODE_MODEL",
-    "covers": "Dense versus memory-bounded FP32 oracle, KL calculations, pinned-source rejection, explicit missing-engine rejection and matched table arithmetic"
+    "covers": "Dense versus memory-bounded FP32 oracle, KL calculations, pinned-source rejection, explicit missing-engine rejection, matched table arithmetic and portable metadata"
   },
   "pinned_model_integration": {
     "command": "nice -n 19 make model-test",
-    "inner_command": "CPU_DECODE_MODEL=/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775 CPU_DECODE_QUANT_MODEL=/home/alp/Projects/profile-program/cache/cpu-decode/int8 CPU_DECODE_KERNEL=simd512x4 PP_MEM=2000M /home/alp/Projects/profile-program/bin/pp-run heavy uv run pytest -q tests/test_reference.py",
+    "inner_command": "CPU_DECODE_MODEL=$MODEL CPU_DECODE_QUANT_MODEL=$INT8 CPU_DECODE_KERNEL=simd512x4 nice -n 19 uv run pytest -q tests/test_reference.py",
     "passed": 11,
     "skipped": 0,
     "memory_cap_M": 2000,
@@ -32,11 +34,14 @@
   "correctness_result": {
     "command": "nice -n 19 make correctness",
     "result": "passed",
-    "files": ["results/correctness.json", "results/quality-summary.json"],
+    "files": [
+      "results/correctness.json",
+      "results/quality-summary.json"
+    ],
     "note": "Int8 quality metrics are reporting-only, not an accuracy guarantee"
   },
   "text_edge_smoke": {
-    "command": "/home/alp/Projects/profile-program/bin/pp-run heavy uv run python -m tools.generate --model /home/alp/Projects/profile-program/cache/cpu-decode/int8 --tokenizer /home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775 --prompt 'Why is the sky blue?' --chat --steps 16 --threads 6",
+    "command": "nice -n 19 uv run python -m tools.generate --model $INT8 --tokenizer $MODEL --prompt 'Why is the sky blue?' --chat --steps 16 --threads 6",
     "result": "passed",
     "note": "Tokenization, native generation and text decoding ran. This is not an answer-quality evaluation."
   }

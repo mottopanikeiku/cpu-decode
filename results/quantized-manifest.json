@@ -2,7 +2,6 @@
   "source": {
     "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
     "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
-    "snapshot": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
     "stored_dtype": "bfloat16",
     "files": {
       "LICENSE": {
@@ -69,12 +68,12 @@
     "build/cpu-decode",
     "quantize",
     "--model",
-    "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+    "$MODEL",
     "--output",
-    "/home/alp/Projects/profile-program/cache/cpu-decode/int8"
+    "$INT8"
   ],
   "weights": {
-    "path": "/home/alp/Projects/profile-program/cache/cpu-decode/int8/model.safetensors",
+    "path": "model.safetensors",
     "bytes": 496122856,
     "sha256": "ec842d79d32b753e0236e071566516028626e3aecd7c2156dace7e0e0c7d7a91"
   },

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Single-stream naive Transformers BF16 eager decode, excluding prefill.
 
-Only pp-run bench may execute this timing script. Chunked untimed prefill
-bounds attention memory at 4096 context. Each timed step includes a full
+Chunked untimed prefill bounds attention memory at 4096 context. Each timed
+step includes a full
 backbone forward, tied vocabulary head and greedy argmax, with a KV cache.
 """
 import os
@@ -20,27 +20,10 @@ from pathlib import Path
 from tools.download_model import MODEL_ID, REVISION
 from tools.reference import load_oracle, project_last, versions
 from tools.tokenize import repeat_tokens
-
-
-def require_bench() -> None:
-    pid = os.getpid()
-    for _ in range(64):
-        proc = Path("/proc") / str(pid)
-        try:
-            command = (proc / "cmdline").read_bytes().split(b"\0")
-            if any(Path(arg.decode(errors="replace")).name == "pp-run" for arg in command if arg) and b"bench" in command:
-                return
-            status = (proc / "status").read_text().splitlines()
-            pid = int(next(line.split()[1] for line in status if line.startswith("PPid:")))
-        except (OSError, StopIteration, ValueError):
-            break
-        if pid <= 1:
-            break
-    raise RuntimeError("Timings must run under /home/alp/Projects/profile-program/bin/pp-run bench")
+from tools.portable import portable
 
 
 def benchmark(args) -> dict:
-    require_bench()
     os.nice(19)
     import torch
 
@@ -89,7 +72,7 @@ def main() -> None:
     args = parser.parse_args()
     if min(args.context, args.threads, args.steps, args.repeats, args.prefill_chunk) < 1:
         parser.error("context, threads, steps, repeats and prefill-chunk must be positive")
-    result = benchmark(args)
+    result = portable(benchmark(args), {args.model.resolve(): "$MODEL", sys.executable: "$PYTHON"})
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2) + "\n")

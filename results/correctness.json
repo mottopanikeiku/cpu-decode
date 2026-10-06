@@ -5,7 +5,6 @@
     "verified_source": {
       "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
       "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
-      "snapshot": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
       "stored_dtype": "bfloat16",
       "files": {
         "LICENSE": {
@@ -118,7 +117,7 @@
           12,
           151936
         ],
-        "logits": "/home/alp/Projects/profile-program/cache/cpu-decode/reference/factual-reference.bin",
+        "logits": "factual-reference.bin",
         "sha256": "9dbe4b03b1a0b388d663cfb12a0e78e9c124172311d7738024d7535fe1d302f1"
       },
       {
@@ -182,7 +181,7 @@
           24,
           151936
         ],
-        "logits": "/home/alp/Projects/profile-program/cache/cpu-decode/reference/code-reference.bin",
+        "logits": "code-reference.bin",
         "sha256": "09440b9c0242d550e859340a3e6e19632f1690b04a6b9e1024a21293be2ae6dc"
       },
       {
@@ -232,7 +231,7 @@
           17,
           151936
         ],
-        "logits": "/home/alp/Projects/profile-program/cache/cpu-decode/reference/plain-reference.bin",
+        "logits": "plain-reference.bin",
         "sha256": "d0a4e35971ba19edf29d3eb99c55ce1b7276485a860e4a91eee5856395dde4df"
       },
       {
@@ -318,7 +317,7 @@
           35,
           151936
         ],
-        "logits": "/home/alp/Projects/profile-program/cache/cpu-decode/reference/chat-reference.bin",
+        "logits": "chat-reference.bin",
         "sha256": "02c68b5fd75c064932b04f4f85f46ab75c6d346449dffeb2cdca11f9044a1252"
       }
     ]
@@ -335,7 +334,7 @@
   "comparisons": [
     {
       "label": "bf16-fp32",
-      "model_directory": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+      "model_directory": "$MODEL",
       "quality_reporting_only": false,
       "passed": true,
       "prompts": [
@@ -531,7 +530,7 @@
             "kv_cache_bytes": 294912,
             "kv_capacity": 12,
             "layout": "row-major little-endian",
-            "model": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+            "model": "$MODEL",
             "prompt_tokens": [
               785,
               6722,
@@ -576,10 +575,10 @@
           },
           "commands": [
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "logits",
               "--model",
-              "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+              "$MODEL",
               "--threads",
               "1",
               "--kernel",
@@ -587,13 +586,13 @@
               "--tokens",
               "785,6722,315,9625,374,12095,13,1084,374,279,7772,3283",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/factual-bf16-fp32"
+              "external/reference/factual-bf16-fp32"
             ],
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "generate",
               "--model",
-              "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+              "$MODEL",
               "--threads",
               "1",
               "--kernel",
@@ -603,7 +602,7 @@
               "--steps",
               "8",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/factual-bf16-fp32-generated.json"
+              "external/reference/factual-bf16-fp32-generated.json"
             ]
           ]
         },
@@ -955,7 +954,7 @@
             "kv_cache_bytes": 589824,
             "kv_capacity": 24,
             "layout": "row-major little-endian",
-            "model": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+            "model": "$MODEL",
             "prompt_tokens": [
               750,
               75698,
@@ -1024,10 +1023,10 @@
           },
           "commands": [
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "logits",
               "--model",
-              "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+              "$MODEL",
               "--threads",
               "1",
               "--kernel",
@@ -1035,13 +1034,13 @@
               "--tokens",
               "750,75698,1445,982,262,421,308,366,220,17,510,286,470,308,198,262,470,75698,1445,12,16,8,488,75698",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/code-bf16-fp32"
+              "external/reference/code-bf16-fp32"
             ],
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "generate",
               "--model",
-              "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+              "$MODEL",
               "--threads",
               "1",
               "--kernel",
@@ -1051,7 +1050,7 @@
               "--steps",
               "8",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/code-bf16-fp32-generated.json"
+              "external/reference/code-bf16-fp32-generated.json"
             ]
           ]
         },
@@ -1312,7 +1311,7 @@
             "kv_cache_bytes": 417792,
             "kv_capacity": 17,
             "layout": "row-major little-endian",
-            "model": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+            "model": "$MODEL",
             "prompt_tokens": [
               32,
               2613,
@@ -1367,10 +1366,10 @@
           },
           "commands": [
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "logits",
               "--model",
-              "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+              "$MODEL",
               "--threads",
               "1",
               "--kernel",
@@ -1378,13 +1377,13 @@
               "--tokens",
               "32,2613,13940,15804,1614,14324,504,4938,13,15277,11,279,13940,646,1172,1349,279",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/plain-bf16-fp32"
+              "external/reference/plain-bf16-fp32"
             ],
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "generate",
               "--model",
-              "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+              "$MODEL",
               "--threads",
               "1",
               "--kernel",
@@ -1394,7 +1393,7 @@
               "--steps",
               "8",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/plain-bf16-fp32-generated.json"
+              "external/reference/plain-bf16-fp32-generated.json"
             ]
           ]
         },
@@ -1889,7 +1888,7 @@
             "kv_cache_bytes": 860160,
             "kv_capacity": 35,
             "layout": "row-major little-endian",
-            "model": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+            "model": "$MODEL",
             "prompt_tokens": [
               151644,
               8948,
@@ -1980,10 +1979,10 @@
           },
           "commands": [
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "logits",
               "--model",
-              "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+              "$MODEL",
               "--threads",
               "1",
               "--kernel",
@@ -1991,13 +1990,13 @@
               "--tokens",
               "151644,8948,198,2610,525,264,10950,17847,13,21806,26753,13,151645,198,151644,872,198,10234,374,279,12884,6303,30,151645,198,151644,77091,198,785,12884,374,6303,1576,432,25963",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/chat-bf16-fp32"
+              "external/reference/chat-bf16-fp32"
             ],
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "generate",
               "--model",
-              "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+              "$MODEL",
               "--threads",
               "1",
               "--kernel",
@@ -2007,7 +2006,7 @@
               "--steps",
               "8",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/chat-bf16-fp32-generated.json"
+              "external/reference/chat-bf16-fp32-generated.json"
             ]
           ]
         }
@@ -2015,7 +2014,7 @@
     },
     {
       "label": "int8",
-      "model_directory": "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+      "model_directory": "$INT8",
       "quality_reporting_only": true,
       "passed": true,
       "prompts": [
@@ -2211,7 +2210,7 @@
             "kv_cache_bytes": 294912,
             "kv_capacity": 12,
             "layout": "row-major little-endian",
-            "model": "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+            "model": "$INT8",
             "prompt_tokens": [
               785,
               6722,
@@ -2256,10 +2255,10 @@
           },
           "commands": [
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "logits",
               "--model",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+              "$INT8",
               "--threads",
               "1",
               "--kernel",
@@ -2267,13 +2266,13 @@
               "--tokens",
               "785,6722,315,9625,374,12095,13,1084,374,279,7772,3283",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/factual-int8"
+              "external/reference/factual-int8"
             ],
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "generate",
               "--model",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+              "$INT8",
               "--threads",
               "1",
               "--kernel",
@@ -2283,7 +2282,7 @@
               "--steps",
               "8",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/factual-int8-generated.json"
+              "external/reference/factual-int8-generated.json"
             ]
           ]
         },
@@ -2635,7 +2634,7 @@
             "kv_cache_bytes": 589824,
             "kv_capacity": 24,
             "layout": "row-major little-endian",
-            "model": "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+            "model": "$INT8",
             "prompt_tokens": [
               750,
               75698,
@@ -2704,10 +2703,10 @@
           },
           "commands": [
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "logits",
               "--model",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+              "$INT8",
               "--threads",
               "1",
               "--kernel",
@@ -2715,13 +2714,13 @@
               "--tokens",
               "750,75698,1445,982,262,421,308,366,220,17,510,286,470,308,198,262,470,75698,1445,12,16,8,488,75698",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/code-int8"
+              "external/reference/code-int8"
             ],
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "generate",
               "--model",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+              "$INT8",
               "--threads",
               "1",
               "--kernel",
@@ -2731,7 +2730,7 @@
               "--steps",
               "8",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/code-int8-generated.json"
+              "external/reference/code-int8-generated.json"
             ]
           ]
         },
@@ -2992,7 +2991,7 @@
             "kv_cache_bytes": 417792,
             "kv_capacity": 17,
             "layout": "row-major little-endian",
-            "model": "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+            "model": "$INT8",
             "prompt_tokens": [
               32,
               2613,
@@ -3047,10 +3046,10 @@
           },
           "commands": [
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "logits",
               "--model",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+              "$INT8",
               "--threads",
               "1",
               "--kernel",
@@ -3058,13 +3057,13 @@
               "--tokens",
               "32,2613,13940,15804,1614,14324,504,4938,13,15277,11,279,13940,646,1172,1349,279",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/plain-int8"
+              "external/reference/plain-int8"
             ],
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "generate",
               "--model",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+              "$INT8",
               "--threads",
               "1",
               "--kernel",
@@ -3074,7 +3073,7 @@
               "--steps",
               "8",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/plain-int8-generated.json"
+              "external/reference/plain-int8-generated.json"
             ]
           ]
         },
@@ -3569,7 +3568,7 @@
             "kv_cache_bytes": 860160,
             "kv_capacity": 35,
             "layout": "row-major little-endian",
-            "model": "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+            "model": "$INT8",
             "prompt_tokens": [
               151644,
               8948,
@@ -3660,10 +3659,10 @@
           },
           "commands": [
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "logits",
               "--model",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+              "$INT8",
               "--threads",
               "1",
               "--kernel",
@@ -3671,13 +3670,13 @@
               "--tokens",
               "151644,8948,198,2610,525,264,10950,17847,13,21806,26753,13,151645,198,151644,872,198,10234,374,279,12884,6303,30,151645,198,151644,77091,198,785,12884,374,6303,1576,432,25963",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/chat-int8"
+              "external/reference/chat-int8"
             ],
             [
-              "/home/alp/Projects/profile-program/work/cpu-decode/build/cpu-decode",
+              "build/cpu-decode",
               "generate",
               "--model",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/int8",
+              "$INT8",
               "--threads",
               "1",
               "--kernel",
@@ -3687,7 +3686,7 @@
               "--steps",
               "8",
               "--output",
-              "/home/alp/Projects/profile-program/cache/cpu-decode/reference/chat-int8-generated.json"
+              "external/reference/chat-int8-generated.json"
             ]
           ]
         }

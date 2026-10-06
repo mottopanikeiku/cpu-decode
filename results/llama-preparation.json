@@ -4,7 +4,6 @@
   "source_model": {
     "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
     "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
-    "snapshot": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
     "stored_dtype": "bfloat16",
     "files": {
       "LICENSE": {
@@ -69,17 +68,17 @@
     "gpu": false,
     "jobs": 4
   },
-  "converter_python": "/home/alp/Projects/profile-program/work/cpu-decode/.venv/bin/python3",
-  "bench_binary": "/home/alp/Projects/profile-program/cache/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/build/bin/llama-bench",
+  "converter_python": "$PYTHON",
+  "bench_binary": "$CACHE/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/build/bin/llama-bench",
   "quantization": "llama.cpp Q8_0, blocks of 32 weights; not the engine's per-output-channel int8 scheme",
   "artifacts": {
     "BF16": {
-      "path": "/home/alp/Projects/profile-program/cache/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-bf16.gguf",
+      "path": "$CACHE/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-bf16.gguf",
       "sha256": "794f9d6e09be1e0509d0c917e4aff89d837f3e16b852b59453894e61a9816ed2",
       "bytes": 994157056
     },
     "Q8_0": {
-      "path": "/home/alp/Projects/profile-program/cache/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+      "path": "$CACHE/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
       "sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7",
       "bytes": 531068416
     }

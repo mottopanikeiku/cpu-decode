@@ -1,7 +1,6 @@
 {
   "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
   "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
-  "snapshot": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
   "stored_dtype": "bfloat16",
   "files": {
     "LICENSE": {

@@ -1,6 +1,6 @@
 """Tokenize text at the edge; all model arithmetic runs in the C++ engine.
 
-Run under pp-run heavy. Use --chat for the pinned Qwen chat-template tokens.
+Use --chat for the pinned Qwen chat-template tokens.
 """
 from __future__ import annotations
 

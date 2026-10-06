@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prepare a pinned native CPU llama.cpp baseline from the same BF16 snapshot.
 
-Run through PP_MEM=2000M pp-run heavy; this script does not measure performance.
+This script builds and converts artifacts; it does not measure performance.
 The downloaded clone is owned by this script and shared read-only by consumers.
 """
 import os
@@ -17,11 +17,12 @@ import subprocess
 from pathlib import Path
 
 from tools.download_model import REVISION, file_hash, verify_snapshot
+from tools.portable import portable
 
 # Resolved from GitHub's commits/master API on 2026-10-06, not a moving branch.
 LLAMA_COMMIT = "6c73b3e12dc501de35fe5f6979960d06921a2f6c"
 LLAMA_URL = "https://github.com/ggml-org/llama.cpp.git"
-DEFAULT_CACHE = Path("/home/alp/Projects/profile-program/cache")
+DEFAULT_CACHE = Path("external")
 
 
 def run(command: list[str], cwd: Path | None = None) -> None:
@@ -76,6 +77,7 @@ def prepare(model: Path, cache: Path, jobs: int, output: Path) -> dict:
             "quantization": "llama.cpp Q8_0, blocks of 32 weights; not the engine's per-output-channel int8 scheme",
             "artifacts": {dtype: {"path": str(path), "sha256": file_hash(path), "bytes": path.stat().st_size} for path, dtype in [(bf16, "BF16"), (q8, "Q8_0")]},
         }
+        manifest = portable(manifest, {cache.resolve(): "$CACHE", model.resolve(): "$MODEL", sys.executable: "$PYTHON"})
         previous_path.write_text(json.dumps(manifest, indent=2) + "\n")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(manifest, indent=2) + "\n")

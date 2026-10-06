@@ -13,7 +13,6 @@ from pathlib import Path
 
 MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
 REVISION = "7ae557604adf67be50417f59c2c2f167def9a775"
-DEFAULT_HF_HOME = "/home/alp/Projects/profile-program/cache/hf"
 # Upstream identities: https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/revision/7ae557604adf67be50417f59c2c2f167def9a775?blobs=true
 FILES = {
     "LICENSE": (11343, "git-sha1", "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"),
@@ -51,19 +50,20 @@ def verify_snapshot(snapshot: Path) -> dict:
             "upstream_algorithm": algorithm,
             "upstream_digest": expected,
         }
-    return {"model_id": MODEL_ID, "revision": REVISION, "snapshot": str(snapshot.resolve()), "stored_dtype": "bfloat16", "files": records}
+    return {"model_id": MODEL_ID, "revision": REVISION, "stored_dtype": "bfloat16", "files": records}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--hf-home", type=Path, default=Path(os.environ.get("HF_HOME", DEFAULT_HF_HOME)))
+    parser.add_argument("--hf-home", type=Path, help="Optional cache override; otherwise use Hugging Face's standard environment settings")
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--output", type=Path, default=Path("results/model-manifest.json"))
     args = parser.parse_args()
-    os.environ["HF_HOME"] = str(args.hf_home.resolve())
+    if args.hf_home is not None:
+        os.environ["HF_HOME"] = str(args.hf_home.resolve())
     from huggingface_hub import snapshot_download
 
-    snapshot = Path(snapshot_download(MODEL_ID, revision=REVISION, cache_dir=str(args.hf_home / "hub"), allow_patterns=list(FILES), local_files_only=args.offline, max_workers=2))
+    snapshot = Path(snapshot_download(MODEL_ID, revision=REVISION, cache_dir=str(args.hf_home / "hub") if args.hf_home is not None else None, allow_patterns=list(FILES), local_files_only=args.offline, max_workers=2))
     manifest = verify_snapshot(snapshot)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(manifest, indent=2) + "\n")

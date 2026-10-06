@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Transformers FP32 arithmetic on BF16 weights, then native-engine comparison.
 
-Run under pp-run heavy (PP_MEM=2000M). The oracle worker exits before any
-engine is loaded. No full FP32 weight copy is retained. Raw logits live in
-shared cache; small per-position metrics and token IDs are written to JSON.
+The oracle worker exits before any engine is loaded. No full FP32 weight copy
+is retained. Raw logits stay outside git; small per-position metrics and token
+IDs are written to JSON with portable artifact locations.
 """
 import os
 import sys
@@ -20,6 +20,7 @@ import types
 from pathlib import Path
 
 from tools.download_model import MODEL_ID, REVISION, file_hash, verify_snapshot
+from tools.portable import portable
 
 
 def versions() -> dict:
@@ -104,7 +105,7 @@ def oracle_worker(args) -> None:
                 del result, row
             logits.flush()
             del logits, cache
-            records.append({"id": case["id"], "prompt_tokens": tokens, "generated_tokens": generated, "tokens": tokens + generated[:-1], "shape": [count, model.config.vocab_size], "logits": str(path.resolve()), "sha256": file_hash(path)})
+            records.append({"id": case["id"], "prompt_tokens": tokens, "generated_tokens": generated, "tokens": tokens + generated[:-1], "shape": [count, model.config.vocab_size], "logits": path.name, "sha256": file_hash(path)})
     del model
     gc.collect()
     metadata = {"model_id": MODEL_ID, "revision": REVISION, "verified_source": source_manifest, "weight_storage": "bfloat16", "arithmetic": args.arithmetic, "attention": "Transformers eager", "kv_dtype": "float32" if args.arithmetic == "fp32" else "bfloat16", "head_chunk_rows": args.head_chunk if args.arithmetic == "fp32" else None, "threads": args.threads, "steps": args.steps, "stop_on_eos": False, "versions": versions(), "prompts": records}
@@ -144,7 +145,7 @@ def compare_engine(args, oracle: dict, model: Path, label: str) -> dict:
         metadata = json.loads(prefix.with_suffix(".json").read_text())
         if metadata["shape"] != case["shape"] or metadata["tokens"] != case["tokens"]:
             raise ValueError("Engine logits metadata does not match reference inputs")
-        reference = np.memmap(case["logits"], dtype="<f4", mode="r", shape=tuple(case["shape"]))
+        reference = np.memmap(args.raw_dir / case["logits"], dtype="<f4", mode="r", shape=tuple(case["shape"]))
         candidate = np.memmap(prefix.with_suffix(".bin"), dtype="<f4", mode="r", shape=tuple(case["shape"]))
         metrics = position_metrics(reference, candidate, args.atol, args.rtol)
         del reference, candidate
@@ -189,7 +190,7 @@ def main() -> None:
     parser.add_argument("--prompts", type=Path, default=Path("configs/prompts.json"))
     parser.add_argument("--tokens-file", type=Path)
     parser.add_argument("--output", type=Path, default=Path("results/correctness.json"))
-    parser.add_argument("--raw-dir", type=Path, default=Path("/home/alp/Projects/profile-program/cache/cpu-decode/reference"))
+    parser.add_argument("--raw-dir", type=Path, default=Path("external/reference"))
     parser.add_argument("--arithmetic", choices=("fp32", "bf16"), default="fp32")
     parser.add_argument("--head-chunk", type=int, default=1024)
     parser.add_argument("--threads", type=int, default=1)
@@ -211,6 +212,10 @@ def main() -> None:
         oracle_worker(args)
         return
     result = run_comparison(args)
+    locations = {args.model.resolve(): "$MODEL", args.engine.resolve(): "build/cpu-decode", args.raw_dir.resolve(): "$RAW"}
+    if args.quant_model is not None:
+        locations[args.quant_model.resolve()] = "$INT8"
+    result = portable(result, locations)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))

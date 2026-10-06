@@ -1,4 +1,4 @@
-"""Run one bounded timing slice; invoke this script through pp-run bench."""
+"""Run one timing slice and record portable commands plus individual repeats."""
 from __future__ import annotations
 
 import argparse
@@ -11,14 +11,16 @@ from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
 
+from tools.portable import portable
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TOKENS = ",".join(map(str, json.loads((ROOT / "configs" / "prompts.json").read_text())["benchmark"]["seed_token_ids"]))
 
 
-def execute(command: list[str], destination: Path) -> dict | list:
+def execute(command: list[str], destination: Path, locations: dict) -> dict | list:
     completed = subprocess.run(command, cwd=ROOT, check=True, text=True, capture_output=True)
-    destination.with_suffix(".stderr.txt").write_text(completed.stderr)
-    data = json.loads(completed.stdout)
+    destination.with_suffix(".stderr.txt").write_text(portable(completed.stderr, locations))
+    data = portable(json.loads(completed.stdout), locations)
     destination.write_text(json.dumps(data, indent=2) + "\n")
     return data
 
@@ -43,12 +45,15 @@ def main() -> None:
         parser.error("--model is required for this stage")
     if args.stage == "llama" and args.llama is None:
         parser.error("--llama is required")
-    if not Path("/home/alp/Projects/profile-program/locks/QUIET").exists():
-        parser.error("timings must run through pp-run bench")
     threads = [int(x) for x in args.threads.split(",")]
     contexts = [int(x) for x in args.contexts.split(",")]
     kernels = args.kernels.split(",")
     args.output.mkdir(parents=True, exist_ok=True)
+    locations = {}
+    if args.model is not None:
+        locations[args.model.resolve()] = "$MODEL"
+    if args.llama is not None:
+        locations[args.llama.resolve()] = "$LLAMA_BENCH"
     environment = {
         "started_utc": datetime.now(timezone.utc).isoformat(),
         "platform": platform.platform(),
@@ -81,12 +86,12 @@ def main() -> None:
                     command = [sys.executable, str(ROOT / "tools" / "benchmark_eager.py"),
                                "--model", str(args.model), "--threads", str(thread), "--context", str(context),
                                "--steps", str(args.steps), "--repeats", str(args.repeats), "--tokens", args.tokens]
-                data = execute(command, path)
+                data = execute(command, path, locations)
                 records.append({"name": name, "command": command, "file": str(path.relative_to(ROOT)), "data": data})
                 print(name, flush=True)
     environment_name = f"environment-{args.stage}-t{args.threads}-c{args.contexts}-k{args.kernels}-rope{args.rope}.json"
     (args.output / environment_name).write_text(
-        json.dumps({"environment": environment, "records": [{k: v for k, v in x.items() if k != "data"} for x in records]}, indent=2) + "\n"
+        json.dumps(portable({"environment": environment, "records": [{k: v for k, v in x.items() if k != "data"} for x in records]}, locations), indent=2) + "\n"
     )
 
 
