@@ -84,3 +84,30 @@ Re-read `tools/reference.py:197`: its argparse choices now explicitly include `s
 The refreshed `results/quality-summary.json` records x4 maximum absolute unquantized logit error **0.0004389286**, all 88 positions within tolerance and 32/32 greedy tokens matching. Int8 prompt-only agreement remains 57/60, with mean KL **0.0287933171** and maximum KL **0.7896918149**; including reference continuations gives 85/88 agreement and mean KL **0.0200647228**. These replace the pre-extension numbers for claims about the current default. Int8 quality remains reporting-only.
 
 This is source/result-file inspection, not independent reproduction. Parent-reported native/integration outcomes were not rerun. No reviewer tests, builds or benchmarks were executed. Final timing results and README still require their separate review.
+
+
+## Publication-location cutover review
+
+Read `tools/portable.py` and its tests, download/reference/quantize/prepare_llama/measure/benchmark_eager, Make, MEASUREMENTS, and the published artifact manifests. No builds/tests/formatters, downloads, model work or benchmarks were run.
+
+**P2 found during the publication cutover — resolved below.** `tools/portable.py:14-16` replaces substrings in every string, while `tools/quantize.py:42-45` adds the literal recorded model/output operands as aliases. A valid pinned snapshot supplied as `--source a` inserts the relative string `a` into the replacement map. Every matching hexadecimal `a` in source/output hashes is then replaced by `$MODEL`; even the recorded `quantize` command word is altered. A relative source named `model` also turns the intended `weights.path` value `model.safetensors` into `$MODEL.safetensors`. This is a provenance/reproduction failure, not cosmetic path normalization, and contradicts the documented preservation of hashes and flags. Canonicalize command paths before constructing aliases, and match only actual path values or path-boundary-aware occurrences. Add a short-relative-name regression requiring hash values and non-path strings to remain identical. Current helper tests cover nested absolute paths and ordinary numeric values, not this case.
+
+The other traced boundary changes are coherent at source level: download defaults delegate to Hugging Face cache settings, Make obtains the same hub-cache constant, large local outputs default to ignored `external/`, oracle raw-logit producers now emit basenames and the comparison consumer joins them with `args.raw_dir`, and publication conversion happens after actual subprocess execution. llama artifact reuse checks actual cache files against hashes rather than attempting to open its published `$CACHE` aliases. Numeric observations retain numeric types, and the previously reviewed source-identity checks remain in place. No further concrete cutover defect was established in this inspection.
+
+Public timing scripts no longer require the workstation-specific wrapper; this is an intentional portability change. This review does not establish what scheduling was actually used for future measurements or interpret unpublished timings. All five earlier findings remain resolved; the unrestricted substitution above is the only new open finding.
+
+
+### Recorded public-command verification
+
+Re-read the publication-hygiene requirement and kept this review free of host-specific paths and internal tool/project names. `results/checks.json` records native checks 3 passed/0 failed, fast Python checks 13 passed/2 explicitly optional model skips, model-specific checks 11 passed/0 skipped, and the full x4 oracle comparison passed. These are parent-reported, file-recorded outcomes; this reviewer independently executed none of them.
+
+The current portability helper and quantizer still contain the unrestricted relative-substring substitution described above. Passing the recorded default-location checks does not resolve that concrete alternative-directory failure. No new finding is added, and the P2 cutover finding remains open pending a source correction and targeted regression.
+
+
+### Publication disposition: resolved
+
+Re-read the correction in `tools/portable.py`: every location-map key is resolved to an absolute path, so a relative directory name such as `a` cannot become a global replacement for hexadecimal characters or command words. Re-read `tools/quantize.py`: model/output aliases and the executable label are now assigned only to their known command-list slots; literal relative operands are no longer inserted as substring aliases. `weights.path` remains the intended basename, and hashes are left untouched by these changes.
+
+The new `test_relative_aliases_cannot_rewrite_hashes_or_command_words` checks an all-`a` hexadecimal value, relative command operands, and a real absolute path in the same record; it requires preservation of the first two while transforming the path. This source regression addresses the reported trigger. No additional actionable defect was established in the fix, and all six findings are now resolved at source level.
+
+No tests, builds, formatters, downloads, model loads or benchmarks were run by this reviewer. Updated command outcomes remain the parent responsibility; final throughput/README interpretation has not yet been reviewed.
