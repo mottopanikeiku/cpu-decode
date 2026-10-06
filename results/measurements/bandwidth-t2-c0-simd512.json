@@ -1,0 +1,22 @@
+{
+  "kind": "read_bandwidth",
+  "kernel": "simd512",
+  "threads": 2,
+  "array_bytes": 268435456,
+  "passes": 128,
+  "samples": [
+    {
+      "seconds": 0.837347,
+      "GB_per_s": 41.0341
+    },
+    {
+      "seconds": 0.826878,
+      "GB_per_s": 41.5536
+    },
+    {
+      "seconds": 0.827794,
+      "GB_per_s": 41.5076
+    }
+  ],
+  "checksum": 0
+}
