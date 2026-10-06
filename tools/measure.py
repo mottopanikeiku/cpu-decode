@@ -30,13 +30,15 @@ def main() -> None:
     parser.add_argument("--llama", type=Path)
     parser.add_argument("--threads", default="1,2,4,6,12")
     parser.add_argument("--contexts", default="128,1024,4096")
-    parser.add_argument("--kernels", default="simd512")
+    parser.add_argument("--kernels")
     parser.add_argument("--rope", choices=["cached", "direct"], default="cached")
     parser.add_argument("--steps", type=int, default=16)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--tokens", default=DEFAULT_TOKENS)
     parser.add_argument("--output", type=Path, default=ROOT / "results" / "measurements")
     args = parser.parse_args()
+    if args.kernels is None:
+        args.kernels = "simd512" if args.stage == "bandwidth" else "simd512x4"
     if args.stage != "bandwidth" and args.model is None:
         parser.error("--model is required for this stage")
     if args.stage == "llama" and args.llama is None:

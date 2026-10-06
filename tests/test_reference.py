@@ -98,7 +98,7 @@ def integration(tmp_path: Path, quantized: bool) -> dict:
     model = model_path()
     engine = Path(os.environ.get("CPU_DECODE_ENGINE", str(root / "build" / "cpu-decode")))
     if not engine.exists():
-        pytest.skip("Native engine absent; build before full-model integration")
+        pytest.fail(f"Explicitly requested native engine does not exist: {engine}")
     output = tmp_path / "metrics.json"
     command = [sys.executable, "-m", "tools.reference", "--model", str(model), "--engine", str(engine), "--steps", "8", "--threads", "1", "--kernel", os.environ.get("CPU_DECODE_KERNEL", "scalar"), "--output", str(output), "--raw-dir", str(tmp_path / "raw")]
     if quantized:
@@ -136,3 +136,30 @@ def test_pinned_int8_per_position_top1_and_kl(tmp_path) -> None:
             assert np.isfinite(row["kl_reference_candidate_nats"])
             assert row["kl_reference_candidate_nats"] >= 0.0
             assert isinstance(row["top1_match"], bool)
+    # Cross-check the produced file with the official parser, not only our loader.
+    from safetensors import safe_open
+
+    path = Path(os.environ["CPU_DECODE_QUANT_MODEL"]) / "model.safetensors"
+    with safe_open(path, framework="numpy") as stored:
+        assert "lm_head.weight" not in stored.keys()
+        assert stored.metadata()["quantization"] == "symmetric-per-row-int8"
+        assert stored.get_slice("model.embed_tokens.weight").get_shape() == [151936, 896]
+        assert stored.get_tensor("model.layers.0.self_attn.k_proj.weight").dtype == np.int8
+        assert stored.get_tensor("model.embed_tokens.weight.scales").dtype == np.float32
+
+
+def test_explicit_integration_rejects_missing_engine(tmp_path, monkeypatch) -> None:
+    (tmp_path / "model.safetensors").write_bytes(b"")
+    monkeypatch.setenv("CPU_DECODE_MODEL", str(tmp_path))
+    monkeypatch.setenv("CPU_DECODE_ENGINE", str(tmp_path / "missing-engine"))
+    with pytest.raises(pytest.fail.Exception, match="Explicitly requested native engine"):
+        integration(tmp_path, False)
+
+
+def test_oracle_rejects_edited_snapshot_before_loading(tmp_path) -> None:
+    from types import SimpleNamespace
+    from tools.reference import oracle_worker
+
+    (tmp_path / "LICENSE").write_text("not the pinned license")
+    with pytest.raises(ValueError, match="Pinned model checksum mismatch"):
+        oracle_worker(SimpleNamespace(model=tmp_path))

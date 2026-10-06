@@ -23,7 +23,7 @@ def main() -> None:
     parser.add_argument("--input", type=Path, default=Path("results/measurements"))
     parser.add_argument("--ablations", type=Path, default=Path("results/ablations"))
     parser.add_argument("--output", type=Path, default=Path("results"))
-    parser.add_argument("--kernel", default="simd512")
+    parser.add_argument("--kernel", default="simd512x4")
     args = parser.parse_args()
     bandwidth = {}
     bandwidth_rows = []
@@ -53,6 +53,9 @@ def main() -> None:
             raise ValueError(f"Expected one matching llama test in {llama_path}")
         llama_rate = spread(matches[0]["samples_ts"])
         eager = load(eager_path)
+        expected = {"threads": thread, "context": context, "steps": raw["steps"], "seed_token_ids": raw["prompt_tokens"]}
+        if any(eager.get(key) != value for key, value in expected.items()):
+            raise ValueError(f"Eager settings do not match engine inputs in {eager_path}")
         eager_rate = spread([r["tokens_per_second"] for r in eager["samples"]])
         operation_medians = {key: statistics.median(s["operation_seconds"][key] / raw["steps"] for s in raw["samples"])
                              for key in raw["samples"][0]["operation_seconds"]}
@@ -78,7 +81,8 @@ def main() -> None:
             ("Int8 weights", ("bf16", "scalar", "cached"), ("int8", "scalar", "cached")),
             ("SIMD256", ("int8", "scalar", "cached"), ("int8", "simd256", "cached")),
             ("SIMD512 instead of SIMD256", ("int8", "simd256", "cached"), ("int8", "simd512", "cached")),
-            ("Cached RoPE", ("int8", "simd512", "direct"), ("int8", "simd512", "cached")),
+            ("Four SIMD512 accumulators", ("int8", "simd512", "cached"), ("int8", "simd512x4", "cached")),
+            ("Cached RoPE", ("int8", "simd512x4", "direct"), ("int8", "simd512x4", "cached")),
         ]
         for change, before, after in pairs:
             if before in variants and after in variants:

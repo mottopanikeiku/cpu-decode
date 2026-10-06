@@ -8,8 +8,12 @@ find_package(OpenMP REQUIRED)
 find_package(nlohmann_json 3.11.3 QUIET)
 if(NOT nlohmann_json_FOUND)
   include(FetchContent)
+  if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+  endif()
   FetchContent_Declare(nlohmann_json
-    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    URL_HASH SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d)
   set(JSON_BuildTests OFF CACHE INTERNAL "")
   FetchContent_MakeAvailable(nlohmann_json)
 endif()

@@ -11,7 +11,7 @@
 namespace decode {
 using Json = nlohmann::json;
 enum class DType { bf16, f32, i8 };
-enum class Kernel { scalar, simd256, simd512 };
+enum class Kernel { scalar, simd256, simd512, simd512x4 };
 Kernel parse_kernel(const std::string& name);
 std::string kernel_name(Kernel kernel);
 float bf16_float(uint16_t value);

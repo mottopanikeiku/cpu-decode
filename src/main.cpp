@@ -47,7 +47,7 @@ void emit(const Json& json, const std::string& path) {
 }
 void usage() {
     std::cout << "cpu-decode quantize --model HF_SNAPSHOT --output INT8_DIR\n"
-                 "cpu-decode logits --model DIR --tokens ID,ID --output PREFIX [--threads N --kernel scalar|simd256|simd512]\n"
+                 "cpu-decode logits --model DIR --tokens ID,ID --output PREFIX [--threads N --kernel scalar|simd256|simd512|simd512x4]\n"
                  "cpu-decode generate --model DIR --tokens ID,ID --steps N [--output JSON --threads N --kernel ...]\n"
                  "cpu-decode bench --model DIR --tokens ID,ID --context N --steps N --repeats N [--output JSON --threads N --kernel ...]\n"
                  "All forward modes accept --rope cached|direct (default cached).\n"

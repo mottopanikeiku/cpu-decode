@@ -26,10 +26,11 @@ prepare: build
 	$(MAKE) correctness
 
 correctness:
-	PP_MEM=2000M $(HEAVY) uv run python -m tools.reference --model $(MODEL) --quant-model $(QUANT) --engine build/cpu-decode --kernel simd512 --output results/correctness.json
+	PP_MEM=2000M $(HEAVY) uv run python -m tools.reference --model $(MODEL) --quant-model $(QUANT) --engine build/cpu-decode --kernel simd512x4 --output results/correctness.json
+	nice -n 19 uv run python -m tools.summarize_quality
 
 model-test:
-	CPU_DECODE_MODEL=$(MODEL) CPU_DECODE_QUANT_MODEL=$(QUANT) CPU_DECODE_KERNEL=simd512 PP_MEM=2000M $(HEAVY) uv run pytest -q tests/test_reference.py
+	CPU_DECODE_MODEL=$(MODEL) CPU_DECODE_QUANT_MODEL=$(QUANT) CPU_DECODE_KERNEL=simd512x4 PP_MEM=2000M $(HEAVY) uv run pytest -q tests/test_reference.py
 
 test:
 	nice -n 19 ctest --test-dir build --output-on-failure
@@ -43,7 +44,7 @@ measure:
 	  $(BENCH) uv run python -m tools.measure llama --model $(GGUF) --llama $(LLAMA_BIN) --contexts $$context || exit $$?; \
 	  $(BENCH) uv run python -m tools.measure eager --model $(MODEL) --contexts $$context || exit $$?; \
 	done
-	$(BENCH) uv run python -m tools.measure engine --model $(QUANT) --threads 6 --contexts 128 --kernels scalar,simd256,simd512 --output results/ablations/int8-cached
+	$(BENCH) uv run python -m tools.measure engine --model $(QUANT) --threads 6 --contexts 128 --kernels scalar,simd256,simd512,simd512x4 --output results/ablations/int8-cached
 	$(BENCH) uv run python -m tools.measure engine --model $(MODEL) --threads 6 --contexts 128 --kernels scalar --output results/ablations/bf16-cached
-	$(BENCH) uv run python -m tools.measure engine --model $(QUANT) --threads 6 --contexts 128 --kernels simd512 --rope direct --output results/ablations/int8-direct
+	$(BENCH) uv run python -m tools.measure engine --model $(QUANT) --threads 6 --contexts 128 --kernels simd512x4 --rope direct --output results/ablations/int8-direct
 	nice -n 19 uv run python -m tools.summarize

@@ -115,8 +115,12 @@ struct Store {
                 intervals.emplace_back(begin, end);
             }
             std::sort(intervals.begin(), intervals.end());
-            for (size_t j = 1; j < intervals.size(); ++j)
-                if (intervals[j].first < intervals[j - 1].second) throw std::runtime_error("overlapping tensors");
+            size_t covered = 0;
+            for (const auto& interval : intervals) {
+                if (interval.first != covered) throw std::runtime_error("gapped or overlapping safetensors payload");
+                covered = interval.second;
+            }
+            if (covered != mapping->length - origin) throw std::runtime_error("unindexed safetensors payload");
             mappings.push_back(std::move(mapping));
         }
     }
@@ -353,7 +357,11 @@ void quantize_model(const std::string& source, const std::string& output) {
     { Engine validate(source, Kernel::scalar, 1, 1); }
     Store store(src);
     if (fs::exists(dst / "model.safetensors") || fs::exists(dst / "config.json")) throw std::runtime_error("quantization output already contains a model");
-    for (const auto& item : store.tensors) if (item.second.type != DType::bf16) throw std::runtime_error("quantization input must be BF16");
+    for (const auto& item : store.tensors) {
+        if (item.second.type != DType::bf16) throw std::runtime_error("quantization input must be BF16");
+        if (item.second.shape.size() == 2 && item.second.count() % 4)
+            throw std::runtime_error("int8 matrices must contain a multiple of four elements");
+    }
     if (store.tensors.count("lm_head.weight")) throw std::runtime_error("duplicate tied head in input");
     Json header;
     uint64_t offset = 0;
@@ -365,8 +373,6 @@ void quantize_model(const std::string& source, const std::string& output) {
         const Tensor& t = item.second;
         if (t.shape.size() == 2) {
             add(item.first, "I8", t.shape, t.count());
-            // Float scales require alignment even for synthetic odd-size matrices.
-            offset = (offset + 3) & ~uint64_t(3);
             add(item.first + ".scales", "F32", {t.shape[0]}, t.shape[0] * 4);
         } else add(item.first, "F32", t.shape, t.count() * 4);
     }
@@ -380,7 +386,6 @@ void quantize_model(const std::string& source, const std::string& output) {
         if (!out) throw std::runtime_error("cannot create quantized model");
         uint64_t header_size = encoded.size();
         out.write(reinterpret_cast<const char*>(&header_size), 8); out.write(encoded.data(), encoded.size());
-        uint64_t written = 0;
         for (const auto& item : store.tensors) {
             const Tensor& t = item.second;
             if (t.shape.size() == 2) {
@@ -391,16 +396,13 @@ void quantize_model(const std::string& source, const std::string& output) {
                     quantize_row(row.data(), row.size(), quantized.data(), scales[r]);
                     out.write(reinterpret_cast<const char*>(quantized.data()), quantized.size());
                 }
-                written += t.count();
-                while (written % 4) { out.put('\0'); ++written; }
-                out.write(reinterpret_cast<const char*>(scales.data()), scales.size() * 4); written += scales.size() * 4;
+                out.write(reinterpret_cast<const char*>(scales.data()), scales.size() * 4);
             } else {
                 for (size_t j = 0; j < t.count(); ++j) {
                     float value = t.at(j);
                     if (!std::isfinite(value)) throw std::runtime_error("nonfinite model vector");
                     out.write(reinterpret_cast<const char*>(&value), 4);
                 }
-                written += t.count() * 4;
             }
             if (!out) throw std::runtime_error("quantization write failed");
         }

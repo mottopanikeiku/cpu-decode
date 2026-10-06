@@ -19,7 +19,7 @@ def main() -> None:
     parser.add_argument("--chat", action="store_true")
     parser.add_argument("--steps", type=int, default=32)
     parser.add_argument("--threads", type=int, default=6)
-    parser.add_argument("--kernel", choices=["scalar", "simd256", "simd512"], default="simd512")
+    parser.add_argument("--kernel", choices=["scalar", "simd256", "simd512", "simd512x4"], default="simd512x4")
     args = parser.parse_args()
     from tokenizers import Tokenizer
 

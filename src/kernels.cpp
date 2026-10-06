@@ -49,22 +49,41 @@ static float dot256(const Matrix& m, size_t row, const float* x) {
     for (; j < m.cols; ++j) total += value(m, start + j) * x[j];
     return m.dtype == DType::i8 ? total * m.scales[row] : total;
 }
+__attribute__((target("avx512f,avx512bw"), always_inline))
+static inline __m512 load512(const Matrix& m, size_t index) {
+    if (m.dtype == DType::bf16) {
+        auto bits = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(static_cast<const uint16_t*>(m.data) + index));
+        return _mm512_castsi512_ps(_mm512_slli_epi32(_mm512_cvtepu16_epi32(bits), 16));
+    }
+    if (m.dtype == DType::i8) {
+        auto bits = _mm_loadu_si128(reinterpret_cast<const __m128i*>(static_cast<const int8_t*>(m.data) + index));
+        return _mm512_cvtepi32_ps(_mm512_cvtepi8_epi32(bits));
+    }
+    return _mm512_loadu_ps(static_cast<const float*>(m.data) + index);
+}
 __attribute__((target("avx512f,avx512bw")))
 static float dot512(const Matrix& m, size_t row, const float* x) {
     size_t j = 0, start = row * m.cols;
     __m512 sum = _mm512_setzero_ps();
-    for (; j + 16 <= m.cols; j += 16) {
-        __m512 w;
-        if (m.dtype == DType::bf16) {
-            auto bits = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(static_cast<const uint16_t*>(m.data) + start + j));
-            w = _mm512_castsi512_ps(_mm512_slli_epi32(_mm512_cvtepu16_epi32(bits), 16));
-        } else if (m.dtype == DType::i8) {
-            auto bits = _mm_loadu_si128(reinterpret_cast<const __m128i*>(static_cast<const int8_t*>(m.data) + start + j));
-            w = _mm512_cvtepi32_ps(_mm512_cvtepi8_epi32(bits));
-        } else w = _mm512_loadu_ps(static_cast<const float*>(m.data) + start + j);
-        sum = _mm512_add_ps(sum, _mm512_mul_ps(w, _mm512_loadu_ps(x + j)));
-    }
+    for (; j + 16 <= m.cols; j += 16)
+        sum = _mm512_add_ps(sum, _mm512_mul_ps(load512(m, start + j), _mm512_loadu_ps(x + j)));
     float total = _mm512_reduce_add_ps(sum);
+    for (; j < m.cols; ++j) total += value(m, start + j) * x[j];
+    return m.dtype == DType::i8 ? total * m.scales[row] : total;
+}
+__attribute__((target("avx512f,avx512bw")))
+static float dot512x4(const Matrix& m, size_t row, const float* x) {
+    size_t j = 0, start = row * m.cols;
+    __m512 a = _mm512_setzero_ps(), b = a, c = a, d = a;
+    for (; j + 64 <= m.cols; j += 64) {
+        a = _mm512_add_ps(a, _mm512_mul_ps(load512(m, start + j), _mm512_loadu_ps(x + j)));
+        b = _mm512_add_ps(b, _mm512_mul_ps(load512(m, start + j + 16), _mm512_loadu_ps(x + j + 16)));
+        c = _mm512_add_ps(c, _mm512_mul_ps(load512(m, start + j + 32), _mm512_loadu_ps(x + j + 32)));
+        d = _mm512_add_ps(d, _mm512_mul_ps(load512(m, start + j + 48), _mm512_loadu_ps(x + j + 48)));
+    }
+    for (; j + 16 <= m.cols; j += 16)
+        a = _mm512_add_ps(a, _mm512_mul_ps(load512(m, start + j), _mm512_loadu_ps(x + j)));
+    float total = _mm512_reduce_add_ps(_mm512_add_ps(_mm512_add_ps(a, b), _mm512_add_ps(c, d)));
     for (; j < m.cols; ++j) total += value(m, start + j) * x[j];
     return m.dtype == DType::i8 ? total * m.scales[row] : total;
 }
@@ -75,11 +94,15 @@ Kernel parse_kernel(const std::string& name) {
     __builtin_cpu_init();
     if (name == "simd256" && __builtin_cpu_supports("avx2")) return Kernel::simd256;
     if (name == "simd512" && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw")) return Kernel::simd512;
+    if (name == "simd512x4" && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw")) return Kernel::simd512x4;
 #endif
     throw std::runtime_error("unknown or unsupported kernel: " + name);
 }
 std::string kernel_name(Kernel k) {
-    return k == Kernel::scalar ? "scalar" : k == Kernel::simd256 ? "simd256" : "simd512";
+    if (k == Kernel::scalar) return "scalar";
+    if (k == Kernel::simd256) return "simd256";
+    if (k == Kernel::simd512) return "simd512";
+    return "simd512x4";
 }
 void matvec(const Matrix& m, const float* x, float* y, Kernel kernel, int threads) {
     if (!m.data || !m.rows || !m.cols || (m.dtype == DType::i8 && !m.scales) || threads < 1)
@@ -88,6 +111,7 @@ void matvec(const Matrix& m, const float* x, float* y, Kernel kernel, int thread
 #ifdef DECODE_X86
     if (kernel == Kernel::simd256) dot = dot256;
     if (kernel == Kernel::simd512) dot = dot512;
+    if (kernel == Kernel::simd512x4) dot = dot512x4;
 #else
     if (kernel != Kernel::scalar) throw std::runtime_error("SIMD requires x86");
 #endif

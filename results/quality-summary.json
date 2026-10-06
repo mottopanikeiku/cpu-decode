@@ -1,0 +1,40 @@
+{
+  "source_passed": true,
+  "oracle": "fp32",
+  "tolerance": {
+    "atol": 0.003,
+    "rtol": 0.0003,
+    "unquantized_requires_exact_greedy": true,
+    "quant_max_position_kl_nats": null,
+    "quant_min_top1_agreement": null,
+    "quant_greedy_match_is_diagnostic": true
+  },
+  "fixed_prompts": 4,
+  "unquantized": {
+    "max_abs_logit_error": 0.00043892860412597656,
+    "positions": 88,
+    "allclose": true,
+    "greedy_tokens": 32,
+    "greedy_matching_tokens": 32,
+    "all_greedy_sequences_identical": true
+  },
+  "quantized": {
+    "prompt_only": {
+      "positions": 60,
+      "top1_matches": 57,
+      "top1_agreement": 0.95,
+      "mean_kl_reference_candidate_nats": 0.028793317107566125,
+      "max_kl_reference_candidate_nats": 0.789691814931885
+    },
+    "prompt_and_reference_continuation": {
+      "positions": 88,
+      "top1_matches": 85,
+      "top1_agreement": 0.9659090909090909,
+      "mean_kl_reference_candidate_nats": 0.02006472282412742,
+      "max_kl_reference_candidate_nats": 0.789691814931885
+    },
+    "greedy_sequences_matching": 4,
+    "quality_is_reporting_only": true
+  },
+  "source": "results/correctness.json"
+}

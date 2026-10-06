@@ -19,9 +19,12 @@ void near(double a, double b, double tolerance, const std::string& what) {
     if (!std::isfinite(a) || !std::isfinite(b) || std::abs(a - b) > tolerance)
         throw std::runtime_error(what + ": " + std::to_string(a) + " vs " + std::to_string(b));
 }
-void fails(const std::function<void()>& operation, const std::string& what) {
+void fails(const std::function<void()>& operation, const std::string& what, const std::string& expected = "") {
     bool failed = false;
-    try { operation(); } catch (const std::exception&) { failed = true; }
+    try { operation(); } catch (const std::exception& error) {
+        failed = true;
+        require(expected.empty() || std::string(error.what()).find(expected) != std::string::npos, what + ": wrong exception");
+    }
     require(failed, what);
 }
 uint16_t to_bf16(float x) {
@@ -30,7 +33,7 @@ uint16_t to_bf16(float x) {
 }
 std::vector<decode::Kernel> kernels() {
     std::vector<decode::Kernel> out{decode::Kernel::scalar};
-    for (const auto& name : {"simd256", "simd512"}) {
+    for (const auto& name : {"simd256", "simd512", "simd512x4"}) {
         try { out.push_back(decode::parse_kernel(name)); }
         catch (const std::exception&) { std::cout << "skip unavailable " << name << '\n'; }
     }
@@ -48,7 +51,7 @@ void numeric_tests() {
         near(rotated[4 * h + j], original[4 * h + j] * std::cos(angle) - original[4 * h + j + 2] * std::sin(angle), 3e-6, "split-half RoPE first");
         near(rotated[4 * h + j + 2], original[4 * h + j] * std::sin(angle) + original[4 * h + j + 2] * std::cos(angle), 3e-6, "split-half RoPE second");
     }
-    constexpr size_t rows = 9, cols = 35;
+    constexpr size_t rows = 9, cols = 147;
     std::vector<float> matrix(rows * cols), input(cols), baseline(rows), result(rows), scales(rows);
     std::vector<uint16_t> bf16(matrix.size()); std::vector<int8_t> quantized(matrix.size());
     for (size_t j = 0; j < matrix.size(); ++j) { matrix[j] = std::sin(float(j) * 0.7f) * 0.4f; bf16[j] = to_bf16(matrix[j]); }
@@ -112,21 +115,21 @@ struct Fixture {
     fs::path path;
     std::map<std::string, std::vector<float>> weights;
     std::map<std::string, std::vector<size_t>> shapes;
-    explicit Fixture(const fs::path& directory) : path(directory) {
+    explicit Fixture(const fs::path& directory, size_t hidden = 8, size_t heads = 2) : path(directory) {
         fs::create_directories(path);
         Json config{{"model_type", "qwen2"}, {"tie_word_embeddings", true}, {"hidden_act", "silu"},
-            {"hidden_size", 8}, {"intermediate_size", 12}, {"num_hidden_layers", 1}, {"num_attention_heads", 2},
+            {"hidden_size", hidden}, {"intermediate_size", 12}, {"num_hidden_layers", 1}, {"num_attention_heads", heads},
             {"num_key_value_heads", 1}, {"vocab_size", 11}, {"max_position_embeddings", 32}, {"rms_norm_eps", 1e-6}, {"rope_theta", 10000}};
         std::ofstream(path / "config.json") << config.dump();
-        add("model.embed_tokens.weight", {11, 8}); add("model.norm.weight", {8}, true);
+        add("model.embed_tokens.weight", {11, hidden}); add("model.norm.weight", {hidden}, true);
         std::string b = "model.layers.0.";
-        add(b + "input_layernorm.weight", {8}, true); add(b + "post_attention_layernorm.weight", {8}, true);
+        add(b + "input_layernorm.weight", {hidden}, true); add(b + "post_attention_layernorm.weight", {hidden}, true);
         for (const auto& name : {"q_proj", "k_proj", "v_proj", "o_proj"}) {
-            size_t rows = std::string(name) == "k_proj" || std::string(name) == "v_proj" ? 4 : 8;
-            add(b + "self_attn." + name + ".weight", {rows, 8});
+            size_t rows = std::string(name) == "k_proj" || std::string(name) == "v_proj" ? hidden / heads : hidden;
+            add(b + "self_attn." + name + ".weight", {rows, hidden});
             if (std::string(name) != "o_proj") add(b + "self_attn." + name + ".bias", {rows});
         }
-        add(b + "mlp.gate_proj.weight", {12, 8}); add(b + "mlp.up_proj.weight", {12, 8}); add(b + "mlp.down_proj.weight", {8, 12});
+        add(b + "mlp.gate_proj.weight", {12, hidden}); add(b + "mlp.up_proj.weight", {12, hidden}); add(b + "mlp.down_proj.weight", {hidden, 12});
         Json header; uint64_t offset = 0;
         for (const auto& item : weights) {
             uint64_t bytes = item.second.size() * 2;
@@ -228,6 +231,9 @@ void engine_tests(const fs::path& root) {
     decode::quantize_model((root / "bf16").string(), (root / "int8").string());
     fixture.quantize_reference(); check(root / "int8");
     fails([&] { decode::quantize_model((root / "bf16").string(), (root / "int8").string()); }, "output overwrite rejected");
+    Fixture odd(root / "odd", 6, 3);
+    fails([&] { decode::quantize_model((root / "odd").string(), (root / "odd-int8").string()); }, "unalignable int8 matrix rejected", "multiple of four");
+    require(!fs::exists(root / "odd-int8"), "unsupported shape must not leave output");
     fails([&] { decode::Engine engine((root / "missing").string(), decode::Kernel::scalar, 1, 4); }, "missing model rejected");
     fails([&] { decode::Engine engine((root / "bf16").string(), decode::Kernel::scalar, 0, 4); }, "zero threads rejected");
     fails([&] { decode::Engine engine((root / "bf16").string(), decode::Kernel::scalar, 1, 33); }, "oversize capacity rejected");
@@ -238,12 +244,12 @@ void engine_tests(const fs::path& root) {
     fails([&] { decode::Engine engine((root / "bad").string(), decode::Kernel::scalar, 1, 4); }, "truncated file rejected");
     { std::ofstream bad(root / "bad/model.safetensors", std::ios::binary); uint64_t n = 1000000; bad.write(reinterpret_cast<const char*>(&n), 8); }
     fails([&] { decode::Engine engine((root / "bad").string(), decode::Kernel::scalar, 1, 4); }, "oversize header rejected");
-    auto malformed = [&](const Json& header, const std::string& message) {
+    auto malformed = [&](const Json& header, const std::string& message, const std::string& expected = "") {
         std::string encoded = header.dump(); while (encoded.size() % 8) encoded += ' ';
         { std::ofstream bad(root / "bad/model.safetensors", std::ios::binary);
           uint64_t n = encoded.size(); bad.write(reinterpret_cast<const char*>(&n), 8);
           bad.write(encoded.data(), encoded.size()); uint64_t payload = 0; bad.write(reinterpret_cast<const char*>(&payload), 8); }
-        fails([&] { decode::Engine engine((root / "bad").string(), decode::Kernel::scalar, 1, 4); }, message);
+        fails([&] { decode::Engine engine((root / "bad").string(), decode::Kernel::scalar, 1, 4); }, message, expected);
     };
     malformed({{"x", {{"dtype", "F16"}, {"shape", {1}}, {"data_offsets", {0, 2}}}}}, "unsupported dtype rejected");
     malformed({{"x", {{"dtype", "BF16"}, {"shape", {-1}}, {"data_offsets", {0, 2}}}}}, "negative shape rejected");
@@ -251,6 +257,8 @@ void engine_tests(const fs::path& root) {
     malformed({{"x", {{"dtype", "F32"}, {"shape", {1}}, {"data_offsets", {1, 5}}}}}, "unaligned offsets rejected");
     malformed({{"x", {{"dtype", "BF16"}, {"shape", {2}}, {"data_offsets", {0, 4}}}},
                {"y", {{"dtype", "BF16"}, {"shape", {2}}, {"data_offsets", {2, 6}}}}}, "overlapping tensors rejected");
+    malformed({{"x", {{"dtype", "BF16"}, {"shape", {1}}, {"data_offsets", {2, 4}}}}}, "payload gap rejected", "gapped");
+    malformed({{"x", {{"dtype", "BF16"}, {"shape", {1}}, {"data_offsets", {0, 2}}}}}, "unindexed trailing payload rejected", "unindexed");
     { Json config; std::ifstream(root / "bf16/config.json") >> config; config["num_attention_heads"] = 3; std::ofstream(root / "bad/config.json") << config.dump(); }
     fails([&] { decode::Engine engine((root / "bad").string(), decode::Kernel::scalar, 1, 4); }, "invalid architecture rejected");
 }

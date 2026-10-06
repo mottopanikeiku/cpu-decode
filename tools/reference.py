@@ -19,7 +19,7 @@ import subprocess
 import types
 from pathlib import Path
 
-from tools.download_model import MODEL_ID, REVISION, file_hash
+from tools.download_model import MODEL_ID, REVISION, file_hash, verify_snapshot
 
 
 def versions() -> dict:
@@ -77,6 +77,7 @@ def project_last(model, hidden, arithmetic: str, head_chunk: int):
 
 
 def oracle_worker(args) -> None:
+    source_manifest = verify_snapshot(args.model)
     import numpy as np
     import torch
 
@@ -106,7 +107,7 @@ def oracle_worker(args) -> None:
             records.append({"id": case["id"], "prompt_tokens": tokens, "generated_tokens": generated, "tokens": tokens + generated[:-1], "shape": [count, model.config.vocab_size], "logits": str(path.resolve()), "sha256": file_hash(path)})
     del model
     gc.collect()
-    metadata = {"model_id": MODEL_ID, "revision": REVISION, "weight_storage": "bfloat16", "arithmetic": args.arithmetic, "attention": "Transformers eager", "kv_dtype": "float32" if args.arithmetic == "fp32" else "bfloat16", "head_chunk_rows": args.head_chunk if args.arithmetic == "fp32" else None, "threads": args.threads, "steps": args.steps, "stop_on_eos": False, "versions": versions(), "prompts": records}
+    metadata = {"model_id": MODEL_ID, "revision": REVISION, "verified_source": source_manifest, "weight_storage": "bfloat16", "arithmetic": args.arithmetic, "attention": "Transformers eager", "kv_dtype": "float32" if args.arithmetic == "fp32" else "bfloat16", "head_chunk_rows": args.head_chunk if args.arithmetic == "fp32" else None, "threads": args.threads, "steps": args.steps, "stop_on_eos": False, "versions": versions(), "prompts": records}
     (args.raw_dir / "reference.json").write_text(json.dumps(metadata, indent=2) + "\n")
 
 
@@ -193,7 +194,7 @@ def main() -> None:
     parser.add_argument("--head-chunk", type=int, default=1024)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--steps", type=int, default=8)
-    parser.add_argument("--kernel", choices=("scalar", "simd256", "simd512"), default="scalar")
+    parser.add_argument("--kernel", choices=("scalar", "simd256", "simd512", "simd512x4"), default="scalar")
     parser.add_argument("--atol", type=float, default=None)
     parser.add_argument("--rtol", type=float, default=None)
     parser.add_argument("--quant-max-kl", type=float, help="Optional caller-chosen maximum per-position KL; otherwise reporting only")
