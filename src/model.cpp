@@ -189,8 +189,8 @@ struct Engine::Impl {
     std::string weight_dtype;
     Impl(const std::string& directory, Kernel ktype, int nthreads, size_t cap, EngineOptions opts)
         : config(read_json(fs::path(directory) / "config.json")), store(directory), kernel(ktype), threads(nthreads),
-          options(std::move(opts)), pool(nthreads, options.cpus, options.persistent_pool),
-          activation(std::max(config.hidden, config.intermediate)), capacity(cap) {
+          options(std::move(opts)), pool(nthreads, options.cpus, options.persistent_pool, options.strict_affinity),
+          activation(ktype == Kernel::vnni ? std::max(config.hidden, config.intermediate) : 0), capacity(cap) {
         if (threads < 1 || threads > 1024 || !capacity || capacity > config.max_positions) throw std::runtime_error("invalid thread count or context capacity");
         parse_kernel(kernel_name(kernel));
         size_t cache = product(product(product(capacity, config.kv_heads * config.dim), config.layers), 2 * (options.cache_type == CacheType::f16 ? 2 : 4));
@@ -247,7 +247,7 @@ struct Engine::Impl {
             if (s.shape.size() == 1 && s.shape[0] == rows) result.group_size = 0;
             else if (s.shape.size() == 2 && s.shape[0] == rows && cols % s.shape[1] == 0) result.group_size = cols / s.shape[1];
             else throw std::runtime_error("invalid scale shape");
-            if (result.group_size && (result.group_size < 8 || (result.group_size & (result.group_size - 1)))) throw std::runtime_error("group size must be a power of two at least8");
+            if (result.group_size && (result.group_size < 32 || (result.group_size & (result.group_size - 1)))) throw std::runtime_error("group size must be a power of two at least32");
             if (s.type != DType::f32 && s.type != DType::f16) throw std::runtime_error("scales must be FP32 or FP16");
             result.scales = s.data; result.scale_dtype = s.type;
             for (size_t j = 0; j < s.count(); ++j) if (!std::isfinite(s.at(j)) || s.at(j) <= 0) throw std::runtime_error("invalid quantization scale");
@@ -370,7 +370,10 @@ void Engine::rewind(size_t position) {
     if (position > impl->pos) throw std::runtime_error("cannot rewind forward");
     impl->pos = position;
 }
-const std::vector<float>& Engine::step(int token, bool head, Profile* profile) { return impl->step(token, head, profile); }
+const std::vector<float>& Engine::step(int token, bool head, Profile* profile) {
+    CpuBinding binding(impl->options.strict_affinity ? impl->pool.cpus()[0] : -1);
+    return impl->step(token, head, profile);
+}
 size_t Engine::vocab_size() const { return impl->config.vocab; }
 size_t Engine::position() const { return impl->pos; }
 Json Engine::metadata() const {
@@ -382,6 +385,7 @@ Json Engine::metadata() const {
             {"stored_weight_bytes", impl->stored_bytes}, {"stored_scale_bytes", impl->stored_scales},
             {"rope", impl->options.cached_rope ? "cached" : "direct"},
             {"scheduler", impl->options.persistent_pool ? "pool" : "openmp"},
+            {"affinity", impl->options.strict_affinity ? "strict" : "unpinned"},
             {"attention", impl->options.scalar_attention ? "scalar" : "blocked"},
             {"attention_block_size", AttentionWorkspace::block_size},
             {"fused_operations", {"qkv_bias", "gate_up_silu", "attention_residual_rmsnorm"}},

@@ -13,6 +13,10 @@ the chosen format (F16 and FP32 KV, and desired kernels), and actual pinned Q8_0
   nice -n 19 uv run python -m tools.quality_v2 evaluate --split heldout --backend llama --model "$GGUF" --label q8_0 --output results/v2/heldout-q8_0.json
   nice -n 19 uv run python -m tools.quality_v2 compare --split heldout --reports results/v2/heldout-*.json --output results/v2/quality.json
 Raw whole-vocabulary logits live in ignored external/quality-v2, never results/.
+All destinations under results/ must resolve inside results/v2/. The v1 baseline
+must match archived weight/configuration hashes and the oracle's pinned source.
+Q8_0 evaluation records resolved llama/ggml shared-library and upstream build
+hashes, rechecking the complete reader identity before and after every window.
 No numerical acceptance threshold is assumed. VNNI is retained only when its
 held-out mean KL, p99 KL, top1 agreement and perplexity are all at least as good
 as actual Q8_0.
@@ -118,6 +122,7 @@ def oracle(args) -> None:
     identity = oracle_identity(args, corpus, source)
     args.raw_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = args.raw_dir / "oracle.json"
+    protect_destination(manifest_path)
     metadata = json.loads(manifest_path.read_text()) if manifest_path.exists() else {"identity": identity, "windows": []}
     if metadata["identity"] != identity:
         raise ValueError("Existing oracle identity differs; use a new raw directory")
@@ -139,6 +144,7 @@ def oracle(args) -> None:
                 inputs, positions, targets = window_alignment(window)
                 name = f"{window['id']}-reference.bin"
                 path = args.raw_dir / name
+                protect_destination(path)
                 shape = [len(positions), model.config.vocab_size]
                 logits = np.memmap(path, dtype="<f4", mode="w+", shape=tuple(shape))
                 priming = model.model(input_ids=torch.tensor([inputs[:POLICY['priming_tokens']]], dtype=torch.long), use_cache=True, return_dict=True)
@@ -239,9 +245,7 @@ def resolved_upstream_libraries(ldd_output: str) -> dict[str, Path]:
     return libraries
 
 
-def reader_build_identity(reader: Path) -> dict:
-    run = subprocess.run(["ldd", str(reader.resolve())], check=True, capture_output=True, text=True)
-    libraries = resolved_upstream_libraries(run.stdout)
+def upstream_build_identity(libraries: dict[str, Path]) -> dict:
     directories = {path.parent for path in libraries.values()}
     if len(directories) != 1:
         raise ValueError("Reader upstream dependencies come from different build directories")
@@ -260,11 +264,17 @@ def reader_build_identity(reader: Path) -> dict:
         flags["compile_commands.json"] = file_hash(commands)
     if not flags:
         raise ValueError("Upstream build identity needs generated flags.make or compile_commands.json")
-    return {"reader_binary_sha256": file_hash(reader), "shared_libraries": {
+    return {"shared_libraries": {
         name: {"resolved_path": str(path.relative_to(build_root)), "sha256": file_hash(path), "bytes": path.stat().st_size}
         for name, path in sorted(libraries.items())},
         "build": {"cache_sha256": file_hash(cache), "settings": settings, "compile_flags_sha256": flags},
         "resolution": "ldd under the same inherited loader environment; resolved upstream files rehashed before and after every window"}
+
+
+def reader_build_identity(reader: Path) -> dict:
+    run = subprocess.run(["ldd", str(reader.resolve())], check=True, capture_output=True, text=True)
+    libraries = resolved_upstream_libraries(run.stdout)
+    return {"reader_binary_sha256": file_hash(reader), **upstream_build_identity(libraries)}
 
 
 def require_reader_identity(expected: dict, actual: dict) -> None:
@@ -284,7 +294,7 @@ def read_selection(path: Path, corpus_hash: str) -> dict:
 def native_settings(metadata: dict) -> dict:
     return {"group_size": metadata["group_size"], "scale_dtype": normalize_dtype(metadata["scale_dtype"]),
         "kv_dtype": normalize_dtype(metadata["kv_dtype"]), "kernel": metadata["kernel"],
-        "attention": metadata["attention"], "scheduler": metadata["scheduler"],
+        "attention": metadata["attention"], "scheduler": metadata["scheduler"], "affinity": metadata["affinity"],
         "cpu_set": metadata["cpu_set"], "threads": metadata["threads"], "weight_dtype": metadata["weight_dtype"]}
 
 
@@ -301,7 +311,7 @@ def validate_heldout_settings(settings: dict, identity: dict, selection: dict) -
         raise ValueError("Heldout format/weights were not selected on calibration")
 
 
-def preflight_native_model(model: Path, identity: dict, selection: dict | None) -> dict:
+def preflight_native_model(model: Path, identity: dict, selection: dict | None, oracle_source: dict | None = None) -> dict:
     # Reject an unselected format before producing/inspecting held-out logits.
     with (model / "model.safetensors").open("rb") as stream:
         prefix = stream.read(8)
@@ -320,6 +330,8 @@ def preflight_native_model(model: Path, identity: dict, selection: dict | None) 
     matrices = [tensor for name, tensor in header.items() if name != "__metadata__" and len(tensor["shape"]) == 2 and not name.endswith(".scales")]
     if not matrices or any(tensor["dtype"] != "I8" for tensor in matrices):
         raise ValueError("Quality candidates must contain real int8 matrix weights")
+    if (settings["group_size"], settings["scale_dtype"]) == (0, "f32") and identity != archived_v1_identity(oracle_source):
+        raise ValueError("Per-row candidate does not match the archived v1 weight/configuration hashes")
     if selection is not None:
         validate_heldout_settings(settings, identity, selection)
     return settings
@@ -338,6 +350,8 @@ def evaluate(args) -> None:
     if args.output.exists():
         raise ValueError("Quality output already exists; do not overwrite recorded measurements")
     metadata = read_oracle(args, corpus)
+    if selection is not None and selection["oracle_identity"] != metadata["identity"]:
+        raise ValueError("Heldout oracle differs from the calibration oracle")
     cases = {case["id"]: case for case in metadata["windows"]}
     windows = [window for window in corpus["windows"] if window["split"] == args.split]
     if any(window["id"] not in cases for window in windows):
@@ -356,7 +370,7 @@ def evaluate(args) -> None:
         pinned = {"llama_commit": LLAMA_COMMIT, "artifact_manifest_sha256": file_hash(args.artifact_manifest),
             **reader_identity, "pin_provenance": "Preparation manifest; executable, resolved upstream libraries and build records independently hashed"}
     else:
-        preflight = preflight_native_model(args.model, identity, selection)
+        preflight = preflight_native_model(args.model, identity, selection, metadata["identity"]["verified_source"])
         pinned = {"engine_binary_sha256": file_hash(args.engine)}
     records, all_rows = [], []
     settings = None
@@ -372,7 +386,7 @@ def evaluate(args) -> None:
             "--output", str(prefix), "--threads", str(args.threads), "--logits-start", str(POLICY["priming_tokens"])]
         if args.backend == "native":
             command = [str(args.engine.resolve()), "logits", *common, "--kernel", args.kernel,
-                "--kv", args.kv, "--attention", args.attention, "--scheduler", args.scheduler]
+                "--kv", args.kv, "--attention", args.attention, "--scheduler", args.scheduler, "--affinity", args.affinity]
             if args.cpu_set:
                 command += ["--cpu-set", args.cpu_set]
         else:
@@ -392,7 +406,7 @@ def evaluate(args) -> None:
         if args.backend == "native":
             if any(current[key] != preflight[key] for key in preflight):
                 raise ValueError("Native settings differ from safetensors format metadata")
-            if (current["kv_dtype"], current["attention"], current["scheduler"]) != (args.kv, args.attention, args.scheduler):
+            if (current["kv_dtype"], current["attention"], current["scheduler"], current["affinity"]) != (args.kv, args.attention, args.scheduler, args.affinity):
                 raise ValueError("Native engine settings differ from request")
             if args.kernel != "auto" and current["kernel"] != args.kernel:
                 raise ValueError("Native kernel differs from request")
@@ -456,7 +470,7 @@ def choose_format(reports: list[dict]) -> dict:
     choices = {(report["settings"]["group_size"], report["settings"]["scale_dtype"]) for report in reports}
     if choices != set(FORMAT_CHOICES):
         raise ValueError("Calibration must cover 32F16,64F32,64F16,128F16")
-    fixed = ("kernel", "kv_dtype", "attention", "scheduler", "threads", "cpu_set", "weight_dtype")
+    fixed = ("kernel", "kv_dtype", "attention", "scheduler", "affinity", "threads", "cpu_set", "weight_dtype")
     if any(any(report["settings"][key] != reports[0]["settings"][key] for key in fixed) for report in reports):
         raise ValueError("Calibration choices must use identical execution settings")
     if reports[0]["settings"]["weight_dtype"] != "int8":
@@ -483,7 +497,7 @@ def heldout_comparison(reports: list[dict], selection: dict) -> dict:
         for f16 in chosen:
             if f16["settings"]["kv_dtype"] != "f16" or f16["model_identity"] != fp32["model_identity"]:
                 continue
-            keys = ("kernel", "attention", "scheduler", "threads", "cpu_set")
+            keys = ("kernel", "attention", "scheduler", "affinity", "threads", "cpu_set")
             if any(f16["settings"][key] != fp32["settings"][key] for key in keys):
                 continue
             pairs.append({"f16_label": f16["label"], "f32_label": fp32["label"], "fixed_weights_sha256": f16["model_identity"]["sha256"],
@@ -577,6 +591,7 @@ def main() -> None:
     evaluation.add_argument("--kv", choices=("f16", "f32"), default="f16")
     evaluation.add_argument("--attention", choices=("blocked", "scalar"), default="blocked")
     evaluation.add_argument("--scheduler", choices=("pool", "openmp"), default="pool")
+    evaluation.add_argument("--affinity", choices=("strict", "unpinned"), default="strict")
     evaluation.add_argument("--cpu-set")
     comparison = commands.add_parser("compare", help="Select on calibration, or report heldout KV/kernel/Q8_0 comparisons")
     comparison.add_argument("--reports", type=Path, nargs="+", required=True)

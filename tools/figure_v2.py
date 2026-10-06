@@ -15,7 +15,7 @@ def figure(summary: dict) -> str:
     if not rows:
         raise ValueError("no measured cells to plot")
     threads = sorted({r["threads"] for r in rows})
-    width, height = max(600, 210 * len(threads) + 40), 340
+    width, height = max(600, 210 * len(threads) + 40), 360
     lines = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title description">',
              '<title id="title">CPU decode speed versus initial context</title>',
              '<desc id="description">Median native and best measured llama.cpp rates, with a format-specific read-bandwidth ceiling. Error bars show measured minimum and maximum. Asterisks mark spreads above five percent.</desc>',
@@ -72,6 +72,7 @@ def figure(summary: dict) -> str:
             lines.append(f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="2"' + (' stroke-dasharray="5 3"' if dashed else '') + '/>')
     text(width / 2, 306, "Initial context (tokens, log₂ spacing); rates exclude loading and prefill", 'text-anchor="middle"')
     text(20, 327, "Whiskers: min–max. * spread >5%. Winner flags, sample counts, byte bound and raw logs: summary.json.")
+    text(20, 347, "Best llama.cpp includes full-allowed defaults; differing winner CPU sets are disclosed in summary.json.")
     lines.append('</svg>')
     return "\n".join(lines) + "\n"
 

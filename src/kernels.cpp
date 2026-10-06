@@ -81,10 +81,15 @@ static inline float scale_fast(const Matrix& m, size_t row, size_t column, unsig
     if (m.scale_dtype == DType::f16) return _cvtsh_ss(static_cast<const uint16_t*>(m.scales)[index]);
     return static_cast<const float*>(m.scales)[index];
 }
-__attribute__((target("avx2,f16c")))
-static float dot256(const Matrix& m, size_t row, const float* x) {
+__attribute__((target("avx2,f16c"), always_inline))
+static inline float row_scale_fast(const Matrix& m, size_t row) {
+    return m.scale_dtype == DType::f16 ? _cvtsh_ss(static_cast<const uint16_t*>(m.scales)[row]) : static_cast<const float*>(m.scales)[row];
+}
+template<bool Grouped>
+__attribute__((target("avx2,f16c,fma"), noinline))
+static float dot256_impl(const Matrix& m, size_t row, const float* x) {
     size_t j = 0, start = row * m.cols;
-    unsigned shift = m.group_size ? unsigned(__builtin_ctzll(m.group_size)) : 0;
+    unsigned shift = Grouped ? unsigned(__builtin_ctzll(m.group_size)) : 0;
     __m256 sum = _mm256_setzero_ps();
     for (; j + 8 <= m.cols; j += 8) {
         __m256 w;
@@ -94,15 +99,16 @@ static float dot256(const Matrix& m, size_t row, const float* x) {
         } else if (m.dtype == DType::i8) {
             auto bits = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(static_cast<const int8_t*>(m.data) + start + j));
             w = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(bits));
-            if (m.group_size) w = _mm256_mul_ps(w, _mm256_set1_ps(scale_fast(m, row, j, shift)));
+            if constexpr (Grouped) w = _mm256_mul_ps(w, _mm256_set1_ps(scale_fast(m, row, j, shift)));
         } else w = _mm256_loadu_ps(static_cast<const float*>(m.data) + start + j);
-        sum = _mm256_add_ps(sum, _mm256_mul_ps(w, _mm256_loadu_ps(x + j)));
+        sum = _mm256_fmadd_ps(w, _mm256_loadu_ps(x + j), sum);
     }
     alignas(32) float lanes[8]; _mm256_store_ps(lanes, sum);
     float total = 0; for (float lane : lanes) total += lane;
-    for (; j < m.cols; ++j) total += value(m, start + j) * x[j] * (m.dtype == DType::i8 && m.group_size ? matrix_scale(m, row, j) : 1);
-    return m.dtype == DType::i8 && !m.group_size ? total * scale_fast(m, row, 0, 0) : total;
+    for (; j < m.cols; ++j) total += value(m, start + j) * x[j] * (m.dtype == DType::i8 && Grouped ? matrix_scale(m, row, j) : 1);
+    return m.dtype == DType::i8 && !Grouped ? total * row_scale_fast(m, row) : total;
 }
+template<bool Grouped>
 __attribute__((target("avx512f,avx512bw,f16c"), always_inline))
 static inline __m512 load512(const Matrix& m, size_t index, size_t row, size_t column, unsigned shift) {
     if (m.dtype == DType::bf16) {
@@ -112,35 +118,47 @@ static inline __m512 load512(const Matrix& m, size_t index, size_t row, size_t c
     if (m.dtype == DType::i8) {
         auto bits = _mm_loadu_si128(reinterpret_cast<const __m128i*>(static_cast<const int8_t*>(m.data) + index));
         auto w = _mm512_cvtepi32_ps(_mm512_cvtepi8_epi32(bits));
-        return m.group_size ? _mm512_mul_ps(w, _mm512_set1_ps(scale_fast(m, row, column, shift))) : w;
+        if constexpr (Grouped) return _mm512_mul_ps(w, _mm512_set1_ps(scale_fast(m, row, column, shift)));
+        return w;
     }
     return _mm512_loadu_ps(static_cast<const float*>(m.data) + index);
 }
-__attribute__((target("avx512f,avx512bw,f16c")))
-static float dot512(const Matrix& m, size_t row, const float* x) {
+template<bool Grouped>
+__attribute__((target("avx512f,avx512bw,f16c"), noinline))
+static float dot512_impl(const Matrix& m, size_t row, const float* x) {
     size_t j = 0, start = row * m.cols;
-    unsigned shift = m.group_size ? unsigned(__builtin_ctzll(m.group_size)) : 0;
+    unsigned shift = Grouped ? unsigned(__builtin_ctzll(m.group_size)) : 0;
     __m512 sum = _mm512_setzero_ps();
-    for (; j + 16 <= m.cols; j += 16) sum = _mm512_add_ps(sum, _mm512_mul_ps(load512(m, start + j, row, j, shift), _mm512_loadu_ps(x + j)));
+    for (; j + 16 <= m.cols; j += 16) sum = _mm512_fmadd_ps(load512<Grouped>(m, start + j, row, j, shift), _mm512_loadu_ps(x + j), sum);
     float total = _mm512_reduce_add_ps(sum);
-    for (; j < m.cols; ++j) total += value(m, start + j) * x[j] * (m.dtype == DType::i8 && m.group_size ? matrix_scale(m, row, j) : 1);
-    return m.dtype == DType::i8 && !m.group_size ? total * scale_fast(m, row, 0, 0) : total;
+    for (; j < m.cols; ++j) total += value(m, start + j) * x[j] * (m.dtype == DType::i8 && Grouped ? matrix_scale(m, row, j) : 1);
+    return m.dtype == DType::i8 && !Grouped ? total * row_scale_fast(m, row) : total;
 }
-__attribute__((target("avx512f,avx512bw,f16c")))
-static float dot512x4(const Matrix& m, size_t row, const float* x) {
+template<bool Grouped>
+__attribute__((target("avx512f,avx512bw,f16c"), noinline))
+static float dot512x4_impl(const Matrix& m, size_t row, const float* x) {
     size_t j = 0, start = row * m.cols;
-    unsigned shift = m.group_size ? unsigned(__builtin_ctzll(m.group_size)) : 0;
+    unsigned shift = Grouped ? unsigned(__builtin_ctzll(m.group_size)) : 0;
     __m512 a = _mm512_setzero_ps(), b = a, c = a, d = a;
     for (; j + 64 <= m.cols; j += 64) {
-        a = _mm512_add_ps(a, _mm512_mul_ps(load512(m, start + j, row, j, shift), _mm512_loadu_ps(x + j)));
-        b = _mm512_add_ps(b, _mm512_mul_ps(load512(m, start + j + 16, row, j + 16, shift), _mm512_loadu_ps(x + j + 16)));
-        c = _mm512_add_ps(c, _mm512_mul_ps(load512(m, start + j + 32, row, j + 32, shift), _mm512_loadu_ps(x + j + 32)));
-        d = _mm512_add_ps(d, _mm512_mul_ps(load512(m, start + j + 48, row, j + 48, shift), _mm512_loadu_ps(x + j + 48)));
+        a = _mm512_fmadd_ps(load512<Grouped>(m, start + j, row, j, shift), _mm512_loadu_ps(x + j), a);
+        b = _mm512_fmadd_ps(load512<Grouped>(m, start + j + 16, row, j + 16, shift), _mm512_loadu_ps(x + j + 16), b);
+        c = _mm512_fmadd_ps(load512<Grouped>(m, start + j + 32, row, j + 32, shift), _mm512_loadu_ps(x + j + 32), c);
+        d = _mm512_fmadd_ps(load512<Grouped>(m, start + j + 48, row, j + 48, shift), _mm512_loadu_ps(x + j + 48), d);
     }
-    for (; j + 16 <= m.cols; j += 16) a = _mm512_add_ps(a, _mm512_mul_ps(load512(m, start + j, row, j, shift), _mm512_loadu_ps(x + j)));
+    for (; j + 16 <= m.cols; j += 16) a = _mm512_fmadd_ps(load512<Grouped>(m, start + j, row, j, shift), _mm512_loadu_ps(x + j), a);
     float total = _mm512_reduce_add_ps(_mm512_add_ps(_mm512_add_ps(a, b), _mm512_add_ps(c, d)));
-    for (; j < m.cols; ++j) total += value(m, start + j) * x[j] * (m.dtype == DType::i8 && m.group_size ? matrix_scale(m, row, j) : 1);
-    return m.dtype == DType::i8 && !m.group_size ? total * scale_fast(m, row, 0, 0) : total;
+    for (; j < m.cols; ++j) total += value(m, start + j) * x[j] * (m.dtype == DType::i8 && Grouped ? matrix_scale(m, row, j) : 1);
+    return m.dtype == DType::i8 && !Grouped ? total * row_scale_fast(m, row) : total;
+}
+static float dot256(const Matrix& m, size_t row, const float* x) {
+    return m.group_size ? dot256_impl<true>(m, row, x) : dot256_impl<false>(m, row, x);
+}
+static float dot512(const Matrix& m, size_t row, const float* x) {
+    return m.group_size ? dot512_impl<true>(m, row, x) : dot512_impl<false>(m, row, x);
+}
+static float dot512x4(const Matrix& m, size_t row, const float* x) {
+    return m.group_size ? dot512x4_impl<true>(m, row, x) : dot512x4_impl<false>(m, row, x);
 }
 __attribute__((target("avx512vnni,avx512vl,avx512bw,avx2,f16c")))
 static float dot_vnni(const Matrix& m, size_t row, const Activation& x) {
@@ -166,10 +184,10 @@ Kernel parse_kernel(const std::string& name) {
     __builtin_cpu_init();
     if (name == "auto") {
         if (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw") && __builtin_cpu_supports("f16c")) return Kernel::simd512x4;
-        if (__builtin_cpu_supports("avx2") && __builtin_cpu_supports("f16c")) return Kernel::simd256;
+        if (__builtin_cpu_supports("avx2") && __builtin_cpu_supports("f16c") && __builtin_cpu_supports("fma")) return Kernel::simd256;
         return Kernel::scalar;
     }
-    if (name == "simd256" && __builtin_cpu_supports("avx2") && __builtin_cpu_supports("f16c")) return Kernel::simd256;
+    if (name == "simd256" && __builtin_cpu_supports("avx2") && __builtin_cpu_supports("f16c") && __builtin_cpu_supports("fma")) return Kernel::simd256;
     if (name == "simd512" && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw") && __builtin_cpu_supports("f16c")) return Kernel::simd512;
     if (name == "simd512x4" && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw") && __builtin_cpu_supports("f16c")) return Kernel::simd512x4;
     if (name == "vnni" && __builtin_cpu_supports("avx512vnni") && __builtin_cpu_supports("avx512vl") && __builtin_cpu_supports("f16c")) return Kernel::vnni;
@@ -192,8 +210,8 @@ void projections(const Projection* items, size_t count, const float* x, Kernel k
     size_t tasks = 0;
     for (size_t i = 0; i < count; ++i) {
         const auto& m = *items[i].matrix;
-        if (!m.data || !m.rows || !m.cols || (!items[i].output && !(swiglu && i == 1)) || (m.dtype == DType::i8 && !m.scales) || m.cols != items[0].matrix->cols ||
-            (m.group_size && (m.group_size < 8 || (m.group_size & (m.group_size - 1)) || m.cols % m.group_size))) throw std::runtime_error("invalid projection dimensions");
+        if (!m.data || !m.rows || !m.cols || m.dtype == DType::f16 || (!items[i].output && !(swiglu && i == 1)) || (m.dtype == DType::i8 && !m.scales) || m.cols != items[0].matrix->cols ||
+            (m.group_size && (m.group_size < 32 || (m.group_size & (m.group_size - 1)) || m.cols % m.group_size))) throw std::runtime_error("invalid projection dimensions");
         if (kernel == Kernel::vnni && (m.dtype != DType::i8 || m.cols % 32 || (m.group_size && m.group_size < 32))) throw std::runtime_error("VNNI requires int8 matrices and groups divisible by32");
         tasks += (m.rows + 63) / 64;
     }
@@ -224,7 +242,8 @@ void projections(const Projection* items, size_t count, const float* x, Kernel k
             return w.function(matrix, row, w.x);
         };
         if (w.swiglu) {
-            for (size_t row = task * 64; row < std::min(w.items[0].matrix->rows, (task + 1) * 64); ++row) {
+            size_t row = task * 64, end = std::min(w.items[0].matrix->rows, (task + 1) * 64);
+            for (; row < end; ++row) {
                 float gate = dot_row(*w.items[0].matrix, row), up = dot_row(*w.items[1].matrix, row);
                 w.items[0].output[row] = (gate / (1 + std::exp(-gate))) * up;
             }
@@ -234,7 +253,8 @@ void projections(const Projection* items, size_t count, const float* x, Kernel k
             const auto& m = *w.items[i].matrix;
             size_t blocks = (m.rows + 63) / 64;
             if (task >= blocks) { task -= blocks; continue; }
-            for (size_t row = task * 64; row < std::min(m.rows, (task + 1) * 64); ++row) {
+            size_t row = task * 64, end = std::min(m.rows, (task + 1) * 64);
+            for (; row < end; ++row) {
                 float result = dot_row(m, row);
                 w.items[i].output[row] = result + (w.items[i].bias ? w.items[i].bias[row] : 0);
             }

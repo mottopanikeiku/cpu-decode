@@ -4,13 +4,13 @@ A small C++ engine for single-stream CPU decoding of one pinned Qwen checkpoint.
 
 **Question:** How close can int8 decoding get to a laptop's read-bandwidth ceiling, and how does it compare with native llama.cpp?
 
-I built the complete forward pass and FP32 KV cache in [model.cpp](src/model.cpp), with scalar and AVX2/AVX-512 matrix-vector kernels in [kernels.cpp](src/kernels.cpp). Weights are memory-mapped; offline quantization uses one FP32 scale per int8 output row. [The reference](tools/reference.py) checks the original BF16 values in FP32 arithmetic against Transformers; a separate reader measures real llama.cpp outputs.
+I built the complete forward pass in [model.cpp](src/model.cpp), shared-GQA block attention with F16 KV in [attention.cpp](src/attention.cpp), and persistent CPU workers plus scalar/AVX2/AVX-512 matrix-vector kernels. Weights are memory-mapped; grouped int8 supports FP16 or FP32 scales. [The reference](tools/reference.py) starts from the original BF16 values and runs FP32 arithmetic.
 
-**Result:** Short-context decoding approaches the estimated ceiling, but scalar attention leaves a long-context gap. More threads are not automatically faster.
+**Result:** The archived engine approached the short-context read ceiling but lost at long contexts. The new engine's [short development check](results/v2/regression-fma/summary.json) recovered parity with that unchanged engine: **69.85 vs 69.27 tokens/s** at two threads/context 128. This is a per-row control, not a completed grouped-quality or final baseline result.
 
-## Measured result
+## Archived original result
 
-[All thread counts and generated tables](results/tables.md), with [raw samples](results/measurements), use median tokens/s over three repeats; native ranges are minimum–maximum. Context is the initial cache length, not timed prefill.
+[All original thread counts and generated tables](results/tables.md), with [raw samples](results/measurements), use median tokens/s over three repeats; native ranges are minimum–maximum. These predate the new F16/block-attention engine. Context is the initial cache length, not timed prefill.
 
 | Threads | Context | This engine (range) | Read ceiling reached | llama.cpp Q8_0 | BF16 eager |
 |---:|---:|---:|---:|---:|---:|
@@ -32,24 +32,24 @@ These are distribution checks, not task accuracy; the lower Q8_0 mean KL matters
 
 [Unquantized checks](results/quality-summary.json) cover 88 positions: maximum absolute logit error **0.000439**, with **32/32** greedy tokens matching. [Ablations](results/tables.md) show int8 alone giving **1.01×**, SIMD256 **5.21×** over scalar, widening **1.10×**, four accumulators **1.01×**, and cached RoPE **1.03×**. Small gains should not be read as stable causal effects. At the longest context, [attention takes 17.22 ms of 31.56 ms/token](results/summary.json), making it the clearest next optimization target.
 
-## Reproduce
+## Reproduce the archived result
 
 Requires Linux x86-64, C++17/OpenMP, CMake and uv; AVX-512 for the recorded kernel. [The recorded hardware/software](results/measurements/environment-engine-t1,2,4,6,12-c128-ksimd512x4-ropecached.json) is a Ryzen AI 5 PRO 340 with GCC 16.2.1. [Model checks](results/checks.json) used a 2000 MB memory cap; this is not a peak-memory measurement. Compute is local CPU with free downloads, no paid compute.
 
 ```sh
-make build
+git switch --detach d98ba9c && make build
 make prepare
 make measure llama-quality traffic
 ```
 
-[llama.cpp is pinned](results/llama-preparation.json) to `6c73b3e12dc501de35fe5f6979960d06921a2f6c`, built Release with `GGML_NATIVE=ON`, CUDA/Vulkan off; [the preparation script](tools/prepare_llama.py) records the full flags. Models and raw logits stay outside git. [Methods](docs/MEASUREMENTS.md), [baseline differences](docs/BASELINE.md) and [cold review](docs/COLD_REVIEW.md) explain the comparison.
+[llama.cpp is pinned](results/llama-preparation.json) to `6c73b3e12dc501de35fe5f6979960d06921a2f6c`, built Release with `GGML_NATIVE=ON`, CUDA/Vulkan off. Models and raw logits stay outside git. For the current engine, [methods and development records](docs/MEASUREMENTS.md), [baseline differences](docs/BASELINE.md) and [cold review](docs/COLD_REVIEW.md) explain what changed.
 
 ## Limitations
 
 - One model and laptop; clocks/temperatures were not fixed. The ceiling is a storage/read-bandwidth estimate, not measured DRAM utilization.
 - Shapes match, but llama-bench uses synthetic tokens and omits sampling; native/eager use greedy trajectories.
-- Quality uses four short prompts. Long-context numerical agreement and free-running Q8_0 generation were not measured.
-- No batched serving, speculative decoding or activation quantization; attention remains scalar within each head.
+- Archived quality uses four short prompts. The new disjoint calibration/held-out corpus and FP32 oracle are [recorded](results/v2/corpus.json); grouped candidate and Q8_0 held-out results are not yet measured.
+- No batched serving or speculative decoding. VNNI activation quantization is experimental, not an established quality-preserving default.
 
 ## Prior work
 

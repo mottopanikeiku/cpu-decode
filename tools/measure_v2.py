@@ -4,13 +4,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import platform
-import queue
 import subprocess
 import sys
 import time
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -51,6 +50,12 @@ def baseline_cpu_set(protocol: dict, thread: int, candidate: dict) -> list[int]:
             else protocol["cpu_order"][:thread])
 
 
+def native_cpu_set(protocol: dict, thread: int, settings: dict | None = None) -> list[int]:
+    config = settings or protocol["native"]
+    return (protocol["cpu_metadata"]["allowed_cpu_ids"] if config["affinity"] == "unpinned"
+            else protocol["cpu_order"][:thread])
+
+
 def cpu_mask(cpus: list[int]) -> str:
     return hex(sum(1 << cpu for cpu in cpus))
 
@@ -70,13 +75,15 @@ def cache_settings(path: Path) -> dict[str, str]:
 def engine_command(engine: Path, model: Path, protocol: dict, thread: int, context: int,
                    settings: dict | None = None) -> list[str]:
     config = settings or protocol["native"]
-    cpus = protocol["cpu_order"][:thread]
-    return [str(engine), "bench", "--model", str(model), "--tokens", protocol["tokens"],
-            "--threads", str(thread), "--context", str(context), "--steps", str(protocol["steps"]),
-            "--repeats", str(protocol["repeats"]), "--kernel", config["kernel"],
-            "--kv", config["kv_dtype"], "--attention", config["attention"],
-            "--scheduler", config["scheduler"], "--cpu-set", ",".join(map(str, cpus)),
-            "--rope", config["rope"]]
+    cpus = native_cpu_set(protocol, thread, config)
+    command = [str(engine), "bench", "--model", str(model), "--tokens", protocol["tokens"],
+               "--threads", str(thread), "--context", str(context), "--steps", str(protocol["steps"]),
+               "--repeats", str(protocol["repeats"]), "--kernel", config["kernel"],
+               "--kv", config["kv_dtype"], "--attention", config["attention"],
+               "--scheduler", config["scheduler"], "--affinity", config["affinity"], "--rope", config["rope"]]
+    if config["affinity"] == "strict":
+        command += ["--cpu-set", ",".join(map(str, cpus))]
+    return command
 
 
 def llama_command(llama: Path, gguf: Path, protocol: dict, thread: int, context: int, candidate: dict) -> list[str]:
@@ -100,6 +107,84 @@ def save(path: Path, value: dict) -> None:
 def stamp(path: Path) -> dict:
     stat = path.stat()
     return {"bytes": stat.st_size, "mtime_ns": stat.st_mtime_ns}
+
+
+QUALITY_METRICS = ["mean_kl_reference_candidate_nats", "p99_kl_reference_candidate_nats", "top1_agreement", "perplexity"]
+
+
+def validate_quality_eligibility(proof: dict, native: dict, artifacts: dict) -> None:
+    """Bind the retained path and independently recompute every metric comparison."""
+    if proof["weights_sha256"] != artifacts["weights"]["sha256"] or proof["chosen_weights_sha256"] != proof["weights_sha256"]:
+        raise ValueError("VNNI quality decision does not match chosen weights")
+    if proof["config_sha256"] != artifacts["config"]["sha256"] or proof["engine_binary_sha256"] != artifacts["engine"]["sha256"]:
+        raise ValueError("VNNI quality decision model configuration or engine binary differs")
+    expected = {key: value for key, value in native.items() if key not in ["rope", "kernel"]}
+    expected["kernel"] = "vnni"
+    if any(proof["settings"].get(key) != value for key, value in expected.items()):
+        raise ValueError("VNNI quality decision execution settings differ")
+    decision = proof["decision"]
+    a, b = decision["candidate"], decision["q8_0"]
+    if any(not math.isfinite(row[key]) for row in [a, b] for key in QUALITY_METRICS):
+        raise ValueError("VNNI quality metrics are not finite")
+    retained = (a[QUALITY_METRICS[0]] <= b[QUALITY_METRICS[0]] and a[QUALITY_METRICS[1]] <= b[QUALITY_METRICS[1]]
+                and a[QUALITY_METRICS[2]] >= b[QUALITY_METRICS[2]] and a[QUALITY_METRICS[3]] <= b[QUALITY_METRICS[3]])
+    if decision["retained"] is not True or not retained:
+        raise ValueError("VNNI rejected: all four heldout metrics must be at least as good as Q8_0")
+
+
+def load_quality_eligibility(path: Path, native: dict, artifacts: dict) -> dict:
+    quality = json.loads(path.read_text())
+    if quality.get("split") != "heldout":
+        raise ValueError("final VNNI needs a heldout quality decision")
+    chosen = quality["selection"]["chosen"]["model_identity"]["files"]["model.safetensors"]["sha256"]
+    proofs = []
+    for decision in quality["comparison"]["vnni_decisions"]:
+        entries = [entry for entry in quality["evidence"] if entry["label"] == decision["label"]]
+        if len(entries) != 1:
+            raise ValueError("VNNI decision needs one linked quality report")
+        entry = entries[0]
+        if Path(entry["report"]).name != entry["report"]:
+            raise ValueError("quality report must be a sibling filename")
+        report_path = path.parent / entry["report"]
+        if file_hash(report_path) != entry["sha256"]:
+            raise ValueError("VNNI heldout report hash changed")
+        report = json.loads(report_path.read_text())
+        if (report.get("split"), report.get("backend"), report.get("selection_sha256")) != ("heldout", "native", quality["selection_sha256"]):
+            raise ValueError("VNNI report split/backend/selection differs")
+        if report["settings"] != entry["settings"] or report["aggregate"] != decision["candidate"]:
+            raise ValueError("VNNI decision differs from its measured report")
+        q8 = [e for e in quality["evidence"] if e["label"] == quality["comparison"]["q8_0_label"]]
+        if len(q8) != 1 or decision["q8_0"] != q8[0]["aggregate"]:
+            raise ValueError("VNNI decision differs from actual Q8_0 comparison")
+        proof = {"file": str(path.resolve()), "quality_sha256": file_hash(path),
+                 "report": entry["report"], "report_sha256": entry["sha256"],
+                 "weights_sha256": report["model_identity"]["files"]["model.safetensors"]["sha256"],
+                 "chosen_weights_sha256": chosen,
+                 "config_sha256": report["model_identity"]["files"]["config.json"]["sha256"],
+                 "engine_binary_sha256": report["binary_identity"]["engine_binary_sha256"],
+                 "settings": report["settings"], "decision": decision}
+        if proof["weights_sha256"] == artifacts["weights"]["sha256"] and all(proof["settings"].get(k) == v for k, v in native.items() if k not in ["kernel", "rope"]):
+            validate_quality_eligibility(proof, native, artifacts)
+            proofs.append(proof)
+    if len(proofs) != 1:
+        raise ValueError("final VNNI needs exactly one retained decision matching chosen weights and execution settings")
+    return proofs[0]
+
+
+def check_quality_eligibility(protocol: dict, directory: Path) -> None:
+    if protocol["development"] or protocol["native"]["kernel"] != "vnni":
+        return
+    proof = protocol.get("quality_eligibility")
+    if not proof:
+        raise ValueError("final VNNI protocol has no retained quality eligibility")
+    validate_quality_eligibility(proof, protocol["native"], protocol["artifacts"])
+    filename = proof["file"].replace("$OUTPUT", str(directory.resolve())).replace("$HOME", str(Path.home()))
+    path = Path(filename)
+    if not path.is_absolute():
+        path = ROOT / path
+    current = load_quality_eligibility(path, protocol["native"], protocol["artifacts"])
+    if {k: v for k, v in current.items() if k != "file"} != {k: v for k, v in proof.items() if k != "file"}:
+        raise ValueError("frozen VNNI quality eligibility changed")
 
 
 def build_flags(directory: Path) -> dict:
@@ -177,6 +262,8 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
             raise ValueError("final protocol requires >=64 measured tokens and >=5 repeats per invocation")
     if args.steps < 1 or args.repeats < 1:
         raise ValueError("steps and repeats must be positive")
+    if os.getpriority(os.PRIO_PROCESS, 0) < 19:
+        raise ValueError("freeze commands must run at nice 19")
     if args.development and args.output.resolve() == (ROOT / "results/v2").resolve():
         raise ValueError("development protocol needs its own --output under results/v2")
     manifest = json.loads(args.model_manifest.read_text())
@@ -219,7 +306,7 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
                 "rounds": 2, "warmup_steps": 1, "tokens": args.tokens, "cpu_order": order,
                 "cpu_metadata": cpus, "candidates": candidates([int(x) for x in args.polls.split(",")]),
                 "native": {"kernel": args.kernel, "kv_dtype": "f16", "attention": args.attention,
-                           "scheduler": args.scheduler, "rope": args.rope, **model_settings},
+                           "scheduler": args.scheduler, "affinity": args.affinity, "rope": args.rope, **model_settings},
                 "model_geometry": geometry,
                 "artifacts": artifacts, "llama_libraries": libraries, "native_build": native_build,
                 "llama_build": llama_build, "source_model": manifest["source"], "llama_commit": LLAMA_COMMIT,
@@ -229,6 +316,9 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
                                       "llama": observation([llama_build["CMAKE_CXX_COMPILER"], "--version"])},
                 "model_manifest": manifest, "preparation": preparation, "environment": environment(locations),
                 "selection": "highest pooled median baseline rate; native uses only the same candidate's ABAB window"}
+    protocol["quality_eligibility"] = (load_quality_eligibility(args.quality, protocol["native"], artifacts)
+                                       if args.kernel == "vnni" and not args.development else None)
+    protocol["experimental_vnni"] = args.kernel == "vnni" and args.development
     protocol = portable(protocol, locations)
     protocol["id"] = digest(protocol)
     with (args.output / "protocol.json").open("x") as stream:
@@ -253,93 +343,6 @@ def check_artifacts(args: argparse.Namespace, protocol: dict, ablation: bool = F
             raise ValueError(f"frozen shared library changed: {name}")
 
 
-class InteractiveNative:
-    """One model/prefix and warmup, repeated run requests; logs survive failures."""
-
-    def __init__(self, command: list[str], stem: Path, locations: dict, deadline: float):
-        self.command, self.stem, self.locations, self.deadline = command, stem, locations, deadline
-        self.lines: queue.Queue = queue.Queue()
-        self.log_path = stem.with_suffix(".stderr.txt")
-        self.log = self.log_path.open("w")
-        self.process = None
-        self.error = None
-        self.ready = None
-        self.reader_thread = None
-        try:
-            self.process = subprocess.Popen(command, cwd=ROOT, text=True, stdin=subprocess.PIPE,
-                                            stdout=subprocess.PIPE, stderr=self.log, bufsize=1)
-            def reader():
-                for line in self.process.stdout:
-                    self.lines.put(line)
-                self.lines.put(None)
-            self.reader_thread = threading.Thread(target=reader, daemon=True)
-            self.reader_thread.start()
-            line = self.line()
-            stem.with_suffix(".stdout.txt").write_text(portable(line, locations))
-            self.ready = json.loads(line, parse_constant=reject_constant)
-            if not isinstance(self.ready, dict) or self.ready.get("ready") is not True:
-                raise ValueError("interactive engine did not emit ready:true")
-        except (OSError, ValueError, TimeoutError) as exc:
-            self.error = str(exc)
-
-    def line(self) -> str:
-        try:
-            line = self.lines.get(timeout=max(0, self.deadline - time.monotonic()))
-        except queue.Empty as exc:
-            raise TimeoutError("interactive engine exceeded window deadline") from exc
-        if line is None:
-            raise ValueError("interactive engine exited before emitting result")
-        return line
-
-    def run(self, stem: Path) -> dict:
-        data, line, error = None, "", self.error
-        try:
-            if error:
-                raise ValueError(error)
-            self.process.stdin.write("run\n")
-            self.process.stdin.flush()
-            line = self.line()
-            data = json.loads(line, parse_constant=reject_constant)
-            if not isinstance(data, dict):
-                raise ValueError("interactive result must be a JSON object")
-        except (OSError, ValueError, TimeoutError) as exc:
-            error = str(exc)
-            self.error = error
-        stdout_path = stem.with_suffix(".stdout.txt")
-        stdout_path.write_text(portable(line, self.locations))
-        result = portable({"command": self.command, "request": "run", "returncode": None,
-                           "success": error is None, "error": error, "data": data,
-                           "stdout_file": str(stdout_path), "stderr_file": str(self.log_path)}, self.locations)
-        save(stem.with_suffix(".json"), result)
-        return result
-
-    def close(self) -> dict:
-        code = None
-        if self.process is not None:
-            try:
-                if self.process.poll() is None:
-                    self.process.stdin.write("quit\n")
-                    self.process.stdin.flush()
-                code = self.process.wait(timeout=max(0.01, self.deadline - time.monotonic()))
-            except (OSError, subprocess.TimeoutExpired):
-                self.process.kill()
-                code = self.process.wait()
-                self.error = self.error or "interactive engine timeout or broken pipe"
-            try:
-                self.process.stdin.close()
-            except OSError:
-                pass  # Process status/error above remains the retained failure.
-            if self.reader_thread is not None:
-                self.reader_thread.join(timeout=1)
-            self.process.stdout.close()
-        self.log.close()
-        self.log_path.write_text(portable(self.log_path.read_text(), self.locations))
-        record = portable({"command": self.command, "ready": self.ready, "returncode": code,
-                           "success": code == 0 and self.error is None, "error": self.error,
-                           "stdout_file": str(self.stem.with_suffix(".stdout.txt")),
-                           "stderr_file": str(self.log_path)}, self.locations)
-        save(self.stem.with_suffix(".json"), record)
-        return record
 
 
 def main() -> None:
@@ -366,6 +369,7 @@ def main() -> None:
     parser.add_argument("--kv", choices=["f16", "f32"], default="f16")
     parser.add_argument("--attention", choices=["blocked", "scalar"], default="blocked")
     parser.add_argument("--scheduler", choices=["pool", "openmp"], default="pool")
+    parser.add_argument("--affinity", choices=["strict", "unpinned"], default="strict")
     parser.add_argument("--rope", choices=["cached", "direct"], default="cached")
     parser.add_argument("--label", help="Ablation ladder label, e.g. scalar-f32 or blocked-f16")
     parser.add_argument("--development", action="store_true")
@@ -395,7 +399,7 @@ def main() -> None:
     if os.getpriority(os.PRIO_PROCESS, 0) < 19:
         parser.error("timing commands must run at nice 19")
     thread, context = args.threads, args.contexts
-    cpus = protocol["cpu_order"][:thread]
+    cpus = native_cpu_set(protocol, thread)
     if not set(cpus).issubset(os.sched_getaffinity(0)):
         raise ValueError("frozen CPU set is no longer available")
     deadline = time.monotonic() + 1740  # Leave a minute below the external 30-minute window limit.
@@ -406,7 +410,8 @@ def main() -> None:
         path = args.output / f"bandwidth-t{thread}.json"
         if path.exists():
             raise FileExistsError(path)
-        env = {**os.environ, "OMP_PLACES": ",".join(f"{{{x}}}" for x in cpus), "OMP_PROC_BIND": "true", "OMP_DYNAMIC": "false"}
+        env = {**os.environ, "OMP_PLACES": ",".join(f"{{{x}}}" for x in cpus),
+               "OMP_PROC_BIND": "true" if protocol["native"]["affinity"] == "strict" else "false", "OMP_DYNAMIC": "false"}
         record = {"schema": "cpu-decode-v2-bandwidth", "protocol_id": protocol["id"], "threads": thread,
                   "cpu_set": cpus, "environment": environment(locations), "invocations": []}
         save(path, record)
@@ -423,9 +428,12 @@ def main() -> None:
     check_artifacts(args, protocol, args.stage == "ablation")
     bundled = args.stage == "window"
     if bundled:
+        check_quality_eligibility(protocol, args.output)
         matches = [c for c in protocol["candidates"] if args.candidate == "all" or c["id"] == args.candidate]
         if not matches:
             parser.error("--candidate must be all or name one frozen candidate")
+        if any(c["affinity"] == "defaults" for c in matches) and not set(protocol["cpu_metadata"]["allowed_cpu_ids"]).issubset(os.sched_getaffinity(0)):
+            raise ValueError("full frozen allowed CPU set is unavailable for defaults candidate")
         settings = protocol["native"]
         name = f"window-t{thread}-c{context}-{args.candidate}"
     else:
@@ -433,7 +441,8 @@ def main() -> None:
             parser.error("ablation needs a safe --label and cell 2/128 or 6/4096")
         matches = [None]
         settings = {"kernel": args.kernel, "kv_dtype": args.kv, "attention": args.attention,
-                    "scheduler": args.scheduler, "rope": args.rope}
+                    "scheduler": args.scheduler, "affinity": args.affinity, "rope": args.rope}
+        cpus = native_cpu_set(protocol, thread, settings)
         name = f"ablation-t{thread}-c{context}-{args.label}"
     path = args.output / f"{name}.json"
     if path.exists():
@@ -442,33 +451,30 @@ def main() -> None:
               "protocol_id": protocol["id"], "threads": thread, "context": context, "cpu_set": cpus,
               "candidates": matches if bundled else [], "native_settings": settings, "label": args.label,
               "environment": environment(locations), "invocations": []}
+    record["experimental_vnni"] = settings["kernel"] == "vnni" and (not bundled or protocol["development"])
     if not bundled:
         record["weights_sha256"] = file_hash(args.model / "model.safetensors")
     save(path, portable(record, locations))
     command = engine_command(args.engine, args.model, protocol, thread, context, settings)
-    native = InteractiveNative(command + ["--interactive", "1"], args.output / f"{name}-native-process", locations, deadline)
-    try:
-        for candidate in matches:
-            candidate_id = candidate["id"] if candidate else args.label
-            for round_id in range(protocol["rounds"]):
-                for engine in (["native", "llama"] if bundled else ["native"]):
-                    stem = args.output / f"{name}-{candidate_id}-r{round_id}-{engine}"
-                    invocation = (native.run(stem) if engine == "native" else
-                                  execute(llama_command(args.llama, args.gguf, protocol, thread, context, candidate),
-                                          stem, locations, deadline))
-                    record["invocations"].append({"engine": engine, "round": round_id,
-                                                  "candidate_id": candidate_id, **invocation})
-                    save(path, portable(record, locations))
-    finally:
-        record["native_process"] = native.close()
-        # A nonzero process exit invalidates even previously emitted native samples.
-        if not record["native_process"]["success"]:
-            for invocation in record["invocations"]:
-                if invocation["engine"] == "native":
+    for candidate in matches:
+        candidate_id = candidate["id"] if candidate else args.label
+        for round_id in range(protocol["rounds"]):
+            for engine in (["native", "llama"] if bundled else ["native"]):
+                stem = args.output / f"{name}-{candidate_id}-r{round_id}-{engine}"
+                invocation_command = (command if engine == "native" else
+                                      llama_command(args.llama, args.gguf, protocol, thread, context, candidate))
+                # subprocess.run waits for model exit before the next engine is loaded.
+                invocation = execute(invocation_command, stem, locations, deadline)
+                invocation["process_cpu_set"] = cpus if engine == "native" else baseline_cpu_set(protocol, thread, candidate)
+                if (engine == "native" and bundled and not protocol["development"]
+                        and invocation["data"] and invocation["data"].get("kernel") == "vnni"
+                        and not protocol.get("quality_eligibility")):
                     invocation["success"] = False
-                    invocation["error"] = "shared native process did not exit successfully"
-        save(path, portable(record, locations))
-    if not all(r["success"] for r in record["invocations"]) or not record["native_process"]["success"]:
+                    invocation["error"] = "final auto-selected VNNI has no retained quality eligibility"
+                record["invocations"].append({"engine": engine, "round": round_id,
+                                              "candidate_id": candidate_id, **invocation})
+                save(path, portable(record, locations))
+    if not all(r["success"] for r in record["invocations"]):
         raise RuntimeError("window has unsuccessful invocations; raw records retained")
 
 

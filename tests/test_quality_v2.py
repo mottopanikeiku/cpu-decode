@@ -3,6 +3,7 @@ import copy
 import json
 import math
 import struct
+from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
@@ -10,12 +11,13 @@ import pytest
 
 from tools.corpus_v2 import (
     CORPUS_SHA256, FORMAT_CHOICES, LICENSE, LICENSE_URL, POLICY, SOURCES,
-    digest_json, load_manifest, validate_manifest, window_alignment, write_json,
+    digest_json, load_manifest, prepare, protect_destination, validate_manifest, window_alignment, write_json,
 )
 from tools.download_model import file_hash
 from tools.quality_v2 import (
-    checked_logits, choose_format, heldout_comparison, log_probabilities,
-    position_metric, preflight_native_model, read_selection, summarize,
+    archived_v1_identity, checked_logits, choose_format, compare, evaluate, heldout_comparison, log_probabilities,
+    oracle, position_metric, preflight_native_model, read_selection, require_reader_identity,
+    resolved_upstream_libraries, summarize, upstream_build_identity,
     validate_case, validate_heldout_settings, validate_reports,
 )
 
@@ -177,7 +179,7 @@ def calibration_choices():
     for index, (group, dtype) in enumerate(FORMAT_CHOICES):
         settings = {"group_size": group, "scale_dtype": dtype, "weight_dtype": "int8",
             "kv_dtype": "f16", "kernel": "scalar", "attention": "blocked",
-            "scheduler": "pool", "threads": 1, "cpu_set": [0]}
+            "scheduler": "pool", "affinity": "strict", "threads": 1, "cpu_set": [0]}
         reports.append({"label": f"g{group}{dtype}", "split": "calibration", "backend": "native",
             "settings": settings, "aggregate": summarize([dict(row, kl_reference_candidate_nats=0.01 * (index + 1))]),
             "model_identity": {"sha256": f"weights-{group}-{dtype}"}})
@@ -226,7 +228,7 @@ def test_heldout_accepts_only_selected_weights_or_original_v1(tmp_path):
     chosen = decision["chosen"]
     settings = {"group_size": 32, "scale_dtype": "f16", "weight_dtype": "int8"}
     validate_heldout_settings(settings, chosen["model_identity"], decision)
-    validate_heldout_settings(dict(settings, group_size=0, scale_dtype="f32"), {"sha256": "v1"}, decision)
+    validate_heldout_settings(dict(settings, group_size=0, scale_dtype="f32"), archived_v1_identity(), decision)
     with pytest.raises(ValueError, match="not selected"):
         validate_heldout_settings(settings, {"sha256": "different-weights"}, decision)
     with pytest.raises(ValueError, match="not selected"):
@@ -294,7 +296,7 @@ def test_kv_fixed_weight_pair_and_vnni_measured_quality_rule():
     fp32 = dict(chosen, split="heldout", label="fp32", positions=[row], aggregate=summarize([row]),
         settings=dict(chosen["settings"], kv_dtype="f32"))
     f16 = dict(fp32, label="f16", settings=dict(fp32["settings"], kv_dtype="f16"))
-    v1 = dict(fp32, label="v1", settings=dict(fp32["settings"], group_size=0, scale_dtype="f32"), model_identity={"sha256": "v1"})
+    v1 = dict(fp32, label="v1", settings=dict(fp32["settings"], group_size=0, scale_dtype="f32"), model_identity=archived_v1_identity())
     q8 = dict(fp32, backend="llama", label="q8_0", settings={"weight_dtype": "Q8_0"})
     vnni = dict(f16, label="vnni", settings=dict(f16["settings"], kernel="vnni"))
     reports = [fp32, f16, v1, q8, vnni]
@@ -321,3 +323,121 @@ def test_kv_fixed_weight_pair_and_vnni_measured_quality_rule():
     changed = dict(fp32, model_identity={"sha256": "changed"})
     with pytest.raises(ValueError, match="not selected"):
         heldout_comparison([changed, f16, v1, q8], decision)
+
+
+def test_result_destination_guard_handles_parent_traversal_and_symlinks(tmp_path):
+    result_root = tmp_path / "results"
+    legacy = result_root / "legacy"
+    legacy.mkdir(parents=True)
+    (result_root / "v2").mkdir()
+    assert protect_destination(result_root / "v2/new.json", tmp_path) == (result_root / "v2/new.json").resolve()
+    assert protect_destination(tmp_path / "external/raw", tmp_path) == (tmp_path / "external/raw").resolve()
+    for path in (result_root / "old.json", result_root / "v2/../old.json", result_root):
+        with pytest.raises(ValueError, match="overwrite v1"):
+            protect_destination(path, tmp_path)
+    alias = tmp_path / "alias"
+    alias.symlink_to(legacy, target_is_directory=True)
+    with pytest.raises(ValueError, match="overwrite v1"):
+        protect_destination(alias / "old.json", tmp_path)
+    (result_root / "v2/escape").symlink_to(legacy, target_is_directory=True)
+    with pytest.raises(ValueError, match="overwrite v1"):
+        protect_destination(result_root / "v2/escape/old.json", tmp_path)
+
+
+def test_every_quality_stage_rejects_archived_destinations_before_inputs(tmp_path):
+    archived = ROOT / "results/llama-quality.json"
+    before = file_hash(archived)
+    # Minimal arguments demonstrate guards execute before imports/model/input reads,
+    # including an oracle invocation that could otherwise reuse complete raw data.
+    for stage in (oracle, evaluate, compare):
+        with pytest.raises(ValueError, match="overwrite v1"):
+            stage(Namespace(output=archived))
+    with pytest.raises(ValueError, match="overwrite v1"):
+        oracle(Namespace(output=tmp_path / "new.json", raw_dir=ROOT / "results/raw"))
+    with pytest.raises(ValueError, match="overwrite v1"):
+        evaluate(Namespace(output=tmp_path / "new.json", raw_dir=ROOT / "results/raw"))
+    with pytest.raises(ValueError, match="overwrite v1"):
+        compare(Namespace(output=tmp_path / "new.json", split="calibration", selection=archived))
+    with pytest.raises(ValueError, match="overwrite v1"):
+        prepare(tmp_path / "absent-model", ROOT / "results", tmp_path / "raw")
+    with pytest.raises(ValueError, match="overwrite v1"):
+        prepare(tmp_path / "absent-model", tmp_path / "output", ROOT / "results/raw")
+    with pytest.raises(ValueError, match="overwrite v1"):
+        write_json(archived, {})
+    assert file_hash(archived) == before
+
+
+@pytest.mark.parametrize("changed", ["weights", "config", "source"])
+def test_v1_baseline_requires_archived_weights_config_and_oracle_source(changed):
+    selection = selected_decision()
+    settings = {"group_size": 0, "scale_dtype": "f32", "weight_dtype": "int8"}
+    identity = archived_v1_identity()
+    source = json.loads((ROOT / "results/quantized-manifest.json").read_text())["source"]
+    selection["oracle_identity"] = {"verified_source": copy.deepcopy(source)}
+    if changed == "weights":
+        identity["files"]["model.safetensors"]["sha256"] = "0" * 64
+    elif changed == "config":
+        identity["files"]["config.json"]["sha256"] = "0" * 64
+    else:
+        selection["oracle_identity"]["verified_source"]["revision"] = "changed"
+    with pytest.raises(ValueError, match="archived v1|Archived v1"):
+        validate_heldout_settings(settings, identity, selection)
+
+
+def test_changed_v1_container_rejected_at_model_preflight(tmp_path):
+    header = {"__metadata__": {"quantization": "symmetric-per-row-int8"},
+        "matrix.weight": {"dtype": "I8", "shape": [1, 2], "data_offsets": [0, 2]}}
+    encoded = json.dumps(header).encode()
+    (tmp_path / "model.safetensors").write_bytes(struct.pack("<Q", len(encoded)) + encoded + b"\x01\x02")
+    with pytest.raises(ValueError, match="archived v1"):
+        preflight_native_model(tmp_path, {"sha256": "changed"}, selected_decision())
+
+
+def upstream_fixture(tmp_path):
+    build = tmp_path / "build"
+    directory = build / "bin"
+    directory.mkdir(parents=True)
+    libraries = {}
+    lines = []
+    for name in ("libllama.so.0", "libggml.so.0", "libggml-base.so.0", "libggml-cpu.so.0"):
+        path = directory / (name + ".1")
+        path.write_bytes(name.encode())
+        alias = directory / name
+        alias.symlink_to(path.name)
+        libraries[name] = path
+        lines.append(f"\t{name} => {alias} (0x0123)")
+    (build / "CMakeCache.txt").write_text("CMAKE_BUILD_TYPE:STRING=Release\nGGML_NATIVE:BOOL=ON\nGGML_BACKEND_DL:BOOL=OFF\n")
+    (build / "flags.make").write_text("CXX_FLAGS = -O3 -march=native\n")
+    return build, libraries, "\n".join(lines)
+
+
+def test_ldd_resolves_actual_symlink_targets_and_requires_all_upstream_dependencies(tmp_path):
+    _, libraries, text = upstream_fixture(tmp_path)
+    assert resolved_upstream_libraries(text) == libraries
+    with pytest.raises(ValueError, match="dynamically link"):
+        resolved_upstream_libraries("\n".join(text.splitlines()[:-1]))
+    with pytest.raises(ValueError, match="Unresolved"):
+        resolved_upstream_libraries(text + "\nlibggml-missing.so => not found")
+
+
+@pytest.mark.parametrize("changed", ["libllama.so.0", "libggml.so.0", "libggml-base.so.0", "libggml-cpu.so.0", "cache", "flags"])
+def test_library_or_build_changes_detected_between_windows(tmp_path, changed):
+    build, libraries, _ = upstream_fixture(tmp_path)
+    before = upstream_build_identity(libraries)
+    require_reader_identity(before, upstream_build_identity(libraries))
+    if changed == "cache":
+        with (build / "CMakeCache.txt").open("a") as stream:
+            stream.write("GGML_OPENMP:BOOL=ON\n")
+    elif changed == "flags":
+        (build / "flags.make").write_text("CXX_FLAGS = -O2\n")
+    else:
+        libraries[changed].write_bytes(b"changed-library-content")
+    with pytest.raises(ValueError, match="identity changed"):
+        require_reader_identity(before, upstream_build_identity(libraries))
+
+
+def test_unrecorded_dynamic_backend_build_rejected(tmp_path):
+    build, libraries, _ = upstream_fixture(tmp_path)
+    (build / "CMakeCache.txt").write_text("GGML_BACKEND_DL:BOOL=ON\n")
+    with pytest.raises(ValueError, match="unrecorded dynamically"):
+        upstream_build_identity(libraries)

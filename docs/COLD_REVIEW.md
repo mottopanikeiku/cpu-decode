@@ -152,3 +152,20 @@ Reviewed the completed README, generated summary/tables, traffic JSON, all prima
 The relative-output metadata fix is coherent: samples are saved before metadata bookkeeping, bookkeeping now records the actual path, and portable publication can replace an external output directory. `attempt-note.json` identifies the retained completed scalar samples, exact command and environment reference; preserving these valid samples without a new timed run is appropriate. Failed/excluded warmup attempts remain outside the final aggregation search. Numeric preservation and reader/source provenance findings remain resolved.
 
 This was source/file inspection only. **No builds, tests, models, benchmarks, linters or formatters were independently executed or rerun by this reviewer.** `results/checks.json` reports native 3 passed, fast Python 18 passed/2 explicitly optional model skips, and model-specific 11 passed/no skips; these remain parent-reported outcomes, not independent reproduction. The final result is a small, honestly bounded measurement suitable for publication within those stated limits.
+
+## Block attention, grouped weights and worker-pool review
+
+Two independent source inspections covered the new native paths and their measurement/quality consumers. The reviewers ran no models, builds, tests or timings. Their concrete findings were:
+
+- SIMD group loads accepted eight-element groups although a 16-lane load used one scale. Groups now have a minimum size of 32.
+- FP16 matrix weights could reach code expecting FP32 or int8 payloads. FP16 is supported for scales and KV, not matrix weights; unsupported matrices are rejected before access.
+- Permanently binding the calling thread in a pool constructor caused overlapping engines to discover only one allowed CPU. Binding is now scoped to a forward/job, with exact restoration on success and exceptions; nested construction uses the original outer mask.
+- Unpinned baseline workers did not establish equal process eligibility, and upstream OpenMP ignored its worker mask at one thread. Selected-set comparisons now restrict the whole process; unrestricted upstream defaults remain a separate, eligible category.
+- An experimental VNNI run could be selected without its held-out quality comparison. Final selection now requires all four Q8 comparisons, matching execution settings and linked artifact identities.
+- Quality output paths could overwrite archived results, any per-row artifact could be labeled the old control, and hashing the reader alone did not identify its actual llama/ggml shared libraries. The consumers now reject archived output paths, check the archived row-artifact hashes, and hash/recheck the resolved libraries and build settings.
+
+The author ran the updated native tests (three passed) and Python suite (117 passed, two optional model skips) after these source corrections and the separated grouped/row SIMD kernels. Those executions are not independent reproductions by the reviewers. New affinity regressions cover overlapping/replaced engines, exception restoration, nested bindings, OpenMP and the full allowed mask for unpinned workers.
+
+The development protocol was also corrected to load one model at a time: each native process exits before llama loads. Earlier interactive development records are not eligible for the final protocol. The archived first-version results remain unchanged.
+
+Performance targets and the held-out grouped-weight results are not established by this source review. Development regressions and their per-operation measurements are retained under `results/v2/`; a faster code path is not an accuracy result.

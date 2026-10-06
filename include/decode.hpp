@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include <sched.h>
 
 namespace decode {
 using Json = nlohmann::json;
@@ -18,10 +19,21 @@ float bf16_float(uint16_t value);
 float half_float(uint16_t value);
 uint16_t float_half(float value);
 Json cpu_topology();
+class CpuBinding {
+public:
+    explicit CpuBinding(int cpu);
+    ~CpuBinding();
+    CpuBinding(const CpuBinding&) = delete;
+    CpuBinding& operator=(const CpuBinding&) = delete;
+private:
+    cpu_set_t original;
+    int previous;
+    bool changed = false;
+};
 class ThreadPool {
 public:
     using Function = void (*)(void*, size_t) noexcept;
-    ThreadPool(int threads, const std::vector<int>& cpus = {}, bool persistent = true);
+    ThreadPool(int threads, const std::vector<int>& cpus = {}, bool persistent = true, bool strict_affinity = true);
     ~ThreadPool();
     ThreadPool(const ThreadPool&) = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;
@@ -76,6 +88,7 @@ struct Profile {
 };
 struct EngineOptions {
     bool cached_rope = true, scalar_attention = false, persistent_pool = true;
+    bool strict_affinity = true;
     CacheType cache_type = CacheType::f16;
     std::vector<int> cpus;
 };

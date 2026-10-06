@@ -3,6 +3,7 @@ from copy import deepcopy
 import json
 from pathlib import Path
 import subprocess
+import os
 import time
 from types import SimpleNamespace
 import xml.etree.ElementTree as ET
@@ -10,7 +11,8 @@ import xml.etree.ElementTree as ET
 import pytest
 
 from tools.figure_v2 import figure
-from tools.measure_v2 import candidates, cpu_mask, cpu_order, digest, engine_command, execute, freeze, llama_command
+from tools.download_model import file_hash
+from tools.measure_v2 import baseline_cpu_set, candidates, check_quality_eligibility, cpu_mask, cpu_order, digest, engine_command, execute, freeze, llama_command, load_quality_eligibility, native_cpu_set, validate_quality_eligibility
 from tools.summarize_v2 import profile_bytes, select_best, spread, summarize, summarize_candidate
 
 
@@ -19,8 +21,9 @@ def protocol():
     p = {"development": False, "threads": [1, 2, 4, 6, 12], "contexts": [128, 1024, 4096],
          "steps": 64, "repeats": 5, "rounds": 2, "warmup_steps": 1, "tokens": "1,2,3",
          "cpu_order": [0, 1, 4, 2, 3, 5, 6, 7, 10, 8, 9, 11], "candidates": candidates([50]),
-         "native": {"kernel": "vnni", "kv_dtype": "f16", "attention": "blocked", "scheduler": "pool",
-                    "rope": "cached", "group_size": 32, "scale_dtype": "f16"},
+         "cpu_metadata": {"allowed_cpu_ids": list(range(12))},
+         "native": {"kernel": "simd512x4", "kv_dtype": "f16", "attention": "blocked", "scheduler": "pool",
+                    "affinity": "strict", "rope": "cached", "group_size": 32, "scale_dtype": "f16"},
          "model_geometry": {"layers": 24, "kv_heads": 2, "head_dim": 64},
          "llama_commit": "6c73b3e12dc501de35fe5f6979960d06921a2f6c",
          "selection": "highest pooled median baseline; paired native only"}
@@ -41,9 +44,8 @@ def byte_counts(p, context=128, scale_bytes=3200):
 
 def window(p, thread=2, context=128):
     w = {"schema": "cpu-decode-v2-window", "protocol_id": p["id"], "threads": thread,
-         "context": context, "cpu_set": p["cpu_order"][:thread], "candidates": p["candidates"],
-         "native_settings": p["native"], "environment": {"nice": 19},
-         "native_process": {"success": True, "returncode": 0}, "invocations": []}
+         "context": context, "cpu_set": native_cpu_set(p, thread), "candidates": p["candidates"],
+         "native_settings": p["native"], "environment": {"nice": 19}, "invocations": []}
     for candidate_index, candidate in enumerate(p["candidates"]):
         for round_id in range(2):
             native_samples = [{"tokens_per_second": rate, "seconds": p["steps"] / rate,
@@ -56,22 +58,23 @@ def window(p, thread=2, context=128):
             llama = {"n_threads": thread, "n_depth": context, "n_gen": p["steps"], "n_prompt": 0,
                      "type_k": "f16", "type_v": "f16", "n_gpu_layers": 0,
                      "flash_attn": {"on": 1, "off": 0, "auto": -1}[candidate["flash_attn"]],
-                     "cpu_strict": candidate["affinity"] == "pinned", "cpu_mask": cpu_mask(w["cpu_set"]) if candidate["affinity"] == "pinned" else "0x0",
+                     "cpu_strict": candidate["affinity"] == "pinned", "cpu_mask": cpu_mask(p["cpu_order"][:thread]) if candidate["affinity"] == "pinned" else "0x0",
                      "poll": candidate["poll"], "repack": True, "backends": "CPU", "model_type": "qwen2 Q8_0",
                      "build_commit": p["llama_commit"][:8], "cpu_info": "test CPU", "model_size": 531000000,
                      "samples_ts": [rate] * 5, "samples_ns": [p["steps"] * 1e9 / rate] * 5}
-            for engine, raw, command in [("native", native, engine_command(Path("engine"), Path("model"), p, thread, context) + ["--interactive", "1"]),
+            for engine, raw, command in [("native", native, engine_command(Path("engine"), Path("model"), p, thread, context)),
                                          ("llama", [llama], llama_command(Path("llama"), Path("gguf"), p, thread, context, candidate))]:
                 w["invocations"].append({"candidate_id": candidate["id"], "engine": engine, "round": round_id,
-                                         "returncode": None if engine == "native" else 0, "request": "run" if engine == "native" else None,
+                                         "returncode": 0,
                                          "success": True, "error": None, "data": raw, "command": command,
+                                         "process_cpu_set": native_cpu_set(p, thread) if engine == "native" else baseline_cpu_set(p, thread, candidate),
                                          "stdout_file": f"{candidate['id']}-{round_id}-{engine}.stdout.txt",
                                          "stderr_file": f"{candidate['id']}-{round_id}-{engine}.stderr.txt"})
     return w
 
 
 def bandwidth(p, thread=2):
-    cpus = p["cpu_order"][:thread]
+    cpus = native_cpu_set(p, thread)
     raw = {"schema": "cpu-decode-v2-bandwidth", "protocol_id": p["id"], "threads": thread,
            "cpu_set": cpus, "environment": {"nice": 19}, "invocations": []}
     for kernel, rate in [("simd256", 10), ("simd512", 12)]:
@@ -80,7 +83,7 @@ def bandwidth(p, thread=2):
                 "samples": [{"GB_per_s": rate, "seconds": 256 * 1024 * 1024 * 128 / rate / 1e9} for _ in range(5)]}
         raw["invocations"].append({"data": data, "success": True, "returncode": 0,
                                    "command": ["taskset", "-c", ",".join(map(str, cpus)), "bandwidth", "--kernel", kernel],
-                                   "environment_overrides": {"OMP_PLACES": ",".join(f"{{{x}}}" for x in cpus), "OMP_PROC_BIND": "true", "OMP_DYNAMIC": "false"},
+                                   "environment_overrides": {"OMP_PLACES": ",".join(f"{{{x}}}" for x in cpus), "OMP_PROC_BIND": "true" if p["native"]["affinity"] == "strict" else "false", "OMP_DYNAMIC": "false"},
                                    "stdout_file": kernel + ".stdout.txt", "stderr_file": kernel + ".stderr.txt"})
     return raw
 
@@ -97,7 +100,7 @@ def test_cpu_order_preserves_fast_physical_then_smt(protocol):
     for explicit in ["0,0", "0,12", "0"]:
         with pytest.raises(ValueError, match="CPU order"):
             cpu_order(metadata, explicit, 2)
-    assert len(candidates([0, 50])) == 12
+    assert len(candidates([0, 50])) == 18
     with pytest.raises(ValueError):
         candidates([50, 50])
 
@@ -119,12 +122,14 @@ def test_best_measured_baseline_not_default_or_weakest(tmp_path, protocol):
     save_inputs(tmp_path, protocol, window(protocol))
     result = summarize(tmp_path, allow_partial=True)
     cell = result["results"][0]
-    assert cell["winner"]["candidate"]["id"] == "auto-unpinned-poll50"
-    assert cell["best_baseline_tps"]["median"] == 70
+    assert cell["winner"]["candidate"]["id"] == "auto-defaults-poll50"
+    assert cell["best_baseline_tps"]["median"] == 100
+    assert not cell["winner_core_sets_matched"]
+    assert cell["winner_baseline_cpu_set"] == list(range(12))
     assert cell["native_tps"]["median"] == 102
     assert cell["native_tps"]["samples"] == cell["best_baseline_tps"]["samples"] == 10
-    assert cell["native_samples_all_candidates"] == 60
-    assert cell["native_over_best_baseline"] == pytest.approx(102 / 70)
+    assert cell["native_samples_all_candidates"] == 90
+    assert cell["native_over_best_baseline"] == pytest.approx(102 / 100)
     assert cell["read_ceiling_tps"] == pytest.approx(12e9 / byte_counts(protocol)["total_min"])
     assert cell["percent_of_ceiling"] == pytest.approx(100 * 102 * byte_counts(protocol)["total_min"] / 12e9)
     assert not result["complete_final_matrix"]
@@ -181,7 +186,7 @@ def test_sampling_and_commands_rejected(protocol, fault):
     elif fault == "exit":
         w["invocations"][1]["returncode"] = 1
     elif fault == "process":
-        w["native_process"]["returncode"] = 1
+        w["invocations"][0]["returncode"] = 1
     elif fault == "warmupflag":
         w["invocations"][1]["command"].append("--no-warmup")
     elif fault == "priority":
@@ -215,8 +220,8 @@ def test_failed_winning_candidate_remains_visible_and_never_successful(tmp_path,
     save_inputs(tmp_path, protocol, w)
     summary = summarize(tmp_path, allow_partial=True)
     assert len(summary["failures"]) == 1
-    assert summary["failures"][0]["candidate"] == "auto-unpinned-poll50"
-    assert summary["results"][0]["missing_candidates"] == ["auto-unpinned-poll50"]
+    assert summary["failures"][0]["candidate"] == "auto-defaults-poll50"
+    assert summary["results"][0]["missing_candidates"] == ["auto-defaults-poll50"]
     assert not summary["complete_final_matrix"]
     assert all(not value for value in summary["targets_all_cells"].values())
 
@@ -297,3 +302,125 @@ def test_malformed_output_and_timeout_are_visible(tmp_path, monkeypatch):
     assert not result["success"] and result["returncode"] is None
     assert (tmp_path / "timeout.stdout.txt").read_text() == "partial"
     assert (tmp_path / "timeout.stderr.txt").read_text() == "timeout log"
+
+
+@pytest.mark.parametrize("affinity", ["pinned", "unpinned", "defaults"])
+def test_process_affinity_is_real_not_just_echoed_flags(protocol, affinity):
+    w = window(protocol, thread=1)
+    candidate = next(c for c in protocol["candidates"] if c["affinity"] == affinity)
+    runs = [r for r in w["invocations"] if r["candidate_id"] == candidate["id"] and r["engine"] == "llama"]
+    expected = list(range(12)) if affinity == "defaults" else [0]
+    assert all(r["command"][:3] == ["taskset", "-c", ",".join(map(str, expected))] for r in runs)
+    assert summarize_candidate(w, protocol, candidate)["baseline_process_cpu_set"] == expected
+    runs[0]["command"] = runs[0]["command"][3:]
+    with pytest.raises(ValueError, match="process affinity"):
+        summarize_candidate(w, protocol, candidate)
+
+
+def quality_fixture(tmp_path, protocol):
+    native = {**protocol["native"], "kernel": "vnni"}
+    artifacts = {"weights": {"sha256": "weights"}, "config": {"sha256": "config"}, "engine": {"sha256": "engine"}}
+    metrics = {"mean_kl_reference_candidate_nats": 0.1, "p99_kl_reference_candidate_nats": 0.2, "top1_agreement": 0.9, "perplexity": 4.0}
+    identity = {"files": {"model.safetensors": {"sha256": "weights"}, "config.json": {"sha256": "config"}}}
+    report = {"split": "heldout", "backend": "native", "selection_sha256": "selection",
+              "settings": native, "aggregate": metrics, "model_identity": identity,
+              "binary_identity": {"engine_binary_sha256": "engine"}}
+    report_path = tmp_path / "heldout-vnni.json"
+    report_path.write_text(json.dumps(report))
+    quality = {"split": "heldout", "selection_sha256": "selection", "selection": {"chosen": {"model_identity": identity}},
+               "evidence": [{"label": "vnni", "report": report_path.name, "sha256": file_hash(report_path), "settings": native, "aggregate": metrics},
+                            {"label": "q8_0", "aggregate": metrics}],
+               "comparison": {"q8_0_label": "q8_0", "vnni_decisions": [{"label": "vnni", "retained": True, "candidate": metrics, "q8_0": metrics}]}}
+    path = tmp_path / "quality.json"
+    path.write_text(json.dumps(quality))
+    return path, native, artifacts
+
+
+@pytest.mark.parametrize("metric,worse", [("mean_kl_reference_candidate_nats", 0.11), ("p99_kl_reference_candidate_nats", 0.21),
+                                       ("top1_agreement", 0.89), ("perplexity", 4.01)])
+def test_vnni_retained_flag_cannot_override_worse_metric(tmp_path, protocol, metric, worse):
+    path, native, artifacts = quality_fixture(tmp_path, protocol)
+    proof = load_quality_eligibility(path, native, artifacts)
+    proof["decision"]["candidate"][metric] = worse
+    with pytest.raises(ValueError, match="all four"):
+        validate_quality_eligibility(proof, native, artifacts)
+
+
+@pytest.mark.parametrize("field", ["weights_sha256", "chosen_weights_sha256", "config_sha256", "engine_binary_sha256"])
+def test_vnni_eligibility_binds_actual_artifact_and_binary(tmp_path, protocol, field):
+    path, native, artifacts = quality_fixture(tmp_path, protocol)
+    proof = load_quality_eligibility(path, native, artifacts)
+    proof[field] = "different"
+    with pytest.raises(ValueError, match="differs|weights"):
+        validate_quality_eligibility(proof, native, artifacts)
+
+
+def test_final_vnni_rejects_missing_rejected_or_mutated_decision(tmp_path, protocol):
+    path, native, artifacts = quality_fixture(tmp_path, protocol)
+    p = {**protocol, "native": native, "artifacts": artifacts}
+    with pytest.raises(ValueError, match="no retained"):
+        check_quality_eligibility(p, tmp_path)
+    p["quality_eligibility"] = load_quality_eligibility(path, native, artifacts)
+    check_quality_eligibility(p, tmp_path)
+    quality = json.loads(path.read_text())
+    quality["comparison"]["vnni_decisions"][0]["retained"] = False
+    path.write_text(json.dumps(quality))
+    with pytest.raises(ValueError, match="rejected"):
+        check_quality_eligibility(p, tmp_path)
+    p["development"] = True
+    check_quality_eligibility(p, tmp_path)
+
+
+def test_vnni_linked_report_and_execution_path_are_bound(tmp_path, protocol):
+    path, native, artifacts = quality_fixture(tmp_path, protocol)
+    changed = {**native, "attention": "scalar"}
+    with pytest.raises(ValueError, match="exactly one"):
+        load_quality_eligibility(path, changed, artifacts)
+    (tmp_path / "heldout-vnni.json").write_text("{}")
+    with pytest.raises(ValueError, match="report hash"):
+        load_quality_eligibility(path, native, artifacts)
+
+
+def test_freeze_keeps_nice19_requirement(tmp_path, monkeypatch):
+    args = SimpleNamespace(model=tmp_path, gguf=tmp_path, llama=tmp_path, model_manifest=tmp_path,
+                           kv="f16", steps=64, repeats=5, development=False)
+    monkeypatch.setattr(os, "getpriority", lambda *args: 0)
+    with pytest.raises(ValueError, match="nice 19"):
+        freeze(args, {})
+
+
+def test_summary_rejects_final_vnni_without_eligibility(tmp_path, protocol):
+    protocol["native"]["kernel"] = "vnni"
+    protocol["id"] = digest({k: v for k, v in protocol.items() if k != "id"})
+    (tmp_path / "protocol.json").write_text(json.dumps(protocol))
+    with pytest.raises(ValueError, match="no retained"):
+        summarize(tmp_path)
+
+
+def test_unpinned_native_inherits_full_mask_and_keeps_baseline_categories(tmp_path, protocol):
+    protocol["native"]["affinity"] = "unpinned"
+    protocol["id"] = digest({k: v for k, v in protocol.items() if k != "id"})
+    w = window(protocol)
+    native_runs = [r for r in w["invocations"] if r["engine"] == "native"]
+    assert w["cpu_set"] == list(range(12))
+    assert all("--cpu-set" not in r["command"] for r in native_runs)
+    assert all(r["command"][r["command"].index("--affinity") + 1] == "unpinned" for r in native_runs)
+    save_inputs(tmp_path, protocol, w)
+    summary = summarize(tmp_path, allow_partial=True)
+    cell = summary["results"][0]
+    assert cell["native_affinity"] == "unpinned"
+    assert cell["cpu_set"] == list(range(12)) and cell["selected_cpu_set"] == [0, 1]
+    assert cell["winner_core_sets_matched"]
+    assert not next(c for c in cell["candidates"] if c["candidate"]["affinity"] == "pinned")["comparison_core_sets_matched"]
+    assert not summary["failures"]
+    native_runs[0]["command"] += ["--cpu-set", "0,1"]
+    with pytest.raises(ValueError, match="inherit"):
+        summarize_candidate(w, protocol, protocol["candidates"][0])
+
+
+def test_interactive_native_overlap_is_rejected(protocol):
+    w = window(protocol)
+    w["invocations"][0]["command"] += ["--interactive", "1"]
+    w["invocations"][0]["request"] = "run"
+    with pytest.raises(ValueError, match="exit before baseline"):
+        summarize_candidate(w, protocol, protocol["candidates"][0])

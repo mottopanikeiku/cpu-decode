@@ -7,7 +7,7 @@ import math
 import statistics
 from pathlib import Path
 
-from tools.measure_v2 import ABLATION_CELLS, ABLATION_LABELS, CONTEXTS, ROOT, THREADS, candidates, cpu_mask, digest
+from tools.measure_v2 import ABLATION_CELLS, ABLATION_LABELS, CONTEXTS, ROOT, THREADS, baseline_cpu_set, candidates, check_quality_eligibility, cpu_mask, digest, native_cpu_set, validate_quality_eligibility
 from tools.portable import portable
 
 BYTE_COMPONENTS = ["matrix_weights", "scales", "norm_bias", "embedding", "kv_read_min", "kv_write"]
@@ -56,6 +56,11 @@ def profile_bytes(samples: list[dict], geometry: dict, kv_dtype: str, context: i
 
 def native_samples(invocation: dict, window: dict, protocol: dict, settings: dict) -> list[dict]:
     raw = invocation["data"]
+    if raw.get("kernel") == "vnni" and not protocol["development"] and window.get("schema") != "cpu-decode-v2-ablation":
+        proof = protocol.get("quality_eligibility")
+        if not proof:
+            raise ValueError("final VNNI samples have no retained quality eligibility")
+        validate_quality_eligibility(proof, protocol["native"], protocol["artifacts"])
     expected = {"threads": window["threads"], "context": window["context"], "steps": protocol["steps"],
                 "repeats": protocol["repeats"], "warmup_steps": 1, "cpu_set": window["cpu_set"],
                 "prompt_tokens": [int(x) for x in protocol["tokens"].split(",")],
@@ -68,11 +73,21 @@ def native_samples(invocation: dict, window: dict, protocol: dict, settings: dic
                        "--repeats": protocol["repeats"], "--tokens": protocol["tokens"], "--kernel": settings["kernel"],
                        "--kv": settings["kv_dtype"], "--attention": settings["attention"],
                        "--scheduler": settings["scheduler"], "--rope": settings["rope"],
-                       "--cpu-set": ",".join(map(str, window["cpu_set"])), "--interactive": "1"}.items():
+                       "--affinity": settings["affinity"]}.items():
         if flag(command, key) != str(value):
             raise ValueError(f"native command mismatch: {key}")
-    if invocation.get("request") != "run" or len(raw["samples"]) != protocol["repeats"]:
-        raise ValueError("native request/repetition count mismatch")
+    expected_cpus = native_cpu_set(protocol, window["threads"], settings)
+    if window["cpu_set"] != expected_cpus or invocation.get("process_cpu_set") != expected_cpus:
+        raise ValueError("native process CPU set record mismatch")
+    if settings["affinity"] == "strict":
+        if flag(command, "--cpu-set") != ",".join(map(str, expected_cpus)):
+            raise ValueError("strict native CPU set mismatch")
+    elif "--cpu-set" in command:
+        raise ValueError("unpinned native must inherit the full allowed mask without --cpu-set")
+    if "--interactive" in command or invocation.get("request") is not None:
+        raise ValueError("native must exit before baseline loading; interactive overlap is not permitted")
+    if invocation["returncode"] != 0 or len(raw["samples"]) != protocol["repeats"]:
+        raise ValueError("native process exit/repetition count mismatch")
     for sample in raw["samples"]:
         if len(sample["step_seconds"]) != protocol["steps"] or len(sample["generated_tokens"]) != protocol["steps"]:
             raise ValueError("native measured token count mismatch")
@@ -91,12 +106,17 @@ def baseline_samples(invocation: dict, window: dict, protocol: dict, candidate: 
                 "flash_attn": {"on": 1, "off": 0, "auto": -1}[candidate["flash_attn"]],
                 "cpu_strict": pinned, "poll": candidate["poll"], "repack": True, "backends": "CPU"}
     require(raw, expected, "baseline settings")
-    expected_mask = cpu_mask(window["cpu_set"]) if pinned else "0x0"
+    expected_mask = cpu_mask(protocol["cpu_order"][:window["threads"]]) if pinned else "0x0"
     if int(raw["cpu_mask"], 16) != int(expected_mask, 16):
         raise ValueError("baseline affinity mask mismatch")
     if "Q8_0" not in raw["model_type"] or not protocol["llama_commit"].startswith(raw["build_commit"]) or len(raw["build_commit"]) < 7:
         raise ValueError("baseline is not the pinned Q8_0 build")
     command = invocation["command"]
+    expected_cpus = baseline_cpu_set(protocol, window["threads"], candidate)
+    if command[:2] != ["taskset", "-c"] or command[2] != ",".join(map(str, expected_cpus)):
+        raise ValueError("baseline process affinity must match the recorded selected/default CPU set")
+    if invocation.get("process_cpu_set") != expected_cpus:
+        raise ValueError("baseline process CPU set record mismatch")
     for key, value in {"-p": 0, "-n": protocol["steps"], "-d": window["context"], "-t": window["threads"],
                        "-r": protocol["repeats"], "-ngl": 0, "-ctk": "f16", "-ctv": "f16",
                        "-fa": candidate["flash_attn"], "--cpu-mask": expected_mask,
@@ -116,9 +136,9 @@ def baseline_samples(invocation: dict, window: dict, protocol: dict, candidate: 
 
 def summarize_candidate(window: dict, protocol: dict, candidate: dict) -> dict:
     require(window, {"protocol_id": protocol["id"], "native_settings": protocol["native"],
-                     "cpu_set": protocol["cpu_order"][:window["threads"]]}, "window settings")
-    if window["environment"]["nice"] < 19 or not window["native_process"]["success"] or window["native_process"]["returncode"] != 0:
-        raise ValueError("window priority or shared native process failure")
+                     "cpu_set": native_cpu_set(protocol, window["threads"])}, "window settings")
+    if window["environment"]["nice"] < 19:
+        raise ValueError("window priority failure")
     runs = [r for r in window["invocations"] if r["candidate_id"] == candidate["id"]]
     expected_order = [(engine, round_id) for round_id in range(protocol["rounds"]) for engine in ["native", "llama"]]
     if [(r["engine"], r["round"]) for r in runs] != expected_order:
@@ -144,6 +164,9 @@ def summarize_candidate(window: dict, protocol: dict, candidate: dict) -> dict:
     bytes_per_token = profile_bytes(samples, protocol["model_geometry"], protocol["native"]["kv_dtype"], window["context"], protocol["steps"])
     return {"candidate": candidate, "native_tps": native, "baseline_tps": baseline,
             "baseline_configurations": configurations, "invocations_per_engine": protocol["rounds"],
+            "baseline_process_cpu_set": baseline_cpu_set(protocol, window["threads"], candidate),
+            "comparison_core_sets_matched": set(baseline_cpu_set(protocol, window["threads"], candidate)) == set(window["cpu_set"]),
+            "affinity_scope": "full-allowed-defaults" if candidate["affinity"] == "defaults" else "selected-core-set",
             "bytes_per_token": bytes_per_token, "observed_native_kernels": sorted({r["data"]["kernel"] for r in runs if r["engine"] == "native"}),
             "raw": [{k: r[k] for k in ["engine", "round", "command", "stdout_file", "stderr_file"]} for r in runs]}
 
@@ -155,7 +178,7 @@ def select_best(rows: list[dict]) -> dict:
 
 
 def summarize_bandwidth(raw: dict, protocol: dict) -> dict:
-    require(raw, {"protocol_id": protocol["id"], "cpu_set": protocol["cpu_order"][:raw["threads"]]}, "bandwidth affinity")
+    require(raw, {"protocol_id": protocol["id"], "cpu_set": native_cpu_set(protocol, raw["threads"])}, "bandwidth affinity")
     if raw["environment"]["nice"] < 19:
         raise ValueError("bandwidth needs nice 19")
     rows = []
@@ -168,7 +191,8 @@ def summarize_bandwidth(raw: dict, protocol: dict) -> dict:
         if command[:2] != ["taskset", "-c"] or command[2] != ",".join(map(str, raw["cpu_set"])):
             raise ValueError("bandwidth must pin the same selected core set")
         overrides = run["environment_overrides"]
-        require(overrides, {"OMP_PLACES": ",".join(f"{{{x}}}" for x in raw["cpu_set"]), "OMP_PROC_BIND": "true", "OMP_DYNAMIC": "false"}, "bandwidth OpenMP affinity")
+        binding = "true" if protocol["native"]["affinity"] == "strict" else "false"
+        require(overrides, {"OMP_PLACES": ",".join(f"{{{x}}}" for x in raw["cpu_set"]), "OMP_PROC_BIND": binding, "OMP_DYNAMIC": "false"}, "bandwidth OpenMP affinity")
         if len(data["samples"]) != protocol["repeats"] or data["array_bytes"] < 256 * 1024 * 1024:
             raise ValueError("bandwidth repetition count/working set mismatch")
         for sample in data["samples"]:
@@ -189,11 +213,12 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
         raise ValueError("frozen protocol digest mismatch")
     if not allow_partial and (protocol["development"] or protocol["steps"] < 64 or protocol["repeats"] < 5 or protocol["rounds"] != 2):
         raise ValueError("final summary requires final sampling settings")
+    check_quality_eligibility(protocol, directory)
     if protocol["native"]["kv_dtype"] != "f16" or protocol["warmup_steps"] != 1:
         raise ValueError("comparison protocol requires F16 KV and one warmup step")
     polls = list(dict.fromkeys(c["poll"] for c in protocol["candidates"]))
     if protocol["candidates"] != candidates(polls):
-        raise ValueError("baseline candidate set must cover on/off/auto and pinned/unpinned")
+        raise ValueError("baseline candidate set must cover on/off/auto and pinned/unpinned/defaults")
     expected_candidates = {c["id"]: c for c in protocol["candidates"]}
     groups, failures, bandwidth = {}, [], {}
     for path in sorted(directory.glob("*.json")):
@@ -229,9 +254,12 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
         ceiling = bw["winner"]["GB_per_s"]["median"] * 1e9 / winner["bytes_per_token"]["total_min"] if bw else None
         percentage = 100 * winner["native_tps"]["median"] / ceiling if ceiling else None
         ratio = winner["native_tps"]["median"] / winner["baseline_tps"]["median"]
-        results.append({"threads": thread, "context": context, "cpu_set": protocol["cpu_order"][:thread],
+        results.append({"threads": thread, "context": context, "cpu_set": native_cpu_set(protocol, thread),
+                        "native_affinity": protocol["native"]["affinity"], "selected_cpu_set": protocol["cpu_order"][:thread],
                         "native_tps": winner["native_tps"], "best_baseline_tps": winner["baseline_tps"],
                         "winner": winner, "candidates": list(measured.values()), "missing_candidates": missing,
+                        "winner_core_sets_matched": winner["comparison_core_sets_matched"],
+                        "winner_baseline_cpu_set": winner["baseline_process_cpu_set"],
                         "native_samples_all_candidates": sum(r["native_tps"]["samples"] for r in measured.values()),
                         "native_over_best_baseline": ratio, "read_ceiling_tps": ceiling,
                         "read_GB_per_s": bw and bw["winner"]["GB_per_s"], "bandwidth_file": bw and bw["file"],
@@ -250,9 +278,9 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
         try:
             if (raw["threads"], raw["context"]) not in ABLATION_CELLS:
                 raise ValueError("ablation outside fixed cells")
-            require(raw, {"protocol_id": protocol["id"], "cpu_set": protocol["cpu_order"][:raw["threads"]]}, "ablation settings")
-            if not raw["native_process"]["success"] or raw["native_process"]["returncode"] != 0 or raw["environment"]["nice"] < 19:
-                raise ValueError("ablation process/priority failure")
+            require(raw, {"protocol_id": protocol["id"], "cpu_set": native_cpu_set(protocol, raw["threads"], raw["native_settings"])}, "ablation settings")
+            if raw["environment"]["nice"] < 19:
+                raise ValueError("ablation priority failure")
             if [(r["engine"], r["round"]) for r in raw["invocations"]] != [("native", i) for i in range(protocol["rounds"])]:
                 raise ValueError("ablation round count mismatch")
             samples = []
@@ -280,6 +308,7 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
     return {"schema": "cpu-decode-v2-summary", "protocol_id": protocol["id"], "development": protocol["development"],
             "complete_final_matrix": complete and not protocol["development"], "missing_cells": sorted(expected_cells - cells),
             "selection": protocol["selection"], "selection_bias": "winner selected and reported on the same samples; no independent holdout",
+            "quality_eligibility": protocol.get("quality_eligibility"),
             "statistic": "median rates; min/max and 100*(max-min)/median spread; >5% disclosed, never discarded",
             "rates_kind": "MEAS", "read_ceiling_kind": "EXT",
             "thresholds": {"native_over_best_baseline": target_ratio, "percent_of_ceiling": target_ceiling_percent},

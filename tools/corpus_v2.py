@@ -141,6 +141,7 @@ def prepare(model: Path, output_dir: Path, raw_dir: Path) -> dict:
     data = {"model_id": MODEL_ID, "revision": REVISION, "policy": POLICY, "sources": {}, "windows": []}
     for split, source in SOURCES.items():
         path = raw_dir / f"{source['id']}.txt"
+        protect_destination(path)
         if not path.exists():
             with urllib.request.urlopen(source["url"], timeout=60) as response:
                 path.write_bytes(response.read())
@@ -159,6 +160,7 @@ def prepare(model: Path, output_dir: Path, raw_dir: Path) -> dict:
         if tokenizer.encode(excerpt, add_special_tokens=False) != selected:
             raise ValueError("Selected token boundary does not round-trip to the attributed text")
         excerpt_name = f"{split}-excerpt.txt"
+        protect_destination(output_dir / excerpt_name)
         (output_dir / excerpt_name).write_text(excerpt, encoding="utf-8")
         data["sources"][split] = dict(source, license=LICENSE, license_url=LICENSE_URL,
             excerpt=excerpt_name, excerpt_sha256=file_hash(output_dir / excerpt_name),

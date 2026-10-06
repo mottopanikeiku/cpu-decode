@@ -1,5 +1,6 @@
 #include "decode.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -268,8 +269,86 @@ void engine_tests(const fs::path& root) {
     { Json config; std::ifstream(root / "bf16/config.json") >> config; config["num_attention_heads"] = 3; std::ofstream(root / "bad/config.json") << config.dump(); }
     fails([&] { decode::Engine engine((root / "bad").string(), decode::Kernel::scalar, 1, 4); }, "invalid architecture rejected");
 }
+void affinity_tests(const fs::path& root) {
+    cpu_set_t original;
+    require(sched_getaffinity(0, sizeof(original), &original) == 0, "read test affinity");
+    auto preferred = decode::cpu_topology()["preferred_cpu_ids"].get<std::vector<int>>();
+    auto check_restored = [&] {
+        cpu_set_t current; require(sched_getaffinity(0, sizeof(current), &current) == 0, "read current test affinity");
+        require(CPU_EQUAL(&original, &current), "restore exact caller affinity");
+    };
+    {
+        decode::Engine first((root / "bf16").string(), decode::Kernel::scalar, 1, 8);
+        decode::Engine second((root / "bf16").string(), decode::Kernel::scalar, 6, 8);
+        std::vector<int> expected; for (size_t j = 0; j < 6; ++j) expected.push_back(preferred[j % preferred.size()]);
+        require(second.metadata()["cpu_set"] == expected, "overlapping engines select original allowed cores");
+        check_restored(); first.step(1, true); check_restored(); second.step(1, true); check_restored();
+        fails([&] { second.step(11, true); }, "step failure still restores affinity"); check_restored();
+        first = decode::Engine((root / "bf16").string(), decode::Kernel::scalar, 6, 8);
+        require(first.metadata()["cpu_set"] == expected, "replacement engine preserves full core selection");
+        check_restored();
+    }
+    check_restored();
+    {
+        decode::CpuBinding outer(preferred[0]);
+        decode::ThreadPool nested(2);
+        require(nested.cpus()[0] == preferred[0] && nested.cpus()[1] == preferred[1 % preferred.size()], "nested pool uses outer allowed mask");
+        if (preferred.size() > 1) {
+            decode::CpuBinding inner(preferred[1]);
+            require(decode::cpu_topology()["preferred_cpu_ids"] == preferred, "nested binding retains original topology");
+        }
+    }
+    check_restored();
+    for (bool persistent : {true, false}) {
+        decode::ThreadPool pool(2, {}, persistent);
+        size_t counts[3]{};
+        pool.run(3, [](void* ptr, size_t index) noexcept { static_cast<size_t*>(ptr)[index] = index + 1; }, counts);
+        require(counts[0] == 1 && counts[1] == 2 && counts[2] == 3, "pool runs every fixed task");
+        check_restored();
+        fails([&] { pool.run(1, nullptr, nullptr); }, "invalid callback"); check_restored();
+    }
+    for (bool persistent : {true, false}) {
+        struct Probe { cpu_set_t expected; std::atomic<bool> mismatch{false}; size_t counts[128]{}; } probe;
+        probe.expected = original;
+        {
+            decode::CpuBinding outer(preferred[0]);
+            decode::ThreadPool pool(2, {}, persistent, false);
+            require(pool.cpus() == decode::cpu_topology()["allowed_cpu_ids"].get<std::vector<int>>(), "unpinned pool reports full allowed mask");
+            pool.run(128, [](void* ptr, size_t index) noexcept {
+                auto& p = *static_cast<Probe*>(ptr); cpu_set_t current;
+                if (sched_getaffinity(0, sizeof(current), &current) || !CPU_EQUAL(&current, &p.expected)) p.mismatch.store(true);
+                p.counts[index] = index + 1;
+            }, &probe);
+            require(!probe.mismatch.load(), "all unpinned tasks use original full allowed mask");
+            cpu_set_t current; require(sched_getaffinity(0, sizeof(current), &current) == 0 && CPU_COUNT(&current) == 1 && CPU_ISSET(preferred[0], &current), "unpinned run restores enclosing strict binding");
+        }
+        for (size_t index = 0; index < 128; ++index) require(probe.counts[index] == index + 1, "unpinned fixed tasks complete");
+        check_restored();
+    }
+    {
+        decode::EngineOptions options; options.strict_affinity = false;
+        decode::Engine unpinned((root / "bf16").string(), decode::Kernel::scalar, 2, 8, options);
+        decode::Engine strict((root / "bf16").string(), decode::Kernel::scalar, 2, 8);
+        require(unpinned.metadata()["affinity"] == "unpinned" && unpinned.metadata()["cpu_set"] == decode::cpu_topology()["allowed_cpu_ids"], "unpinned engine reports actual allowed CPUs");
+        for (int token : {1, 4, 2}) {
+            const auto& expected = strict.step(token, true); const auto& actual = unpinned.step(token, true);
+            require(std::memcmp(expected.data(), actual.data(), actual.size() * sizeof(float)) == 0, "unpinned and strict logits bitwise equal");
+            check_restored();
+        }
+        fails([&] { decode::ThreadPool invalid(1, {preferred[0]}, true, false); }, "unpinned explicit CPU set rejected");
+    }
+}
 void group_kernel_tests(const fs::path& root) {
-    constexpr size_t rows = 3, cols = 128;
+    constexpr size_t rows = 5, cols = 128;
+    {
+        decode::ThreadPool pool(1);
+        float input16[16]{}, output[1], scales8[2]{1, 2};
+        uint16_t half_weights[16]{}; int8_t weights8[16]{};
+        decode::Matrix unsupported{half_weights, nullptr, 1, 16, decode::DType::f16};
+        fails([&] { decode::matvec(unsupported, input16, output, decode::Kernel::scalar, pool); }, "FP16 matrix rejected before access");
+        decode::Matrix too_small{weights8, scales8, 1, 16, decode::DType::i8, 8, decode::DType::f32};
+        for (auto kernel : kernels()) fails([&] { decode::matvec(too_small, input16, output, kernel, pool); }, "unsupported eight-element group rejected consistently");
+    }
     std::vector<float> weights(rows * cols), input(cols), actual(rows), expected(rows);
     std::vector<int8_t> bytes(weights.size());
     for (size_t j = 0; j < weights.size(); ++j) weights[j] = std::sin(float(j) * .37f) * .4f;
@@ -390,7 +469,7 @@ int main() {
     if (!directory) { std::cerr << "cannot create temporary directory\n"; return 1; }
     fs::path root(directory);
     try {
-        numeric_tests(); engine_tests(root); group_kernel_tests(root); optimized_tests(root); fs::remove_all(root);
+        numeric_tests(); engine_tests(root); affinity_tests(root); group_kernel_tests(root); optimized_tests(root); fs::remove_all(root);
         std::cout << "synthetic numerical and malformed-input tests passed\n"; return 0;
     } catch (const std::exception& error) {
         fs::remove_all(root); std::cerr << error.what() << '\n'; return 1;

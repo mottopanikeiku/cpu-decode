@@ -51,7 +51,7 @@ void usage() {
                  "cpu-decode logits --model DIR --tokens ID,ID --output PREFIX [--threads N --kernel scalar|simd256|simd512|simd512x4]\n"
                  "cpu-decode generate --model DIR --tokens ID,ID --steps N [--output JSON --threads N --kernel ...]\n"
                  "cpu-decode bench --model DIR --tokens ID,ID --context N --steps N --repeats N [--output JSON --threads N --kernel ...]\n"
-                 "Forward modes: --rope cached|direct --kv f16|f32 --attention blocked|scalar --scheduler pool|openmp --cpu-set IDS.\n"
+                 "Forward modes: --rope cached|direct --kv f16|f32 --attention blocked|scalar --scheduler pool|openmp --affinity strict|unpinned --cpu-set IDS.\n"
                  "Kernel defaults to auto (FP32 activations); vnni quantizes activations in groups of32.\n"
                  "logits accepts --logits-start N to skip the head on priming positions. bench --interactive 1 uses run/quit lines.\n"
                  "Token IDs only; generation does not stop at EOS. logits writes PREFIX.bin float32 [positions,vocab] and PREFIX.json.\n";
@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
             if (argc != 2) throw std::runtime_error("cpus takes no arguments");
             emit(decode::cpu_topology(), ""); return 0;
         }
-        std::set<std::string> known{"--model", "--output", "--tokens", "--threads", "--kernel", "--steps", "--context", "--repeats", "--rope", "--kv", "--attention", "--scheduler", "--cpu-set", "--group-size", "--scale-dtype", "--logits-start", "--interactive"};
+        std::set<std::string> known{"--model", "--output", "--tokens", "--threads", "--kernel", "--steps", "--context", "--repeats", "--rope", "--kv", "--attention", "--scheduler", "--affinity", "--cpu-set", "--group-size", "--scale-dtype", "--logits-start", "--interactive"};
         std::map<std::string, std::string> options;
         for (int i = 2; i < argc; i += 2) {
             std::string key(argv[i]);
@@ -97,10 +97,12 @@ int main(int argc, char** argv) {
         if (rope_mode != "cached" && rope_mode != "direct") throw std::runtime_error("rope must be cached or direct");
         decode::EngineOptions engine_options;
         engine_options.cached_rope = rope_mode == "cached";
-        std::string kv = option("--kv", "f16"), attention = option("--attention", "blocked"), scheduler = option("--scheduler", "pool");
+        std::string kv = option("--kv", "f16"), attention = option("--attention", "blocked"), scheduler = option("--scheduler", "pool"), affinity = option("--affinity", "strict");
         if (kv != "f16" && kv != "f32") throw std::runtime_error("kv must be f16 or f32");
         if (attention != "blocked" && attention != "scalar") throw std::runtime_error("attention must be blocked or scalar");
         if (scheduler != "pool" && scheduler != "openmp") throw std::runtime_error("scheduler must be pool or openmp");
+        if (affinity != "strict" && affinity != "unpinned") throw std::runtime_error("affinity must be strict or unpinned");
+        engine_options.strict_affinity = affinity == "strict";
         engine_options.cache_type = kv == "f16" ? decode::CacheType::f16 : decode::CacheType::f32;
         engine_options.scalar_attention = attention == "scalar"; engine_options.persistent_pool = scheduler == "pool";
         if (!option("--cpu-set", "").empty()) engine_options.cpus = tokens(option("--cpu-set", ""));
