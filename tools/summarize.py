@@ -52,10 +52,17 @@ def main() -> None:
         if len(matches) != 1:
             raise ValueError(f"Expected one matching llama test in {llama_path}")
         llama_rate = spread(matches[0]["samples_ts"])
+        baseline = matches[0]
+        if (baseline.get("type_k"), baseline.get("type_v"), baseline.get("flash_attn"), baseline.get("n_gpu_layers")) != ("f16", "f16", -1, 0) or "Q8_0" not in baseline.get("model_type", ""):
+            raise ValueError("Expected CPU Q8_0 baseline with F16 KV and flash attention auto")
+        if raw.get("warmup_steps") != 1 or len(raw["samples"]) != raw["repeats"] or len(baseline["samples_ts"]) != raw["repeats"]:
+            raise ValueError("Expected one native warmup step and matched repetition counts")
         eager = load(eager_path)
-        expected = {"threads": thread, "context": context, "steps": raw["steps"], "seed_token_ids": raw["prompt_tokens"]}
+        expected = {"threads": thread, "context": context, "steps": raw["steps"], "seed_token_ids": raw["prompt_tokens"], "warmup_steps": 1}
         if any(eager.get(key) != value for key, value in expected.items()):
             raise ValueError(f"Eager settings do not match engine inputs in {eager_path}")
+        if len(eager["samples"]) != raw["repeats"]:
+            raise ValueError("Eager repetition count does not match engine samples")
         eager_rate = spread([r["tokens_per_second"] for r in eager["samples"]])
         operation_medians = {key: statistics.median(s["operation_seconds"][key] / raw["steps"] for s in raw["samples"])
                              for key in raw["samples"][0]["operation_seconds"]}

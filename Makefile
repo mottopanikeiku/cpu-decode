@@ -26,6 +26,12 @@ correctness:
 	$(RUN) uv run python -m tools.reference --model $(MODEL) --quant-model $(QUANT) --engine build/cpu-decode --kernel simd512x4 --output results/correctness.json
 	$(RUN) uv run python -m tools.summarize_quality
 
+.PHONY: llama-quality
+llama-quality:
+	$(RUN) cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPU_DECODE_LLAMA_ROOT="$(LLAMA_ROOT)"
+	$(RUN) cmake --build build --target llama-logits -j4
+	$(RUN) uv run python -m tools.llama_quality --model "$(GGUF)" --reader build/llama-logits --reference-dir external/reference --artifact-manifest results/llama-preparation.json --threads 1 --output results/llama-quality.json
+
 model-test:
 	CPU_DECODE_MODEL=$(MODEL) CPU_DECODE_QUANT_MODEL=$(QUANT) CPU_DECODE_KERNEL=simd512x4 $(RUN) uv run pytest -q tests/test_reference.py
 
@@ -44,3 +50,7 @@ measure:
 	$(RUN) uv run python -m tools.measure engine --model $(MODEL) --threads 6 --contexts 128 --kernels scalar --output results/ablations/bf16-cached
 	$(RUN) uv run python -m tools.measure engine --model $(QUANT) --threads 6 --contexts 128 --kernels simd512x4 --rope direct --output results/ablations/int8-direct
 	$(RUN) uv run python -m tools.summarize
+
+.PHONY: traffic
+traffic:
+	$(RUN) uv run python -m tools.traffic --llama-root $(LLAMA_ROOT) --gguf $(GGUF)

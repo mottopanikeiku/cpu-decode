@@ -45,7 +45,7 @@ def benchmark(args) -> dict:
             del hidden
             decoded = []
             begin = time.perf_counter_ns()
-            for _ in range(args.steps):
+            for _ in range(1 if repeat < 0 else args.steps):
                 decoded.append(next_token)
                 result = model.model(input_ids=torch.tensor([[next_token]], dtype=torch.long), past_key_values=cache, use_cache=True, return_dict=True)
                 cache = result.past_key_values
@@ -73,6 +73,7 @@ def main() -> None:
     if min(args.context, args.threads, args.steps, args.repeats, args.prefill_chunk) < 1:
         parser.error("context, threads, steps, repeats and prefill-chunk must be positive")
     result = portable(benchmark(args), {args.model.resolve(): "$MODEL", sys.executable: "$PYTHON"})
+    result["warmup_steps"] = 1
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2) + "\n")

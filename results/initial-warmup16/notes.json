@@ -1,0 +1,8 @@
+{
+  "reason_excluded": "Native warmup used 16 steps. Independent source review established that the unchanged upstream baseline warms only one decoding step; final native and eager runs were corrected to one step before comparison.",
+  "context": 128,
+  "steps": 16,
+  "repeats": 3,
+  "warmup_steps": 16,
+  "scope": "These native samples are retained, not included in final tables. Supported F16/AUTO llama samples from the same attempt remain valid and are reused."
+}

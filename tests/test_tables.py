@@ -22,10 +22,10 @@ def test_summary_uses_matched_baselines_and_byte_bound(tmp_path: Path) -> None:
     inputs.mkdir()
     ablations.mkdir()
     bandwidth = {"threads": 6, "kernel": "simd512", "samples": [{"GB_per_s": r} for r in [1, 2, 1.5]]}
-    engine = {"threads": 6, "context": 128, "steps": 16, "kernel": "simd512", "weight_dtype": "int8", "rope": "cached", "prompt_tokens": [1, 2, 3],
+    engine = {"threads": 6, "context": 128, "steps": 16, "repeats": 3, "warmup_steps": 1, "kernel": "simd512", "weight_dtype": "int8", "rope": "cached", "prompt_tokens": [1, 2, 3],
               "samples": [{"tokens_per_second": r, "bytes_per_token": {"total_min": 1000}, "operation_seconds": {"lm_head": 0.16}} for r in [10, 12, 11]]}
-    llama = [{"n_threads": 6, "n_depth": 128, "n_gen": 16, "samples_ts": [20, 22, 21]}]
-    eager = {"threads": 6, "context": 128, "steps": 16, "seed_token_ids": [1, 2, 3],
+    llama = [{"n_threads": 6, "n_depth": 128, "n_gen": 16, "samples_ts": [20, 22, 21], "type_k": "f16", "type_v": "f16", "flash_attn": -1, "n_gpu_layers": 0, "model_type": "Q8_0"}]
+    eager = {"threads": 6, "context": 128, "steps": 16, "warmup_steps": 1, "seed_token_ids": [1, 2, 3],
              "samples": [{"tokens_per_second": r} for r in [5, 7, 6]]}
     for name, data in [("bandwidth-t6-c0-simd512", bandwidth), ("engine-t6-c128-simd512", engine),
                        ("llama-t6-c128-baseline", llama), ("eager-t6-c128-baseline", eager)]:
@@ -40,7 +40,7 @@ def test_summary_uses_matched_baselines_and_byte_bound(tmp_path: Path) -> None:
     assert result["percent_of_ceiling"] == pytest.approx(100 * 11 / 1.5e6)
     assert result["engine_over_llama"] == pytest.approx(11 / 21)
     assert result["operation_seconds_per_token"]["lm_head"] == pytest.approx(0.01)
-    for key, value in [("threads", 4), ("context", 1024), ("steps", 8), ("seed_token_ids", [3, 2, 1])]:
+    for key, value in [("threads", 4), ("context", 1024), ("steps", 8), ("seed_token_ids", [3, 2, 1]), ("warmup_steps", 16)]:
         (inputs / "eager-t6-c128-baseline.json").write_text(json.dumps({**eager, key: value}))
         failed = subprocess.run(command, capture_output=True, text=True, cwd=Path(__file__).resolve().parents[1])
         assert failed.returncode != 0

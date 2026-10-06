@@ -17,10 +17,10 @@
   },
   "python_fast": {
     "command": "nice -n 19 uv run pytest -q tests",
-    "passed": 14,
+    "passed": 18,
     "skipped": 2,
     "skip_reason": "Real model integrations require explicit CPU_DECODE_MODEL",
-    "covers": "Dense versus memory-bounded FP32 oracle, KL calculations, pinned-source rejection, explicit missing-engine rejection, matched table arithmetic and portable metadata"
+    "covers": "Dense versus memory-bounded FP32 oracle, KL calculations, pinned-source rejection, explicit missing-engine rejection, matched table arithmetic and portable metadata; baseline quality aggregation/pin rejection and failed-command preservation"
   },
   "pinned_model_integration": {
     "command": "nice -n 19 make model-test",
@@ -44,5 +44,12 @@
     "command": "nice -n 19 uv run python -m tools.generate --model $INT8 --tokenizer $MODEL --prompt 'Why is the sky blue?' --chat --steps 16 --threads 6",
     "result": "passed",
     "note": "Tokenization, native generation and text decoding ran. This is not an answer-quality evaluation."
+  },
+  "llama_quality": {
+    "command": "nice -n 19 uv run python -m tools.llama_quality --model $GGUF",
+    "result": "completed",
+    "file": "results/llama-quality.json",
+    "threads": 1,
+    "scope": "Teacher-forced full-vocabulary logits on the four fixed prompts; independent greedy generation not run"
   }
 }

@@ -1,0 +1,1785 @@
+{
+  "label": "llama.cpp Q8_0",
+  "quality_reporting_only": true,
+  "quality_thresholds": null,
+  "independent_greedy_generation_checked": false,
+  "comparison": "Full-vocabulary logits at every position on the exact oracle teacher-forced tokens; KL(reference || candidate) in nats",
+  "scope": "Four fixed prompts only; prompt-only includes every prompt position, and the larger scope also includes the oracle's reference continuation inputs",
+  "compared_path": {
+    "weight_quantization": "Q8_0",
+    "kv_dtype": "float16",
+    "flash_attention": "auto",
+    "threads": 1,
+    "batch_size": 1,
+    "fresh_context_per_prompt": true
+  },
+  "identity": {
+    "llama_commit": "6c73b3e12dc501de35fe5f6979960d06921a2f6c",
+    "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "pin_provenance": "Preparation manifest; reader binary revision is not independently reported by the reader interface",
+    "artifact": {
+      "path": "$GGUF",
+      "sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7",
+      "bytes": 531068416
+    },
+    "artifact_manifest": {
+      "path": "$ARTIFACT_MANIFEST",
+      "sha256": "279e4cf73d66a6f226c15f95bd4b1bfe6aa538ce49c3bc5b6f6ab13c05592e0a"
+    },
+    "oracle_metadata": {
+      "path": "$REFERENCE_DIR/reference.json",
+      "sha256": "73a608fdb76c55e82fb928a81c6e942627985d2e63d593ecb332aa07120f1a64"
+    }
+  },
+  "oracle": {
+    "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "verified_source": {
+      "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "stored_dtype": "bfloat16",
+      "files": {
+        "LICENSE": {
+          "bytes": 11343,
+          "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+        },
+        "README.md": {
+          "bytes": 4917,
+          "sha256": "b19c806a904db6dc878a0462e70b551f6b7ac78dfbb88c2eb966ca2b9109ae15",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "4b8373851d093eb9f3017443f27781c6971eff24"
+        },
+        "config.json": {
+          "bytes": 659,
+          "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "0dbb161213629a23f0fc00ef286e6b1e366d180f"
+        },
+        "generation_config.json": {
+          "bytes": 242,
+          "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+        },
+        "merges.txt": {
+          "bytes": 1671839,
+          "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+        },
+        "model.safetensors": {
+          "bytes": 988097824,
+          "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+          "upstream_algorithm": "sha256",
+          "upstream_digest": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+        },
+        "tokenizer.json": {
+          "bytes": 7031645,
+          "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+        },
+        "tokenizer_config.json": {
+          "bytes": 7305,
+          "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+        },
+        "vocab.json": {
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+        }
+      }
+    },
+    "weight_storage": "bfloat16",
+    "arithmetic": "fp32",
+    "attention": "Transformers eager",
+    "kv_dtype": "float32",
+    "head_chunk_rows": 1024,
+    "threads": 1,
+    "steps": 8,
+    "stop_on_eos": false,
+    "versions": {
+      "torch": "2.8.0+cpu",
+      "transformers": "4.56.2",
+      "safetensors": "0.6.2",
+      "tokenizers": "0.22.1",
+      "huggingface-hub": "0.35.3",
+      "numpy": "2.3.3"
+    },
+    "prompts": [
+      {
+        "id": "factual",
+        "prompt_tokens": [
+          785,
+          6722,
+          315,
+          9625,
+          374
+        ],
+        "generated_tokens": [
+          12095,
+          13,
+          1084,
+          374,
+          279,
+          7772,
+          3283,
+          304
+        ],
+        "tokens": [
+          785,
+          6722,
+          315,
+          9625,
+          374,
+          12095,
+          13,
+          1084,
+          374,
+          279,
+          7772,
+          3283
+        ],
+        "shape": [
+          12,
+          151936
+        ],
+        "logits": "factual-reference.bin",
+        "sha256": "9dbe4b03b1a0b388d663cfb12a0e78e9c124172311d7738024d7535fe1d302f1"
+      },
+      {
+        "id": "code",
+        "prompt_tokens": [
+          750,
+          75698,
+          1445,
+          982,
+          262,
+          421,
+          308,
+          366,
+          220,
+          17,
+          510,
+          286,
+          470,
+          308,
+          198,
+          262,
+          470
+        ],
+        "generated_tokens": [
+          75698,
+          1445,
+          12,
+          16,
+          8,
+          488,
+          75698,
+          1445
+        ],
+        "tokens": [
+          750,
+          75698,
+          1445,
+          982,
+          262,
+          421,
+          308,
+          366,
+          220,
+          17,
+          510,
+          286,
+          470,
+          308,
+          198,
+          262,
+          470,
+          75698,
+          1445,
+          12,
+          16,
+          8,
+          488,
+          75698
+        ],
+        "shape": [
+          24,
+          151936
+        ],
+        "logits": "code-reference.bin",
+        "sha256": "09440b9c0242d550e859340a3e6e19632f1690b04a6b9e1024a21293be2ae6dc"
+      },
+      {
+        "id": "plain",
+        "prompt_tokens": [
+          32,
+          2613,
+          13940,
+          15804,
+          1614,
+          14324,
+          504,
+          4938,
+          13,
+          15277
+        ],
+        "generated_tokens": [
+          11,
+          279,
+          13940,
+          646,
+          1172,
+          1349,
+          279,
+          14324
+        ],
+        "tokens": [
+          32,
+          2613,
+          13940,
+          15804,
+          1614,
+          14324,
+          504,
+          4938,
+          13,
+          15277,
+          11,
+          279,
+          13940,
+          646,
+          1172,
+          1349,
+          279
+        ],
+        "shape": [
+          17,
+          151936
+        ],
+        "logits": "plain-reference.bin",
+        "sha256": "d0a4e35971ba19edf29d3eb99c55ce1b7276485a860e4a91eee5856395dde4df"
+      },
+      {
+        "id": "chat",
+        "prompt_tokens": [
+          151644,
+          8948,
+          198,
+          2610,
+          525,
+          264,
+          10950,
+          17847,
+          13,
+          21806,
+          26753,
+          13,
+          151645,
+          198,
+          151644,
+          872,
+          198,
+          10234,
+          374,
+          279,
+          12884,
+          6303,
+          30,
+          151645,
+          198,
+          151644,
+          77091,
+          198
+        ],
+        "generated_tokens": [
+          785,
+          12884,
+          374,
+          6303,
+          1576,
+          432,
+          25963,
+          39020
+        ],
+        "tokens": [
+          151644,
+          8948,
+          198,
+          2610,
+          525,
+          264,
+          10950,
+          17847,
+          13,
+          21806,
+          26753,
+          13,
+          151645,
+          198,
+          151644,
+          872,
+          198,
+          10234,
+          374,
+          279,
+          12884,
+          6303,
+          30,
+          151645,
+          198,
+          151644,
+          77091,
+          198,
+          785,
+          12884,
+          374,
+          6303,
+          1576,
+          432,
+          25963
+        ],
+        "shape": [
+          35,
+          151936
+        ],
+        "logits": "chat-reference.bin",
+        "sha256": "02c68b5fd75c064932b04f4f85f46ab75c6d346449dffeb2cdca11f9044a1252"
+      }
+    ]
+  },
+  "fixed_prompts": 4,
+  "aggregate": {
+    "prompt_only": {
+      "positions": 60,
+      "top1_matches": 56,
+      "top1_agreement": 0.9333333333333333,
+      "mean_kl_reference_candidate_nats": 0.009703647062021672,
+      "max_kl_reference_candidate_nats": 0.18274310601898247
+    },
+    "prompt_and_reference_continuation": {
+      "positions": 88,
+      "top1_matches": 84,
+      "top1_agreement": 0.9545454545454546,
+      "mean_kl_reference_candidate_nats": 0.007193047111506248,
+      "max_kl_reference_candidate_nats": 0.18274310601898247
+    }
+  },
+  "prompts": [
+    {
+      "id": "factual",
+      "prompt_tokens": [
+        785,
+        6722,
+        315,
+        9625,
+        374
+      ],
+      "teacher_forced_tokens": [
+        785,
+        6722,
+        315,
+        9625,
+        374,
+        12095,
+        13,
+        1084,
+        374,
+        279,
+        7772,
+        3283
+      ],
+      "reference_generated_tokens": [
+        12095,
+        13,
+        1084,
+        374,
+        279,
+        7772,
+        3283,
+        304
+      ],
+      "positions": [
+        {
+          "position": 0,
+          "reference_top1": 2701,
+          "candidate_top1": 2701,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.046720047699218996,
+          "max_abs_error": 1.807877540588379,
+          "rmse": 0.3535031491507314
+        },
+        {
+          "position": 1,
+          "reference_top1": 315,
+          "candidate_top1": 315,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0012762801707258296,
+          "max_abs_error": 0.899611234664917,
+          "rmse": 0.17165406971312552
+        },
+        {
+          "position": 2,
+          "reference_top1": 279,
+          "candidate_top1": 279,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.008980323122162877,
+          "max_abs_error": 0.9697535037994385,
+          "rmse": 0.19001411742516583
+        },
+        {
+          "position": 3,
+          "reference_top1": 374,
+          "candidate_top1": 374,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0020527918174551084,
+          "max_abs_error": 0.760043740272522,
+          "rmse": 0.1583401059172959
+        },
+        {
+          "position": 4,
+          "reference_top1": 12095,
+          "candidate_top1": 12095,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.005251445859925212,
+          "max_abs_error": 0.6101460456848145,
+          "rmse": 0.1185514926933927
+        },
+        {
+          "position": 5,
+          "reference_top1": 13,
+          "candidate_top1": 13,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0008469390774838888,
+          "max_abs_error": 0.7393484115600586,
+          "rmse": 0.13835409505982732
+        },
+        {
+          "position": 6,
+          "reference_top1": 1084,
+          "candidate_top1": 1084,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0036511439991475693,
+          "max_abs_error": 0.6571155786514282,
+          "rmse": 0.13339788093827407
+        },
+        {
+          "position": 7,
+          "reference_top1": 374,
+          "candidate_top1": 374,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0006428845413203151,
+          "max_abs_error": 0.5190773010253906,
+          "rmse": 0.12117220894778104
+        },
+        {
+          "position": 8,
+          "reference_top1": 279,
+          "candidate_top1": 279,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.000978895084415773,
+          "max_abs_error": 0.5027666091918945,
+          "rmse": 0.10211721890304266
+        },
+        {
+          "position": 9,
+          "reference_top1": 7772,
+          "candidate_top1": 7772,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0019435657927138312,
+          "max_abs_error": 0.41675758361816406,
+          "rmse": 0.09488486502551897
+        },
+        {
+          "position": 10,
+          "reference_top1": 3283,
+          "candidate_top1": 3283,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0005856383638409386,
+          "max_abs_error": 0.49161338806152344,
+          "rmse": 0.09904591394299794
+        },
+        {
+          "position": 11,
+          "reference_top1": 304,
+          "candidate_top1": 304,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0009273447951568075,
+          "max_abs_error": 0.6100379228591919,
+          "rmse": 0.14934601541710013
+        }
+      ],
+      "reader_settings": {
+        "argmax": [
+          2701,
+          315,
+          279,
+          374,
+          12095,
+          13,
+          1084,
+          374,
+          279,
+          7772,
+          3283,
+          304
+        ],
+        "flash_attention": "auto",
+        "kv_dtype": "float16",
+        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+        "shape": [
+          12,
+          151936
+        ],
+        "threads": 1,
+        "tokens": [
+          785,
+          6722,
+          315,
+          9625,
+          374,
+          12095,
+          13,
+          1084,
+          374,
+          279,
+          7772,
+          3283
+        ]
+      },
+      "logits": {
+        "path": "$REFERENCE_DIR/factual-llama-q8_0.bin",
+        "sha256": "8bf54b2224183ef33a5a95aef56f3d6883227ed40bcdc58368782bc645286949",
+        "shape": [
+          12,
+          151936
+        ],
+        "dtype": "little-endian float32"
+      },
+      "reader_metadata": {
+        "path": "$REFERENCE_DIR/factual-llama-q8_0.json",
+        "sha256": "3fc5cb2e078daeaeabc7a3cb67dd503b0e1efec08f911ff67f0b3b1ad4084660"
+      },
+      "command": [
+        "$LLAMA_LOGITS",
+        "--model",
+        "$GGUF",
+        "--tokens",
+        "785,6722,315,9625,374,12095,13,1084,374,279,7772,3283",
+        "--output",
+        "$REFERENCE_DIR/factual-llama-q8_0",
+        "--threads",
+        "1"
+      ],
+      "aggregate": {
+        "prompt_only": {
+          "positions": 5,
+          "top1_matches": 5,
+          "top1_agreement": 1.0,
+          "mean_kl_reference_candidate_nats": 0.012856177733897606,
+          "max_kl_reference_candidate_nats": 0.046720047699218996
+        },
+        "prompt_and_reference_continuation": {
+          "positions": 12,
+          "top1_matches": 12,
+          "top1_agreement": 1.0,
+          "mean_kl_reference_candidate_nats": 0.006154775026963929,
+          "max_kl_reference_candidate_nats": 0.046720047699218996
+        }
+      }
+    },
+    {
+      "id": "code",
+      "prompt_tokens": [
+        750,
+        75698,
+        1445,
+        982,
+        262,
+        421,
+        308,
+        366,
+        220,
+        17,
+        510,
+        286,
+        470,
+        308,
+        198,
+        262,
+        470
+      ],
+      "teacher_forced_tokens": [
+        750,
+        75698,
+        1445,
+        982,
+        262,
+        421,
+        308,
+        366,
+        220,
+        17,
+        510,
+        286,
+        470,
+        308,
+        198,
+        262,
+        470,
+        75698,
+        1445,
+        12,
+        16,
+        8,
+        488,
+        75698
+      ],
+      "reference_generated_tokens": [
+        75698,
+        1445,
+        12,
+        16,
+        8,
+        488,
+        75698,
+        1445
+      ],
+      "positions": [
+        {
+          "position": 0,
+          "reference_top1": 1887,
+          "candidate_top1": 1887,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.04289325115829194,
+          "max_abs_error": 1.4829087257385254,
+          "rmse": 0.3073054022917887
+        },
+        {
+          "position": 1,
+          "reference_top1": 1445,
+          "candidate_top1": 1445,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.003053219751851194,
+          "max_abs_error": 0.678004264831543,
+          "rmse": 0.13645594873138023
+        },
+        {
+          "position": 2,
+          "reference_top1": 982,
+          "candidate_top1": 982,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0013373888101733875,
+          "max_abs_error": 0.6653895378112793,
+          "rmse": 0.13419264094080904
+        },
+        {
+          "position": 3,
+          "reference_top1": 262,
+          "candidate_top1": 262,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 9.876330214833638e-05,
+          "max_abs_error": 0.5043513774871826,
+          "rmse": 0.10231225854491903
+        },
+        {
+          "position": 4,
+          "reference_top1": 421,
+          "candidate_top1": 421,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.001511828163587744,
+          "max_abs_error": 0.5863037109375,
+          "rmse": 0.11144707555582677
+        },
+        {
+          "position": 5,
+          "reference_top1": 308,
+          "candidate_top1": 308,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 8.093534960056072e-05,
+          "max_abs_error": 0.5663542747497559,
+          "rmse": 0.10583743913922367
+        },
+        {
+          "position": 6,
+          "reference_top1": 2651,
+          "candidate_top1": 2651,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0017197351267875683,
+          "max_abs_error": 0.6194549798965454,
+          "rmse": 0.10885840587445451
+        },
+        {
+          "position": 7,
+          "reference_top1": 220,
+          "candidate_top1": 220,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 1.718602730527132e-05,
+          "max_abs_error": 0.6501646041870117,
+          "rmse": 0.11691291576187941
+        },
+        {
+          "position": 8,
+          "reference_top1": 15,
+          "candidate_top1": 15,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0026381234319953774,
+          "max_abs_error": 0.7422696352005005,
+          "rmse": 0.1518776671142091
+        },
+        {
+          "position": 9,
+          "reference_top1": 510,
+          "candidate_top1": 510,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 8.318794967109894e-05,
+          "max_abs_error": 0.5356769561767578,
+          "rmse": 0.1060408647085222
+        },
+        {
+          "position": 10,
+          "reference_top1": 286,
+          "candidate_top1": 286,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 1.5415191522761206e-05,
+          "max_abs_error": 0.5197985172271729,
+          "rmse": 0.11570757599727445
+        },
+        {
+          "position": 11,
+          "reference_top1": 470,
+          "candidate_top1": 470,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 8.796180768908074e-05,
+          "max_abs_error": 0.6107786893844604,
+          "rmse": 0.11907371583543025
+        },
+        {
+          "position": 12,
+          "reference_top1": 308,
+          "candidate_top1": 308,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0024594318844175975,
+          "max_abs_error": 0.6114108562469482,
+          "rmse": 0.13193942416594795
+        },
+        {
+          "position": 13,
+          "reference_top1": 198,
+          "candidate_top1": 198,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.00027744279290719414,
+          "max_abs_error": 0.616157054901123,
+          "rmse": 0.11865483590157849
+        },
+        {
+          "position": 14,
+          "reference_top1": 262,
+          "candidate_top1": 262,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 1.5345712686783706e-05,
+          "max_abs_error": 0.7357681393623352,
+          "rmse": 0.13368093484421376
+        },
+        {
+          "position": 15,
+          "reference_top1": 770,
+          "candidate_top1": 770,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0008576341942052308,
+          "max_abs_error": 0.7517185211181641,
+          "rmse": 0.17157244324726523
+        },
+        {
+          "position": 16,
+          "reference_top1": 75698,
+          "candidate_top1": 75698,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0004159387333519437,
+          "max_abs_error": 0.6841478645801544,
+          "rmse": 0.13337776901495269
+        },
+        {
+          "position": 17,
+          "reference_top1": 1445,
+          "candidate_top1": 1445,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 2.348062637498792e-05,
+          "max_abs_error": 0.790825366973877,
+          "rmse": 0.18628558536605255
+        },
+        {
+          "position": 18,
+          "reference_top1": 12,
+          "candidate_top1": 12,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.00013182557914617808,
+          "max_abs_error": 0.5862576961517334,
+          "rmse": 0.12749921865040112
+        },
+        {
+          "position": 19,
+          "reference_top1": 16,
+          "candidate_top1": 16,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0005116031680376799,
+          "max_abs_error": 0.6151888370513916,
+          "rmse": 0.1296715777292772
+        },
+        {
+          "position": 20,
+          "reference_top1": 8,
+          "candidate_top1": 8,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 7.481301982472719e-05,
+          "max_abs_error": 0.6083807945251465,
+          "rmse": 0.13446982612260186
+        },
+        {
+          "position": 21,
+          "reference_top1": 488,
+          "candidate_top1": 488,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 5.324522893146718e-06,
+          "max_abs_error": 0.5712404251098633,
+          "rmse": 0.12608629817553038
+        },
+        {
+          "position": 22,
+          "reference_top1": 75698,
+          "candidate_top1": 75698,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 1.6387582577474354e-06,
+          "max_abs_error": 0.6046302318572998,
+          "rmse": 0.1266623395527232
+        },
+        {
+          "position": 23,
+          "reference_top1": 1445,
+          "candidate_top1": 1445,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 4.422310337834227e-07,
+          "max_abs_error": 0.6502571105957031,
+          "rmse": 0.14769226461501975
+        }
+      ],
+      "reader_settings": {
+        "argmax": [
+          1887,
+          1445,
+          982,
+          262,
+          421,
+          308,
+          2651,
+          220,
+          15,
+          510,
+          286,
+          470,
+          308,
+          198,
+          262,
+          770,
+          75698,
+          1445,
+          12,
+          16,
+          8,
+          488,
+          75698,
+          1445
+        ],
+        "flash_attention": "auto",
+        "kv_dtype": "float16",
+        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+        "shape": [
+          24,
+          151936
+        ],
+        "threads": 1,
+        "tokens": [
+          750,
+          75698,
+          1445,
+          982,
+          262,
+          421,
+          308,
+          366,
+          220,
+          17,
+          510,
+          286,
+          470,
+          308,
+          198,
+          262,
+          470,
+          75698,
+          1445,
+          12,
+          16,
+          8,
+          488,
+          75698
+        ]
+      },
+      "logits": {
+        "path": "$REFERENCE_DIR/code-llama-q8_0.bin",
+        "sha256": "818344578f3ed0d06c6c88dc45079a060a17d68800245d47e068fa503d71999f",
+        "shape": [
+          24,
+          151936
+        ],
+        "dtype": "little-endian float32"
+      },
+      "reader_metadata": {
+        "path": "$REFERENCE_DIR/code-llama-q8_0.json",
+        "sha256": "ec74278b4b43d85db901ffd862fdc1720a3763b38f12b88882694ef6fee74fdd"
+      },
+      "command": [
+        "$LLAMA_LOGITS",
+        "--model",
+        "$GGUF",
+        "--tokens",
+        "750,75698,1445,982,262,421,308,366,220,17,510,286,470,308,198,262,470,75698,1445,12,16,8,488,75698",
+        "--output",
+        "$REFERENCE_DIR/code-llama-q8_0",
+        "--threads",
+        "1"
+      ],
+      "aggregate": {
+        "prompt_only": {
+          "positions": 17,
+          "top1_matches": 17,
+          "top1_agreement": 1.0,
+          "mean_kl_reference_candidate_nats": 0.0033860464345995926,
+          "max_kl_reference_candidate_nats": 0.04289325115829194
+        },
+        "prompt_and_reference_continuation": {
+          "positions": 24,
+          "top1_matches": 24,
+          "top1_agreement": 1.0,
+          "mean_kl_reference_candidate_nats": 0.0024296632205733884,
+          "max_kl_reference_candidate_nats": 0.04289325115829194
+        }
+      }
+    },
+    {
+      "id": "plain",
+      "prompt_tokens": [
+        32,
+        2613,
+        13940,
+        15804,
+        1614,
+        14324,
+        504,
+        4938,
+        13,
+        15277
+      ],
+      "teacher_forced_tokens": [
+        32,
+        2613,
+        13940,
+        15804,
+        1614,
+        14324,
+        504,
+        4938,
+        13,
+        15277,
+        11,
+        279,
+        13940,
+        646,
+        1172,
+        1349,
+        279
+      ],
+      "reference_generated_tokens": [
+        11,
+        279,
+        13940,
+        646,
+        1172,
+        1349,
+        279,
+        14324
+      ],
+      "positions": [
+        {
+          "position": 0,
+          "reference_top1": 220,
+          "candidate_top1": 1550,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.053313286797598045,
+          "max_abs_error": 2.0164313316345215,
+          "rmse": 0.406869108406203
+        },
+        {
+          "position": 1,
+          "reference_top1": 6290,
+          "candidate_top1": 6290,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.015029472612864506,
+          "max_abs_error": 1.223311185836792,
+          "rmse": 0.16331936752760007
+        },
+        {
+          "position": 2,
+          "reference_top1": 374,
+          "candidate_top1": 374,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.006348967090191091,
+          "max_abs_error": 0.8604733943939209,
+          "rmse": 0.16575621952256364
+        },
+        {
+          "position": 3,
+          "reference_top1": 264,
+          "candidate_top1": 264,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.002897125400699648,
+          "max_abs_error": 0.7759871482849121,
+          "rmse": 0.16895824233510176
+        },
+        {
+          "position": 4,
+          "reference_top1": 821,
+          "candidate_top1": 5109,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.02039564777298965,
+          "max_abs_error": 1.0761489868164062,
+          "rmse": 0.19469434652205944
+        },
+        {
+          "position": 5,
+          "reference_top1": 504,
+          "candidate_top1": 504,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0033316361167981473,
+          "max_abs_error": 0.7387139797210693,
+          "rmse": 0.14942143912162928
+        },
+        {
+          "position": 6,
+          "reference_top1": 264,
+          "candidate_top1": 264,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0022304463511183697,
+          "max_abs_error": 0.5475234985351562,
+          "rmse": 0.11224035532417889
+        },
+        {
+          "position": 7,
+          "reference_top1": 323,
+          "candidate_top1": 323,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.002648613858262734,
+          "max_abs_error": 0.7902393341064453,
+          "rmse": 0.15550912101532363
+        },
+        {
+          "position": 8,
+          "reference_top1": 576,
+          "candidate_top1": 576,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0038132115837728247,
+          "max_abs_error": 0.6316318511962891,
+          "rmse": 0.1475778461108739
+        },
+        {
+          "position": 9,
+          "reference_top1": 11,
+          "candidate_top1": 11,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.00015223272083655936,
+          "max_abs_error": 0.5822427272796631,
+          "rmse": 0.10260504687488485
+        },
+        {
+          "position": 10,
+          "reference_top1": 279,
+          "candidate_top1": 279,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.001695364097161729,
+          "max_abs_error": 0.44855797290802,
+          "rmse": 0.09300638361092699
+        },
+        {
+          "position": 11,
+          "reference_top1": 13940,
+          "candidate_top1": 13940,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0028486375364781217,
+          "max_abs_error": 0.43115711212158203,
+          "rmse": 0.08906287063201554
+        },
+        {
+          "position": 12,
+          "reference_top1": 646,
+          "candidate_top1": 646,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.004292987320611895,
+          "max_abs_error": 0.48444366455078125,
+          "rmse": 0.09441743495926597
+        },
+        {
+          "position": 13,
+          "reference_top1": 1172,
+          "candidate_top1": 1172,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.003805639836295992,
+          "max_abs_error": 0.45490097999572754,
+          "rmse": 0.09158383717048169
+        },
+        {
+          "position": 14,
+          "reference_top1": 1349,
+          "candidate_top1": 1349,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.003044875681815707,
+          "max_abs_error": 0.40897178649902344,
+          "rmse": 0.08773306633068118
+        },
+        {
+          "position": 15,
+          "reference_top1": 279,
+          "candidate_top1": 279,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.003620512350006475,
+          "max_abs_error": 0.46170473098754883,
+          "rmse": 0.09725083751828431
+        },
+        {
+          "position": 16,
+          "reference_top1": 14324,
+          "candidate_top1": 14324,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0017375293833056982,
+          "max_abs_error": 0.4542365074157715,
+          "rmse": 0.0900755033116169
+        }
+      ],
+      "reader_settings": {
+        "argmax": [
+          1550,
+          6290,
+          374,
+          264,
+          5109,
+          504,
+          264,
+          323,
+          576,
+          11,
+          279,
+          13940,
+          646,
+          1172,
+          1349,
+          279,
+          14324
+        ],
+        "flash_attention": "auto",
+        "kv_dtype": "float16",
+        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+        "shape": [
+          17,
+          151936
+        ],
+        "threads": 1,
+        "tokens": [
+          32,
+          2613,
+          13940,
+          15804,
+          1614,
+          14324,
+          504,
+          4938,
+          13,
+          15277,
+          11,
+          279,
+          13940,
+          646,
+          1172,
+          1349,
+          279
+        ]
+      },
+      "logits": {
+        "path": "$REFERENCE_DIR/plain-llama-q8_0.bin",
+        "sha256": "774b00a70d5e4b6000f04f06fb6aa56243d671b0b1988278b2c7980bf8b83afb",
+        "shape": [
+          17,
+          151936
+        ],
+        "dtype": "little-endian float32"
+      },
+      "reader_metadata": {
+        "path": "$REFERENCE_DIR/plain-llama-q8_0.json",
+        "sha256": "b88dc651a9c0e7bb0a87eabf456ec2867cf16c52d8c37d223ebbf8b023fff075"
+      },
+      "command": [
+        "$LLAMA_LOGITS",
+        "--model",
+        "$GGUF",
+        "--tokens",
+        "32,2613,13940,15804,1614,14324,504,4938,13,15277,11,279,13940,646,1172,1349,279",
+        "--output",
+        "$REFERENCE_DIR/plain-llama-q8_0",
+        "--threads",
+        "1"
+      ],
+      "aggregate": {
+        "prompt_only": {
+          "positions": 10,
+          "top1_matches": 8,
+          "top1_agreement": 0.8,
+          "mean_kl_reference_candidate_nats": 0.011016064030513157,
+          "max_kl_reference_candidate_nats": 0.053313286797598045
+        },
+        "prompt_and_reference_continuation": {
+          "positions": 17,
+          "top1_matches": 15,
+          "top1_agreement": 0.8823529411764706,
+          "mean_kl_reference_candidate_nats": 0.007718010971223953,
+          "max_kl_reference_candidate_nats": 0.053313286797598045
+        }
+      }
+    },
+    {
+      "id": "chat",
+      "prompt_tokens": [
+        151644,
+        8948,
+        198,
+        2610,
+        525,
+        264,
+        10950,
+        17847,
+        13,
+        21806,
+        26753,
+        13,
+        151645,
+        198,
+        151644,
+        872,
+        198,
+        10234,
+        374,
+        279,
+        12884,
+        6303,
+        30,
+        151645,
+        198,
+        151644,
+        77091,
+        198
+      ],
+      "teacher_forced_tokens": [
+        151644,
+        8948,
+        198,
+        2610,
+        525,
+        264,
+        10950,
+        17847,
+        13,
+        21806,
+        26753,
+        13,
+        151645,
+        198,
+        151644,
+        872,
+        198,
+        10234,
+        374,
+        279,
+        12884,
+        6303,
+        30,
+        151645,
+        198,
+        151644,
+        77091,
+        198,
+        785,
+        12884,
+        374,
+        6303,
+        1576,
+        432,
+        25963
+      ],
+      "reference_generated_tokens": [
+        785,
+        12884,
+        374,
+        6303,
+        1576,
+        432,
+        25963,
+        39020
+      ],
+      "positions": [
+        {
+          "position": 0,
+          "reference_top1": 72030,
+          "candidate_top1": 72030,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.18274310601898247,
+          "max_abs_error": 2.3314342498779297,
+          "rmse": 0.47398723151174044
+        },
+        {
+          "position": 1,
+          "reference_top1": 198,
+          "candidate_top1": 198,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.010982105700825084,
+          "max_abs_error": 0.9527411460876465,
+          "rmse": 0.21983292925230696
+        },
+        {
+          "position": 2,
+          "reference_top1": 2,
+          "candidate_top1": 2,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.006979335244781349,
+          "max_abs_error": 0.6227766275405884,
+          "rmse": 0.12222190784749966
+        },
+        {
+          "position": 3,
+          "reference_top1": 525,
+          "candidate_top1": 525,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.002312063394734629,
+          "max_abs_error": 0.7759380340576172,
+          "rmse": 0.1490110923994319
+        },
+        {
+          "position": 4,
+          "reference_top1": 2661,
+          "candidate_top1": 2661,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.009087837031791567,
+          "max_abs_error": 0.8763537406921387,
+          "rmse": 0.16814717716893054
+        },
+        {
+          "position": 5,
+          "reference_top1": 10950,
+          "candidate_top1": 10950,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.006124781627240199,
+          "max_abs_error": 0.9877090454101562,
+          "rmse": 0.20036075945853624
+        },
+        {
+          "position": 6,
+          "reference_top1": 17847,
+          "candidate_top1": 17847,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.006390629747312783,
+          "max_abs_error": 1.245314359664917,
+          "rmse": 0.27637287124966337
+        },
+        {
+          "position": 7,
+          "reference_top1": 382,
+          "candidate_top1": 382,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.01508734488775054,
+          "max_abs_error": 1.2644834518432617,
+          "rmse": 0.24635142887853384
+        },
+        {
+          "position": 8,
+          "reference_top1": 5209,
+          "candidate_top1": 5209,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.006077854355772604,
+          "max_abs_error": 0.7966964244842529,
+          "rmse": 0.13091677190737885
+        },
+        {
+          "position": 9,
+          "reference_top1": 279,
+          "candidate_top1": 279,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0028416989363989576,
+          "max_abs_error": 1.4282875061035156,
+          "rmse": 0.29402670825126176
+        },
+        {
+          "position": 10,
+          "reference_top1": 304,
+          "candidate_top1": 304,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.00010208547993942935,
+          "max_abs_error": 1.361250877380371,
+          "rmse": 0.2761765954174208
+        },
+        {
+          "position": 11,
+          "reference_top1": 7414,
+          "candidate_top1": 7414,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.031196943375245298,
+          "max_abs_error": 1.6539807319641113,
+          "rmse": 0.33832344027834804
+        },
+        {
+          "position": 12,
+          "reference_top1": 46487,
+          "candidate_top1": 8948,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.03499105316335758,
+          "max_abs_error": 1.64969801902771,
+          "rmse": 0.2859200786406343
+        },
+        {
+          "position": 13,
+          "reference_top1": 785,
+          "candidate_top1": 785,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.013014386276622325,
+          "max_abs_error": 1.3136978149414062,
+          "rmse": 0.28136749467627276
+        },
+        {
+          "position": 14,
+          "reference_top1": 198,
+          "candidate_top1": 198,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.000687087272203345,
+          "max_abs_error": 1.2075014114379883,
+          "rmse": 0.24300006593069604
+        },
+        {
+          "position": 15,
+          "reference_top1": 25,
+          "candidate_top1": 25,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 4.0480807850528035e-06,
+          "max_abs_error": 1.4642713069915771,
+          "rmse": 0.2711546380022216
+        },
+        {
+          "position": 16,
+          "reference_top1": 40,
+          "candidate_top1": 3838,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.006878264352445573,
+          "max_abs_error": 0.5663609504699707,
+          "rmse": 0.1224111521258599
+        },
+        {
+          "position": 17,
+          "reference_top1": 653,
+          "candidate_top1": 653,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0010462047845982477,
+          "max_abs_error": 0.44777393341064453,
+          "rmse": 0.09992155674020245
+        },
+        {
+          "position": 18,
+          "reference_top1": 432,
+          "candidate_top1": 432,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0022876199157844225,
+          "max_abs_error": 0.46005964279174805,
+          "rmse": 0.09689053556509682
+        },
+        {
+          "position": 19,
+          "reference_top1": 17788,
+          "candidate_top1": 17788,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.004048953513743991,
+          "max_abs_error": 0.48301219940185547,
+          "rmse": 0.09913018140809349
+        },
+        {
+          "position": 20,
+          "reference_top1": 6303,
+          "candidate_top1": 6303,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0020613231710234726,
+          "max_abs_error": 0.44678807258605957,
+          "rmse": 0.0936389069356784
+        },
+        {
+          "position": 21,
+          "reference_top1": 30,
+          "candidate_top1": 30,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.003547335421605554,
+          "max_abs_error": 0.5804080963134766,
+          "rmse": 0.10519977473536536
+        },
+        {
+          "position": 22,
+          "reference_top1": 151645,
+          "candidate_top1": 151645,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.001216161068738134,
+          "max_abs_error": 0.9220964908599854,
+          "rmse": 0.145688779454422
+        },
+        {
+          "position": 23,
+          "reference_top1": 198,
+          "candidate_top1": 198,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 1.5440472665802294e-07,
+          "max_abs_error": 0.9950761795043945,
+          "rmse": 0.21551787672206466
+        },
+        {
+          "position": 24,
+          "reference_top1": 151644,
+          "candidate_top1": 151644,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 1.5556402556817467e-06,
+          "max_abs_error": 0.7099094390869141,
+          "rmse": 0.1386461579743241
+        },
+        {
+          "position": 25,
+          "reference_top1": 872,
+          "candidate_top1": 872,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0002758983590237861,
+          "max_abs_error": 1.1507933139801025,
+          "rmse": 0.2972228526250349
+        },
+        {
+          "position": 26,
+          "reference_top1": 198,
+          "candidate_top1": 198,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 6.0875811291214766e-05,
+          "max_abs_error": 1.6745014190673828,
+          "rmse": 0.30172997669293616
+        },
+        {
+          "position": 27,
+          "reference_top1": 785,
+          "candidate_top1": 785,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.00016779832150766046,
+          "max_abs_error": 0.5918234586715698,
+          "rmse": 0.12155603869168316
+        },
+        {
+          "position": 28,
+          "reference_top1": 12884,
+          "candidate_top1": 12884,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.00016841764813186434,
+          "max_abs_error": 0.4746239185333252,
+          "rmse": 0.1065169988392794
+        },
+        {
+          "position": 29,
+          "reference_top1": 374,
+          "candidate_top1": 374,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0007063325386624459,
+          "max_abs_error": 0.5421352386474609,
+          "rmse": 0.1044276652637684
+        },
+        {
+          "position": 30,
+          "reference_top1": 6303,
+          "candidate_top1": 6303,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.012797299915326046,
+          "max_abs_error": 0.552004337310791,
+          "rmse": 0.10869594398121996
+        },
+        {
+          "position": 31,
+          "reference_top1": 1576,
+          "candidate_top1": 1576,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 5.318669584313313e-06,
+          "max_abs_error": 0.6079015731811523,
+          "rmse": 0.12444789502719705
+        },
+        {
+          "position": 32,
+          "reference_top1": 432,
+          "candidate_top1": 432,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0027018359714088428,
+          "max_abs_error": 0.6109504699707031,
+          "rmse": 0.11993578994408045
+        },
+        {
+          "position": 33,
+          "reference_top1": 25963,
+          "candidate_top1": 25963,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0016066801319281785,
+          "max_abs_error": 0.5274636745452881,
+          "rmse": 0.11225622312927837
+        },
+        {
+          "position": 34,
+          "reference_top1": 39020,
+          "candidate_top1": 39020,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.0014123514508847916,
+          "max_abs_error": 0.6260719299316406,
+          "rmse": 0.11697642454050172
+        }
+      ],
+      "reader_settings": {
+        "argmax": [
+          72030,
+          198,
+          2,
+          525,
+          2661,
+          10950,
+          17847,
+          382,
+          5209,
+          279,
+          304,
+          7414,
+          8948,
+          785,
+          198,
+          25,
+          3838,
+          653,
+          432,
+          17788,
+          6303,
+          30,
+          151645,
+          198,
+          151644,
+          872,
+          198,
+          785,
+          12884,
+          374,
+          6303,
+          1576,
+          432,
+          25963,
+          39020
+        ],
+        "flash_attention": "auto",
+        "kv_dtype": "float16",
+        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+        "shape": [
+          35,
+          151936
+        ],
+        "threads": 1,
+        "tokens": [
+          151644,
+          8948,
+          198,
+          2610,
+          525,
+          264,
+          10950,
+          17847,
+          13,
+          21806,
+          26753,
+          13,
+          151645,
+          198,
+          151644,
+          872,
+          198,
+          10234,
+          374,
+          279,
+          12884,
+          6303,
+          30,
+          151645,
+          198,
+          151644,
+          77091,
+          198,
+          785,
+          12884,
+          374,
+          6303,
+          1576,
+          432,
+          25963
+        ]
+      },
+      "logits": {
+        "path": "$REFERENCE_DIR/chat-llama-q8_0.bin",
+        "sha256": "281fb177d4cb8634f5a773e6246eef42da982cf975892f393d5ce5c6e1b6f34f",
+        "shape": [
+          35,
+          151936
+        ],
+        "dtype": "little-endian float32"
+      },
+      "reader_metadata": {
+        "path": "$REFERENCE_DIR/chat-llama-q8_0.json",
+        "sha256": "e7c13a4f2bc0d7fa734fa50d0eda9d4c79eb01dc652de23ddb77928681de394e"
+      },
+      "command": [
+        "$LLAMA_LOGITS",
+        "--model",
+        "$GGUF",
+        "--tokens",
+        "151644,8948,198,2610,525,264,10950,17847,13,21806,26753,13,151645,198,151644,872,198,10234,374,279,12884,6303,30,151645,198,151644,77091,198,785,12884,374,6303,1576,432,25963",
+        "--output",
+        "$REFERENCE_DIR/chat-llama-q8_0",
+        "--threads",
+        "1"
+      ],
+      "aggregate": {
+        "prompt_only": {
+          "positions": 28,
+          "top1_matches": 26,
+          "top1_agreement": 0.9285714285714286,
+          "mean_kl_reference_candidate_nats": 0.012507660905660271,
+          "max_kl_reference_candidate_nats": 0.18274310601898247
+        },
+        "prompt_and_reference_continuation": {
+          "positions": 35,
+          "top1_matches": 33,
+          "top1_agreement": 0.9428571428571428,
+          "mean_kl_reference_candidate_nats": 0.010560364048126117,
+          "max_kl_reference_candidate_nats": 0.18274310601898247
+        }
+      }
+    }
+  ]
+}

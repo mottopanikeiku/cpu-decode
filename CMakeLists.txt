@@ -30,6 +30,35 @@ target_compile_options(read-bandwidth PRIVATE -O3 -Wall -Wextra -Wpedantic)
 if(CPU_DECODE_NATIVE)
   target_compile_options(read-bandwidth PRIVATE -march=native)
 endif()
+
+# Optional reader for the prebuilt public llama.cpp API at
+# 6c73b3e12dc501de35fe5f6979960d06921a2f6c; never builds or modifies upstream.
+set(CPU_DECODE_LLAMA_ROOT "" CACHE PATH "Pinned llama.cpp root containing source/ and build/")
+if(CPU_DECODE_LLAMA_ROOT)
+  get_filename_component(CPU_DECODE_LLAMA_ROOT "${CPU_DECODE_LLAMA_ROOT}" ABSOLUTE)
+  find_path(CPU_DECODE_LLAMA_INCLUDE_DIR llama.h
+    PATHS "${CPU_DECODE_LLAMA_ROOT}/source/include" NO_DEFAULT_PATH)
+  find_path(CPU_DECODE_GGML_INCLUDE_DIR ggml.h
+    PATHS "${CPU_DECODE_LLAMA_ROOT}/source/ggml/include" NO_DEFAULT_PATH)
+  find_library(CPU_DECODE_LLAMA_LIBRARY NAMES llama
+    PATHS "${CPU_DECODE_LLAMA_ROOT}/build/bin" NO_DEFAULT_PATH)
+  if(NOT CPU_DECODE_LLAMA_INCLUDE_DIR OR NOT CPU_DECODE_GGML_INCLUDE_DIR OR NOT CPU_DECODE_LLAMA_LIBRARY)
+    message(FATAL_ERROR "CPU_DECODE_LLAMA_ROOT requires pinned llama.h, ggml.h and a prebuilt llama library")
+  endif()
+  add_library(cpu-decode-llama UNKNOWN IMPORTED)
+  set_target_properties(cpu-decode-llama PROPERTIES
+    IMPORTED_LOCATION "${CPU_DECODE_LLAMA_LIBRARY}"
+    INTERFACE_COMPILE_DEFINITIONS LLAMA_SHARED)
+  add_executable(llama-logits tools/llama_logits.cpp)
+  target_include_directories(llama-logits SYSTEM PRIVATE
+    "${CPU_DECODE_LLAMA_INCLUDE_DIR}" "${CPU_DECODE_GGML_INCLUDE_DIR}")
+  target_link_libraries(llama-logits PRIVATE cpu-decode-llama nlohmann_json::nlohmann_json)
+  target_compile_options(llama-logits PRIVATE -O3 -Wall -Wextra -Wpedantic)
+  get_filename_component(CPU_DECODE_LLAMA_LIBRARY_DIR "${CPU_DECODE_LLAMA_LIBRARY}" DIRECTORY)
+  set_target_properties(llama-logits PROPERTIES
+    BUILD_RPATH "${CPU_DECODE_LLAMA_LIBRARY_DIR}"
+    INSTALL_RPATH "${CPU_DECODE_LLAMA_LIBRARY_DIR}")
+endif()
 include(CTest)
 if(BUILD_TESTING)
   add_executable(decode-tests tests/native.cpp)

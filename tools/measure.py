@@ -18,8 +18,12 @@ DEFAULT_TOKENS = ",".join(map(str, json.loads((ROOT / "configs" / "prompts.json"
 
 
 def execute(command: list[str], destination: Path, locations: dict) -> dict | list:
-    completed = subprocess.run(command, cwd=ROOT, check=True, text=True, capture_output=True)
+    completed = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
     destination.with_suffix(".stderr.txt").write_text(portable(completed.stderr, locations))
+    if completed.returncode:
+        failure = {"command": command, "returncode": completed.returncode, "stdout": completed.stdout, "stderr": completed.stderr}
+        destination.with_suffix(".failure.json").write_text(json.dumps(portable(failure, locations), indent=2) + "\n")
+        completed.check_returncode()
     data = portable(json.loads(completed.stdout), locations)
     destination.write_text(json.dumps(data, indent=2) + "\n")
     return data
@@ -81,7 +85,7 @@ def main() -> None:
                 elif args.stage == "llama":
                     command = [str(args.llama), "-m", str(args.model), "-p", "0", "-n", str(args.steps),
                                "-d", str(context), "-t", str(thread), "-r", str(args.repeats),
-                               "-ngl", "0", "-ctk", "f32", "-ctv", "f32", "-fa", "off", "-o", "json"]
+                               "-ngl", "0", "-ctk", "f16", "-ctv", "f16", "-fa", "auto", "-o", "json"]
                 else:
                     command = [sys.executable, str(ROOT / "tools" / "benchmark_eager.py"),
                                "--model", str(args.model), "--threads", str(thread), "--context", str(context),

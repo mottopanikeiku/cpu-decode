@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
         if (steps > 1000000) throw std::runtime_error("too many steps");
         size_t context = command == "bench" ? number(required("--context")) : prompt.size();
         if (!context || context > 1000000) throw std::runtime_error("invalid context size");
-        size_t capacity = context + (command == "logits" ? 0 : std::max(steps, size_t(2)));
+        size_t capacity = context + (command == "logits" ? 0 : steps);
         decode::Engine engine(model, kernel, int(nthreads), capacity, rope_mode == "cached");
         // Validate every supplied ID even when a short benchmark context uses only its prefix.
         for (int id : prompt) if (size_t(id) >= engine.vocab_size()) throw std::runtime_error("token ID outside vocabulary");
@@ -137,10 +137,10 @@ int main(int argc, char** argv) {
             }
             result["prefill_seconds"] = std::chrono::duration<double>(Clock::now() - prefill_start).count();
             int next = seed;
-            for (size_t i = 0; i < 2; ++i) next = argmax(engine.step(next, true));
+            next = argmax(engine.step(next, true));
             engine.rewind(context);
             result["context"] = context; result["steps"] = steps; result["repeats"] = repeats;
-            result["warmup_steps"] = 2; result["samples"] = Json::array();
+            result["warmup_steps"] = 1; result["samples"] = Json::array();
             for (size_t r = 0; r < repeats; ++r) {
                 engine.rewind(context);
                 decode::Profile profile;
@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
                 result["samples"].push_back({{"seconds", seconds}, {"tokens_per_second", steps / seconds}, {"step_seconds", timings},
                     {"generated_tokens", generated}, {"operation_seconds", profile.seconds}, {"profile", profile.json()}, {"bytes_per_token", bytes}});
             }
-            result["timing_scope"] = "decode forward including LM head and greedy argmax; excludes one-time load/prefill and two warmup steps; operation timers enabled";
+            result["timing_scope"] = "decode forward including LM head and greedy argmax; excludes one-time load/prefill and one warmup step; operation timers enabled";
             result["context_tokens"] = "provided token IDs repeated to context length";
             emit(result, output);
         }
