@@ -12,8 +12,10 @@ import pytest
 
 from tools.figure_v2 import figure
 from tools.download_model import file_hash
-from tools.measure_v2 import baseline_cpu_set, candidates, check_quality_eligibility, cpu_mask, cpu_order, digest, engine_command, execute, freeze, llama_command, load_quality_eligibility, native_cpu_set, validate_quality_eligibility
+from tools.measure_v2 import baseline_cpu_set, candidates, check_baseline_identity, check_quality_eligibility, cpu_mask, cpu_order, digest, engine_command, execute, execute_baseline, freeze, llama_command, load_quality_eligibility, native_cpu_set, validate_quality_eligibility
 from tools.summarize_v2 import profile_bytes, select_best, spread, summarize, summarize_candidate
+from tools.portable import portable
+from tools.quality_v2 import reader_build_identity, reader_identity_locations
 
 
 @pytest.fixture
@@ -26,6 +28,7 @@ def protocol():
                     "affinity": "strict", "rope": "cached", "group_size": 32, "scale_dtype": "f16"},
          "model_geometry": {"layers": 24, "kv_heads": 2, "head_dim": 64},
          "llama_commit": "6c73b3e12dc501de35fe5f6979960d06921a2f6c",
+         "baseline_build_identity": {"reader_binary_sha256": "synthetic-reader", "shared_libraries": {}},
          "selection": "highest pooled median baseline; paired native only"}
     p["id"] = digest(p)
     return p
@@ -66,6 +69,8 @@ def window(p, thread=2, context=128):
                                          ("llama", [llama], llama_command(Path("llama"), Path("gguf"), p, thread, context, candidate))]:
                 w["invocations"].append({"candidate_id": candidate["id"], "engine": engine, "round": round_id,
                                          "returncode": 0,
+                                         **({"baseline_identity_before": deepcopy(p["baseline_build_identity"]),
+                                             "baseline_identity_after": deepcopy(p["baseline_build_identity"])} if engine == "llama" else {}),
                                          "success": True, "error": None, "data": raw, "command": command,
                                          "process_cpu_set": native_cpu_set(p, thread) if engine == "native" else baseline_cpu_set(p, thread, candidate),
                                          "stdout_file": f"{candidate['id']}-{round_id}-{engine}.stdout.txt",
@@ -133,7 +138,8 @@ def test_best_measured_baseline_not_default_or_weakest(tmp_path, protocol):
     assert cell["read_ceiling_tps"] == pytest.approx(12e9 / byte_counts(protocol)["total_min"])
     assert cell["percent_of_ceiling"] == pytest.approx(100 * 102 * byte_counts(protocol)["total_min"] / 12e9)
     assert not result["complete_final_matrix"]
-    assert result["targets_all_cells"] == {"native_over_best_baseline": False, "percent_of_ceiling": False}
+    assert not any(result["target_predicates"].values())
+    assert cell["targets"] is None
     assert not result["failures"]
     assert ET.fromstring(figure(result)).tag.endswith("svg")
 
@@ -223,7 +229,7 @@ def test_failed_winning_candidate_remains_visible_and_never_successful(tmp_path,
     assert summary["failures"][0]["candidate"] == "auto-defaults-poll50"
     assert summary["results"][0]["missing_candidates"] == ["auto-defaults-poll50"]
     assert not summary["complete_final_matrix"]
-    assert all(not value for value in summary["targets_all_cells"].values())
+    assert not any(summary["target_predicates"].values())
 
 
 def test_bandwidth_mismatched_core_set_invalidates_ceiling(tmp_path, protocol):
@@ -259,9 +265,10 @@ def test_all_cell_targets_need_every_cell_and_candidate(tmp_path, protocol):
         (tmp_path / f"bandwidth-t{thread}.json").write_text(json.dumps(bandwidth(protocol, thread)))
         for context in protocol["contexts"]:
             (tmp_path / f"window-t{thread}-c{context}-all.json").write_text(json.dumps(window(protocol, thread, context)))
-    summary = summarize(tmp_path, target_ceiling_percent=1)
+    summary = summarize(tmp_path, target_short_best_ceiling_percent=1, target_long_all_ceiling_percent=1)
     assert summary["complete_final_matrix"]
-    assert summary["targets_all_cells"] == {"native_over_best_baseline": True, "percent_of_ceiling": True}
+    assert all(summary["target_predicates"].values())
+    assert summary["numeric_targets_met"] and summary["threshold_basis"] == "custom"
     path = tmp_path / "window-t12-c4096-all.json"
     raw = json.loads(path.read_text())
     winner_id = protocol["candidates"][-1]["id"]
@@ -272,14 +279,19 @@ def test_all_cell_targets_need_every_cell_and_candidate(tmp_path, protocol):
                 sample["seconds"] = protocol["steps"] / 50
                 sample["step_seconds"] = [1 / 50] * protocol["steps"]
     path.write_text(json.dumps(raw))
-    summary = summarize(tmp_path, target_ceiling_percent=1)
+    summary = summarize(tmp_path, target_short_best_ceiling_percent=1, target_long_all_ceiling_percent=1)
     assert summary["complete_final_matrix"]
-    assert not summary["targets_all_cells"]["native_over_best_baseline"]
+    assert not summary["target_predicates"]["native_over_best_baseline"]
+    scaling = next(r for r in summary["thread12_scaling"]["comparisons"] if r["context"] == 4096)
+    assert scaling["12_over_6"] == pytest.approx(50 / 102)
+    assert scaling["decrease_percent_vs_strongest_lower"] == pytest.approx(100 * (1 - 50 / 102))
+    assert summary["thread12_scaling"]["acceptance"] is None
     path.unlink()
-    summary = summarize(tmp_path, target_ceiling_percent=1)
+    summary = summarize(tmp_path, target_short_best_ceiling_percent=1, target_long_all_ceiling_percent=1)
     assert not summary["complete_final_matrix"]
     assert summary["missing_cells"] == [(12, 4096)]
-    assert all(not value for value in summary["targets_all_cells"].values())
+    assert not any(summary["target_predicates"].values())
+    assert all(row["targets"] is None for row in summary["results"])
 
 
 def test_removing_stronger_baseline_from_protocol_is_rejected(tmp_path, protocol):
@@ -424,3 +436,231 @@ def test_interactive_native_overlap_is_rejected(protocol):
     w["invocations"][0]["request"] = "run"
     with pytest.raises(ValueError, match="exit before baseline"):
         summarize_candidate(w, protocol, protocol["candidates"][0])
+
+
+@pytest.mark.parametrize("existing", ["protocol.json", "cpu-discovery.json", "cpu-discovery.stdout.txt", "cpu-discovery.stderr.txt"])
+def test_freeze_replay_preserves_all_discovery_evidence(tmp_path, monkeypatch, existing):
+    names = ["protocol.json", "cpu-discovery.json", "cpu-discovery.stdout.txt", "cpu-discovery.stderr.txt"]
+    evidence = tmp_path / existing
+    evidence.write_bytes(b"original evidence")
+    before = {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in tmp_path.iterdir()}
+    args = SimpleNamespace(model=tmp_path, gguf=tmp_path, llama=tmp_path, model_manifest=tmp_path,
+                           kv="f16", steps=64, repeats=5, development=False, output=tmp_path)
+    monkeypatch.setattr(os, "getpriority", lambda *a: 19)
+    def no_execution(*a, **kw):
+        raise AssertionError("rejected freeze must not launch discovery or any subprocess")
+    monkeypatch.setattr(subprocess, "run", no_execution)
+    with pytest.raises(FileExistsError):
+        freeze(args, {})
+    assert {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in tmp_path.iterdir()} == before
+    assert all((tmp_path / name).exists() == (name == existing) for name in names)
+
+
+def resolved_baseline_fixture(tmp_path, monkeypatch):
+    # The executable is deliberately outside the actual dependencies' build tree.
+    executable = tmp_path / "launch" / "renamed-benchmark"
+    executable.parent.mkdir()
+    executable.write_bytes(b"benchmark")
+    build = tmp_path / "upstream" / "build"
+    library_dir = build / "bin"
+    library_dir.mkdir(parents=True)
+    (build / "CMakeCache.txt").write_text(
+        "CMAKE_BUILD_TYPE:STRING=Release\nCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++\nGGML_NATIVE:BOOL=ON\nGGML_BACKEND_DL:BOOL=OFF\n")
+    (build / "compile_commands.json").write_text("[]")
+    libraries = {}
+    for name in ["libllama.so", "libggml.so", "libggml-base.so", "libggml-cpu.so"]:
+        libraries[name] = library_dir / name
+        libraries[name].write_bytes(name.encode())
+    def fake_ldd(command, **kwargs):
+        assert command == ["ldd", str(executable.resolve())]
+        text = "\n".join(f"{name} => {path} (0x1234)" for name, path in libraries.items())
+        return subprocess.CompletedProcess(command, 0, text, "")
+    monkeypatch.setattr(subprocess, "run", fake_ldd)
+    return executable, build, libraries, fake_ldd
+
+
+def test_resolved_library_hash_not_adjacent_file_or_stamp(tmp_path, monkeypatch):
+    executable, build, libraries, _ = resolved_baseline_fixture(tmp_path, monkeypatch)
+    locations = {tmp_path: "$FIXTURE"}
+    identity = reader_build_identity(executable)
+    p = {"baseline_build_identity": portable(identity, {**locations, **reader_identity_locations(identity)})}
+    assert check_baseline_identity(executable, p, locations) == p["baseline_build_identity"]
+    (executable.parent / "libggml-cpu.so").write_bytes(b"unused neighbor")
+    check_baseline_identity(executable, p, locations)
+    library = libraries["libggml-cpu.so"]
+    old = library.stat()
+    original = library.read_bytes()
+    library.write_bytes(b"x" * len(original))
+    os.utime(library, ns=(old.st_atime_ns, old.st_mtime_ns))
+    with pytest.raises(ValueError, match="identity changed"):
+        check_baseline_identity(executable, p, locations)
+    library.write_bytes(original)
+    (build / "compile_commands.json").write_text('[{"command":"changed flags"}]')
+    with pytest.raises(ValueError, match="identity changed"):
+        check_baseline_identity(executable, p, locations)
+
+
+@pytest.mark.parametrize("phase", ["before", "after"])
+def test_baseline_identity_checked_around_each_invocation(tmp_path, monkeypatch, phase):
+    executable, _, libraries, fake_ldd = resolved_baseline_fixture(tmp_path, monkeypatch)
+    locations = {tmp_path: "$FIXTURE"}
+    identity = reader_build_identity(executable)
+    p = {"baseline_build_identity": portable(identity, {**locations, **reader_identity_locations(identity)})}
+    library = libraries["libggml-cpu.so"]
+    launches = []
+    def run(command, **kwargs):
+        if command[0] == "ldd":
+            return fake_ldd(command, **kwargs)
+        launches.append(command)
+        library.write_bytes(b"changed during invocation")
+        return subprocess.CompletedProcess(command, 0, '[{"rate":100}]', "raw stderr")
+    monkeypatch.setattr(subprocess, "run", run)
+    stem = tmp_path / "baseline"
+    if phase == "before":
+        library.write_bytes(b"changed before invocation")
+        with pytest.raises(ValueError, match="identity changed"):
+            execute_baseline(["benchmark"], executable, p, stem, locations, time.monotonic() + 10)
+        assert not launches
+        assert not stem.with_suffix(".json").exists()
+    else:
+        record = execute_baseline(["benchmark"], executable, p, stem, locations, time.monotonic() + 10)
+        assert launches == [["benchmark"]]
+        assert not record["success"]
+        assert "baseline identity changed" in record["error"]
+        assert record["data"] == [{"rate": 100}]
+        assert stem.with_suffix(".stdout.txt").read_text() == '[{"rate":100}]'
+        assert stem.with_suffix(".stderr.txt").read_text() == "raw stderr"
+        assert not json.loads(stem.with_suffix(".json").read_text())["success"]
+
+
+@pytest.mark.parametrize("phase", ["before", "after"])
+def test_summary_rejects_unbound_baseline_identity(protocol, phase):
+    w = window(protocol)
+    run = next(r for r in w["invocations"] if r["engine"] == "llama")
+    run[f"baseline_identity_{phase}"]["reader_binary_sha256"] = "changed"
+    with pytest.raises(ValueError, match="identity changed"):
+        summarize_candidate(w, protocol, protocol["candidates"][0])
+
+
+def save_target_matrix(directory, p, short_percentages, long_percentages):
+    (directory / "protocol.json").write_text(json.dumps(p))
+    for index, thread in enumerate(p["threads"]):
+        (directory / f"bandwidth-t{thread}.json").write_text(json.dumps(bandwidth(p, thread)))
+        for context in p["contexts"]:
+            w = window(p, thread, context)
+            percentage = (short_percentages[index] if context == 128 else
+                          long_percentages[index] if context == 4096 else 80)
+            rate = percentage / 100 * 12e9 / byte_counts(p, context)["total_min"]
+            for run in w["invocations"]:
+                if run["engine"] == "native":
+                    for sample in run["data"]["samples"]:
+                        sample["tokens_per_second"] = rate
+                        sample["seconds"] = p["steps"] / rate
+                        sample["step_seconds"] = [1 / rate] * p["steps"]
+            (directory / f"window-t{thread}-c{context}-all.json").write_text(json.dumps(w))
+
+
+@pytest.mark.parametrize("short,long,short_met,long_met", [
+    ([60, 60, 86, 60, 60], [76] * 5, True, True),
+    ([84] * 5, [76] * 5, False, True),
+    ([86] * 5, [76, 76, 76, 74, 76], True, False),
+    ([60] * 5, [60] * 5, False, False),
+])
+def test_default_targets_are_short_best_and_long_all(tmp_path, protocol, short, long, short_met, long_met):
+    save_target_matrix(tmp_path, protocol, short, long)
+    summary = summarize(tmp_path)
+    assert summary["complete_final_matrix"]
+    assert summary["thresholds"] == {"native_over_best_baseline": 1,
+                                     "short_best_percent_of_ceiling": 85,
+                                     "long_all_percent_of_ceiling": 75}
+    assert summary["threshold_basis"] == "user"
+    assert summary["target_predicates"] == {"native_over_best_baseline": True,
+                                            "short_best_percent_of_ceiling": short_met,
+                                            "long_all_percent_of_ceiling": long_met}
+    assert summary["numeric_targets_met"] == (short_met and long_met)
+    assert all(r["targets"]["long_all_percent_of_ceiling"] is None for r in summary["results"] if r["context"] != 4096)
+    assert all(r["targets"]["short_best_percent_of_ceiling"] is None for r in summary["results"] if r["context"] != 128)
+    assert summary["thread12_scaling"]["acceptance"] is None
+
+
+@pytest.mark.parametrize("fault", ["missing_cell", "missing_candidate", "missing_bandwidth", "development"])
+def test_context_targets_never_claim_incomplete_or_development_matrix(tmp_path, protocol, fault):
+    if fault == "development":
+        protocol["development"] = True
+        protocol["id"] = digest({k: v for k, v in protocol.items() if k != "id"})
+    save_target_matrix(tmp_path, protocol, [86] * 5, [76] * 5)
+    path = tmp_path / "window-t12-c4096-all.json"
+    if fault == "missing_cell":
+        path.unlink()
+    elif fault == "missing_candidate":
+        raw = json.loads(path.read_text())
+        raw["candidates"].pop()
+        path.write_text(json.dumps(raw))
+    elif fault == "missing_bandwidth":
+        (tmp_path / "bandwidth-t12.json").unlink()
+    summary = summarize(tmp_path, allow_partial=True)
+    assert not summary["complete_final_matrix"]
+    assert not summary["numeric_targets_met"]
+    assert not any(summary["target_predicates"].values())
+    assert all(row["targets"] is None for row in summary["results"])
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"target_ratio": float("nan")}, {"target_short_best_ceiling_percent": 0},
+    {"target_long_all_ceiling_percent": float("inf")},
+])
+def test_custom_target_thresholds_reject_invalid_values(tmp_path, kwargs):
+    with pytest.raises(ValueError, match="finite and positive"):
+        summarize(tmp_path, **kwargs)
+
+
+def test_freeze_uses_resolved_build_for_relocated_benchmark(tmp_path, monkeypatch, protocol):
+    executable, build, libraries, _ = resolved_baseline_fixture(tmp_path, monkeypatch)
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "model.safetensors").write_bytes(b"weights")
+    (model / "config.json").write_text(json.dumps(
+        {"num_hidden_layers": 24, "num_key_value_heads": 2, "hidden_size": 128, "num_attention_heads": 2}))
+    native = tmp_path / "native"
+    native.mkdir()
+    engine = native / "engine"
+    engine.write_bytes(b"engine")
+    (native / "CMakeCache.txt").write_text(
+        "CMAKE_BUILD_TYPE:STRING=Release\nCPU_DECODE_NATIVE:BOOL=ON\nCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++\n")
+    (native / "compile_commands.json").write_text("[]")
+    gguf = tmp_path / "baseline.gguf"
+    gguf.write_bytes(b"Q8")
+    bw = native / "bandwidth"
+    bw.write_bytes(b"bandwidth")
+    manifest = tmp_path / "manifest.json"
+    source = {"fixture": "same pinned model"}
+    manifest.write_text(json.dumps({"source": source, "group_size": 32, "scale_dtype": "f16",
+        "weights": {"sha256": file_hash(model / "model.safetensors")},
+        "config_sha256": file_hash(model / "config.json")}))
+    preparation = tmp_path / "preparation.json"
+    preparation.write_text(json.dumps({"llama_commit": protocol["llama_commit"], "source_model": source,
+        "build": {"type": "Release", "native_cpu": True, "gpu": False},
+        "artifacts": {"Q8_0": {"sha256": file_hash(gguf)}}}))
+    output = tmp_path / "evidence"
+    output.mkdir()
+    args = SimpleNamespace(model=model, engine=engine, llama=executable, gguf=gguf, bandwidth=bw,
+        model_manifest=manifest, preparation=preparation, output=output, development=False,
+        kv="f16", steps=64, repeats=5, cpu_order=None, polls="50", tokens="1,2,3",
+        kernel="simd512x4", attention="blocked", scheduler="pool", affinity="strict", rope="cached")
+    monkeypatch.setattr(os, "getpriority", lambda *a: 19)
+    monkeypatch.setattr("tools.measure_v2.observation", lambda command: {"command": command})
+    monkeypatch.setattr("tools.measure_v2.environment", lambda locations: {"fixture": "isolated host observation"})
+    cpus = {"allowed_cpu_ids": list(range(12)), "preferred_cpu_ids": list(range(12))}
+    monkeypatch.setattr("tools.measure_v2.execute", lambda *a, **kw: {"success": True, "data": cpus})
+    locations = {tmp_path: "$FIXTURE"}
+    freeze(args, locations)
+    frozen = json.loads((output / "protocol.json").read_text())
+    identity = frozen["baseline_build_identity"]
+    assert identity["build"]["root"] == "$LLAMA_BUILD"
+    assert identity["build"]["compile_flags_sha256"] == {"compile_commands.json": file_hash(build / "compile_commands.json")}
+    assert identity["shared_libraries"]["libggml-cpu.so"]["resolved_path"] == "$LLAMA_BUILD/bin/libggml-cpu.so"
+    assert identity["shared_libraries"]["libggml-cpu.so"]["sha256"] == file_hash(libraries["libggml-cpu.so"])
+    assert identity["reader_binary_sha256"] == file_hash(executable)
+    assert frozen["source_model"] == source
+    assert str(tmp_path) not in json.dumps(frozen)
+    check_baseline_identity(executable, frozen, {tmp_path: "$FIXTURE"})

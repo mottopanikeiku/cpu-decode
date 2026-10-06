@@ -1,14 +1,20 @@
 """Analytical quality statistics and real pinned corpus integrity (no model loads)."""
 import copy
+import hashlib
 import json
 import math
+import os
+import shlex
 import struct
+import subprocess
+import sys
 from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+import tools.quality_v2 as quality_v2
 from tools.corpus_v2 import (
     CORPUS_SHA256, FORMAT_CHOICES, LICENSE, LICENSE_URL, POLICY, SOURCES,
     digest_json, load_manifest, prepare, protect_destination, validate_manifest, window_alignment, write_json,
@@ -367,6 +373,115 @@ def test_every_quality_stage_rejects_archived_destinations_before_inputs(tmp_pat
     assert file_hash(archived) == before
 
 
+@pytest.mark.parametrize("backend", ["native", "llama"])
+@pytest.mark.parametrize("window_index", [0, -1], ids=["first-window", "later-window"])
+@pytest.mark.parametrize("suffix", [".bin", ".json"])
+@pytest.mark.parametrize("kind", ["file", "symlink", "dangling-symlink"])
+def test_evaluation_preflights_all_raw_outputs_before_subprocess(
+        tmp_path, monkeypatch, backend, window_index, suffix, kind):
+    corpus = load_manifest(CORPUS)
+    windows = [window for window in corpus["windows"] if window["split"] == "calibration"]
+    args = Namespace(output=tmp_path / "quality.json", raw_dir=tmp_path / "raw",
+        corpus=CORPUS, split="calibration", selection=tmp_path / "selection.json",
+        label="candidate", backend=backend, model=tmp_path / "candidate-model",
+        engine=tmp_path / "engine", reader=tmp_path / "reader",
+        artifact_manifest=tmp_path / "artifact-manifest.json", threads=2,
+        kernel="scalar", kv="f16", attention="blocked", scheduler="pool",
+        affinity="unpinned", cpu_set=None)
+    args.raw_dir.mkdir()
+    oracle_path = args.raw_dir / "reference.bin"
+    oracle_path.write_bytes(b"recorded oracle bytes")
+    args.engine.write_bytes(b"engine fixture")
+    artifact = {"sha256": "candidate hash", "bytes": 1}
+    source = {"fixture": "verified source"}
+    args.artifact_manifest.write_text(json.dumps({
+        "llama_commit": quality_v2.LLAMA_COMMIT, "llama_repository": quality_v2.LLAMA_URL,
+        "source_model": source, "artifacts": {"Q8_0": artifact}}))
+    metadata = {"identity": {"verified_source": source}, "windows": [
+        {"id": window["id"], "logits": oracle_path.name, "shape": [256, 2],
+            "input_tokens": window_alignment(window)[0]} for window in windows]}
+    monkeypatch.setattr(quality_v2, "read_oracle", lambda *_: metadata)
+    monkeypatch.setattr(quality_v2, "model_identity",
+        lambda *_: {"files": {args.model.name: artifact}})
+    monkeypatch.setattr(quality_v2, "preflight_native_model", lambda *_: {})
+    reader_calls = []
+
+    def reader_identity(*_):
+        reader_calls.append(True)
+        return {}
+
+    monkeypatch.setattr(quality_v2, "reader_build_identity", reader_identity)
+    monkeypatch.setattr(quality_v2, "checked_logits", lambda *_: np.zeros((256, 2)))
+    subprocess_calls = []
+
+    def unexpected_subprocess(*command, **kwargs):
+        subprocess_calls.append(command)
+        raise AssertionError("Raw collisions must be rejected before any subprocess")
+
+    monkeypatch.setattr(quality_v2.subprocess, "run", unexpected_subprocess)
+    collision = args.raw_dir / f"{windows[window_index]['id']}-{args.label}{suffix}"
+    recorded = b"recorded candidate bytes must not change"
+    target = tmp_path / "recorded-output"
+    if kind == "file":
+        collision.write_bytes(recorded)
+    else:
+        if kind == "symlink":
+            target.write_bytes(recorded)
+        collision.symlink_to(target)
+    before = set(args.raw_dir.iterdir())
+
+    with pytest.raises(ValueError, match="raw output already exists"):
+        evaluate(args)
+
+    assert subprocess_calls == []
+    assert reader_calls == []
+    assert set(args.raw_dir.iterdir()) == before
+    assert oracle_path.read_bytes() == b"recorded oracle bytes"
+    assert not args.output.exists()
+    if kind == "dangling-symlink":
+        assert collision.is_symlink()
+        assert not target.exists()
+    else:
+        assert collision.read_bytes() == recorded
+        if kind == "symlink":
+            assert collision.is_symlink()
+            assert target.read_bytes() == recorded
+
+
+def test_make_raw_uses_resolved_results_path_and_preserves_override(tmp_path, monkeypatch):
+    # Evaluate only the variable definitions; no project recipe or uv environment
+    # setup runs. The shim executes the real inline Python with this interpreter.
+    uv = tmp_path / "uv"
+    uv.write_text(f'#!/bin/sh\nshift 2\nexec {shlex.quote(sys.executable)} "$@"\n')
+    uv.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
+    definitions = "\n".join((ROOT / "Makefile").read_text().splitlines()[:5])
+    makefile = definitions + "\n.PHONY: print-raw\nprint-raw:\n\t@printf '%s\\n' '$(RAW)'\n"
+
+    def raw_for(results, override=None):
+        command = ["make", "--no-print-directory", "-f", "-", "print-raw",
+            "CACHE=external", f"RESULTS={results}"]
+        if override is not None:
+            command.append(f"RAW={override}")
+        return subprocess.run(command, input=makefile, cwd=tmp_path, check=True,
+            capture_output=True, text=True).stdout.strip()
+
+    first = "results/v2/run-a/reproduction"
+    second = "results/v2/run-b/reproduction"
+    destination = (tmp_path / first).resolve()
+    expected = "external/quality-v2-" + hashlib.sha256(str(destination).encode()).hexdigest()
+    assert raw_for(first) == expected
+    assert raw_for(second) != expected
+    assert raw_for(destination) == expected
+    assert raw_for("results/v2/run-a/../run-a/reproduction") == expected
+    destination.parent.mkdir(parents=True)
+    alias = tmp_path / "alias"
+    alias.symlink_to(destination.parent, target_is_directory=True)
+    assert raw_for(alias / "reproduction") == expected
+    assert raw_for("results/v2/run with spaces/reproduction") != expected
+    assert raw_for(first, "external/explicit-raw") == "external/explicit-raw"
+
+
 @pytest.mark.parametrize("changed", ["weights", "config", "source"])
 def test_v1_baseline_requires_archived_weights_config_and_oracle_source(changed):
     selection = selected_decision()
@@ -441,3 +556,61 @@ def test_unrecorded_dynamic_backend_build_rejected(tmp_path):
     (build / "CMakeCache.txt").write_text("GGML_BACKEND_DL:BOOL=ON\n")
     with pytest.raises(ValueError, match="unrecorded dynamically"):
         upstream_build_identity(libraries)
+
+
+@pytest.mark.parametrize("name", ["libggml-cuda.so", "libggml-cpu-extra.so", "libllama-extra.so"])
+def test_unknown_resolved_upstream_dependency_rejected(tmp_path, name):
+    _, libraries, text = upstream_fixture(tmp_path)
+    path = next(iter(libraries.values()))
+    with pytest.raises(ValueError, match="Unknown upstream"):
+        resolved_upstream_libraries(text + f"\n{name} => {path} (0x1234)")
+
+
+def test_identical_libraries_in_different_builds_keep_distinct_portable_identity(tmp_path):
+    from tools.portable import portable
+    left = tmp_path / "first"
+    right = tmp_path / "second"
+    _, left_libraries, _ = upstream_fixture(left)
+    _, right_libraries, _ = upstream_fixture(right)
+    first = upstream_build_identity(left_libraries)
+    second = upstream_build_identity(right_libraries)
+    assert {name: row["sha256"] for name, row in first["shared_libraries"].items()} == {
+        name: row["sha256"] for name, row in second["shared_libraries"].items()}
+    first = portable(first, quality_v2.reader_identity_locations(first))
+    second = portable(second, quality_v2.reader_identity_locations(second))
+    assert first["build"]["root"] == second["build"]["root"] == "$LLAMA_BUILD"
+    assert all(row["resolved_path"].startswith("$LLAMA_BUILD/") for row in first["shared_libraries"].values())
+    assert str(tmp_path) not in json.dumps(first)
+    with pytest.raises(ValueError, match="identity changed"):
+        require_reader_identity(first, second)
+
+
+@pytest.mark.parametrize("variable", ["LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT"])
+def test_reader_identity_binds_loader_environment_without_publishing_paths(tmp_path, monkeypatch, variable):
+    _, _, text = upstream_fixture(tmp_path)
+    reader = tmp_path / "relocated-reader"
+    reader.write_bytes(b"reader")
+    monkeypatch.setattr(subprocess, "run",
+        lambda command, **kw: subprocess.CompletedProcess(command, 0, text, ""))
+    monkeypatch.delenv(variable, raising=False)
+    first = quality_v2.reader_build_identity(reader)
+    loader_path = str(tmp_path / "private-loader-location")
+    monkeypatch.setenv(variable, loader_path)
+    second = quality_v2.reader_build_identity(reader)
+    assert loader_path not in json.dumps(second["loader_environment_sha256"])
+    assert first["loader_environment_sha256"][variable] != second["loader_environment_sha256"][variable]
+    with pytest.raises(ValueError, match="identity changed"):
+        require_reader_identity(first, second)
+
+
+def test_reader_compiler_setting_is_bound_and_portable(tmp_path):
+    from tools.portable import portable
+    build, libraries, _ = upstream_fixture(tmp_path)
+    compiler = tmp_path / "private-toolchain" / "c++"
+    with (build / "CMakeCache.txt").open("a") as stream:
+        stream.write(f"CMAKE_CXX_COMPILER:FILEPATH={compiler}\n")
+    identity = upstream_build_identity(libraries)
+    assert identity["build"]["settings"]["CMAKE_CXX_COMPILER"] == str(compiler)
+    public = portable(identity, quality_v2.reader_identity_locations(identity))
+    assert public["build"]["settings"]["CMAKE_CXX_COMPILER"] == "$LLAMA_CXX_COMPILER"
+    assert str(tmp_path) not in json.dumps(public)

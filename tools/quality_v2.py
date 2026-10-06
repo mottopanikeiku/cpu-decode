@@ -236,6 +236,10 @@ def resolved_upstream_libraries(ldd_output: str) -> dict[str, Path]:
     for line in ldd_output.splitlines():
         match = re.match(r"\s*(lib(?:llama|ggml)[^ ]*)\s+=>\s+(/.*?)\s+\(0x[0-9a-fA-F]+\)", line)
         if match:
+            if not re.fullmatch(r"lib(?:llama|ggml|ggml-base|ggml-cpu)\.so(?:\.\d+)*", match.group(1)):
+                raise ValueError(f"Unknown upstream CPU reader dependency: {match.group(1)}")
+            if match.group(1) in libraries:
+                raise ValueError("Duplicate upstream reader dependency")
             libraries[match.group(1)] = Path(match.group(2)).resolve(strict=True)
         elif re.match(r"\s*lib(?:llama|ggml)", line):
             raise ValueError("Unresolved upstream reader dependency")
@@ -253,7 +257,7 @@ def upstream_build_identity(libraries: dict[str, Path]) -> dict:
     cache = build_root / "CMakeCache.txt"
     settings = {}
     for line in cache.read_text().splitlines():
-        match = re.match(r"(CMAKE_BUILD_TYPE):[^=]+=(.*)|(GGML_[^:]+):BOOL=(.*)", line)
+        match = re.match(r"(CMAKE_BUILD_TYPE|CMAKE_CXX_COMPILER):[^=]+=(.*)|(GGML_[^:]+):BOOL=(.*)", line)
         if match:
             settings[match.group(1) or match.group(3)] = match.group(2) if match.group(1) else match.group(4)
     if settings.get("GGML_BACKEND_DL") == "ON":
@@ -265,16 +269,30 @@ def upstream_build_identity(libraries: dict[str, Path]) -> dict:
     if not flags:
         raise ValueError("Upstream build identity needs generated flags.make or compile_commands.json")
     return {"shared_libraries": {
-        name: {"resolved_path": str(path.relative_to(build_root)), "sha256": file_hash(path), "bytes": path.stat().st_size}
+        name: {"resolved_path": str(path), "sha256": file_hash(path), "bytes": path.stat().st_size}
         for name, path in sorted(libraries.items())},
-        "build": {"cache_sha256": file_hash(cache), "settings": settings, "compile_flags_sha256": flags},
+        "build": {"root": str(build_root), "root_sha256": digest_json(str(build_root)),
+                  "cache_sha256": file_hash(cache), "settings": settings, "compile_flags_sha256": flags},
         "resolution": "ldd under the same inherited loader environment; resolved upstream files rehashed before and after every window"}
 
 
 def reader_build_identity(reader: Path) -> dict:
     run = subprocess.run(["ldd", str(reader.resolve())], check=True, capture_output=True, text=True)
     libraries = resolved_upstream_libraries(run.stdout)
-    return {"reader_binary_sha256": file_hash(reader), **upstream_build_identity(libraries)}
+    return {"reader_binary_sha256": file_hash(reader), **upstream_build_identity(libraries),
+            "loader_environment_sha256": {
+                name: digest_json(os.environ.get(name))
+                for name in ["LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT"]}}
+
+
+def reader_identity_locations(identity: dict) -> dict:
+    """Alias the resolved dependency build, independent of reader placement."""
+    root = Path(identity["build"]["root"])
+    locations = {root.parent: "$LLAMA_ROOT", root: "$LLAMA_BUILD"}
+    compiler = identity["build"]["settings"].get("CMAKE_CXX_COMPILER")
+    if compiler and Path(compiler).is_absolute():
+        locations[Path(compiler)] = "$LLAMA_CXX_COMPILER"
+    return locations
 
 
 def require_reader_identity(expected: dict, actual: dict) -> None:
@@ -356,6 +374,15 @@ def evaluate(args) -> None:
     windows = [window for window in corpus["windows"] if window["split"] == args.split]
     if any(window["id"] not in cases for window in windows):
         raise ValueError("Oracle generation is incomplete for the requested split")
+    # Both readers truncate PREFIX.bin/PREFIX.json: reject every collision before
+    # any subprocess, so a later window cannot leave a partially written run.
+    prefixes = [args.raw_dir.resolve() / f"{window['id']}-{args.label}" for window in windows]
+    for prefix in prefixes:
+        for suffix in (".bin", ".json"):
+            path = prefix.with_suffix(suffix)
+            destination = protect_destination(path)
+            if destination.exists() or path.is_symlink():
+                raise ValueError("Quality raw output already exists; do not overwrite recorded measurements")
     identity = model_identity(args.model, args.backend)
     pinned = None
     if args.backend == "llama":
@@ -374,14 +401,11 @@ def evaluate(args) -> None:
         pinned = {"engine_binary_sha256": file_hash(args.engine)}
     records, all_rows = [], []
     settings = None
-    for window in windows:
+    for window, prefix in zip(windows, prefixes, strict=True):
         if args.backend == "llama":
             require_reader_identity(reader_identity, reader_build_identity(args.reader))
         case = cases[window["id"]]
         reference = checked_logits(raw_file(args.raw_dir, case["logits"]), case)
-        prefix = args.raw_dir.resolve() / f"{window['id']}-{args.label}"
-        protect_destination(prefix.with_suffix(".bin"))
-        protect_destination(prefix.with_suffix(".json"))
         common = ["--model", str(args.model.resolve()), "--tokens", ",".join(map(str, case["input_tokens"])),
             "--output", str(prefix), "--threads", str(args.threads), "--logits-start", str(POLICY["priming_tokens"])]
         if args.backend == "native":
@@ -443,6 +467,8 @@ def evaluate(args) -> None:
         "scope": "Teacher-forced held-out next-token likelihood, full-vocabulary KL(reference||candidate), fresh cache per window; no independent generation or tuning on heldout"}
     if result["aggregate"]["positions"] != POLICY[f"{args.split}_windows"] * 256:
         raise ValueError("Incomplete scored corpus")
+    if args.backend == "llama":
+        result["binary_identity"] = portable(pinned, reader_identity_locations(reader_identity))
     write_json(args.output, result, exclusive=True)
     print(json.dumps({"label": args.label, "split": args.split, "aggregate": result["aggregate"]}, sort_keys=True))
 

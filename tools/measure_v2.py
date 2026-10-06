@@ -16,6 +16,7 @@ from pathlib import Path
 from tools.download_model import file_hash
 from tools.portable import portable
 from tools.prepare_llama import LLAMA_COMMIT
+from tools.quality_v2 import reader_build_identity, reader_identity_locations, require_reader_identity
 
 ROOT = Path(__file__).resolve().parents[1]
 THREADS = [1, 2, 4, 6, 12]
@@ -211,7 +212,7 @@ def environment(locations: dict) -> dict:
                      "python": sys.version, "cpu": observation(["lscpu"]),
                      "compiler": observation(["c++", "--version"]), "nice": os.getpriority(os.PRIO_PROCESS, 0),
                      "allowed_cpu_ids": sorted(os.sched_getaffinity(0)),
-                     "environment": {k: os.environ.get(k) for k in ["OMP_NUM_THREADS", "OMP_PLACES", "OMP_PROC_BIND", "OMP_WAIT_POLICY", "LD_LIBRARY_PATH"]}}, locations)
+                     "environment": {k: os.environ.get(k) for k in ["OMP_NUM_THREADS", "OMP_PLACES", "OMP_PROC_BIND", "OMP_WAIT_POLICY"]}}, locations)
 
 
 def execute(command: list[str], stem: Path, locations: dict, deadline: float,
@@ -251,6 +252,33 @@ def execute(command: list[str], stem: Path, locations: dict, deadline: float,
     return record
 
 
+def baseline_build_identity(llama: Path, locations: dict) -> dict:
+    actual = reader_build_identity(llama)
+    return portable(actual, {**locations, **reader_identity_locations(actual)})
+
+
+def check_baseline_identity(llama: Path, protocol: dict, locations: dict) -> dict:
+    identity = baseline_build_identity(llama, locations)
+    require_reader_identity(protocol["baseline_build_identity"], identity)
+    return identity
+
+
+def execute_baseline(command: list[str], llama: Path, protocol: dict, stem: Path,
+                     locations: dict, deadline: float) -> dict:
+    """An invocation counts only if the resolved loader identity stayed frozen."""
+    before = check_baseline_identity(llama, protocol, locations)
+    record = execute(command, stem, locations, deadline)
+    record["baseline_identity_before"] = before
+    try:
+        record["baseline_identity_after"] = baseline_build_identity(llama, locations)
+        require_reader_identity(protocol["baseline_build_identity"], record["baseline_identity_after"])
+    except (ValueError, OSError, subprocess.CalledProcessError) as exc:
+        record["success"] = False
+        record["error"] = "; ".join(filter(None, [record["error"], f"baseline identity changed: {exc}"]))
+    save(stem.with_suffix(".json"), record)
+    return record
+
+
 def freeze(args: argparse.Namespace, locations: dict) -> None:
     for key in ["model", "gguf", "llama", "model_manifest"]:
         if getattr(args, key) is None:
@@ -266,6 +294,11 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
         raise ValueError("freeze commands must run at nice 19")
     if args.development and args.output.resolve() == (ROOT / "results/v2").resolve():
         raise ValueError("development protocol needs its own --output under results/v2")
+    # Reject replays before CPU discovery can overwrite any retained evidence.
+    for name in ["protocol.json", "cpu-discovery.json", "cpu-discovery.stdout.txt", "cpu-discovery.stderr.txt"]:
+        path = args.output / name
+        if path.exists() or path.is_symlink():
+            raise FileExistsError(path)
     manifest = json.loads(args.model_manifest.read_text())
     preparation = json.loads(args.preparation.read_text())
     if preparation["llama_commit"] != LLAMA_COMMIT or manifest["source"] != preparation["source_model"]:
@@ -278,7 +311,9 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
     if file_hash(args.gguf) != preparation["artifacts"]["Q8_0"]["sha256"]:
         raise ValueError("Q8_0 GGUF hash mismatch")
     native_build = cache_settings(args.engine.resolve().parent / "CMakeCache.txt")
-    llama_build = cache_settings(args.llama.resolve().parent.parent / "CMakeCache.txt")
+    baseline_identity = reader_build_identity(args.llama)
+    locations.update(reader_identity_locations(baseline_identity))
+    llama_build = baseline_identity["build"]["settings"]
     if native_build.get("CMAKE_BUILD_TYPE") != "Release" or native_build.get("CPU_DECODE_NATIVE") != "ON":
         raise ValueError("native engine must use CPU_DECODE_NATIVE=ON and Release")
     if llama_build.get("CMAKE_BUILD_TYPE") != "Release" or llama_build.get("GGML_NATIVE") != "ON":
@@ -298,9 +333,6 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
                  "weights": {"sha256": manifest["weights"]["sha256"], **stamp(weights)},
                  "config": {"sha256": manifest["config_sha256"], **stamp(args.model / "config.json")},
                  "gguf": {"sha256": preparation["artifacts"]["Q8_0"]["sha256"], **stamp(args.gguf)}}
-    # Shared objects influence dispatch just as much as the benchmark executable.
-    libraries = {path.name: {"sha256": file_hash(path), **stamp(path)}
-                 for path in sorted(args.llama.resolve().parent.glob("*.so*")) if path.is_file()}
     protocol = {"schema": "cpu-decode-v2-protocol", "development": args.development,
                 "threads": THREADS, "contexts": CONTEXTS, "steps": args.steps, "repeats": args.repeats,
                 "rounds": 2, "warmup_steps": 1, "tokens": args.tokens, "cpu_order": order,
@@ -308,10 +340,9 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
                 "native": {"kernel": args.kernel, "kv_dtype": "f16", "attention": args.attention,
                            "scheduler": args.scheduler, "affinity": args.affinity, "rope": args.rope, **model_settings},
                 "model_geometry": geometry,
-                "artifacts": artifacts, "llama_libraries": libraries, "native_build": native_build,
+                "artifacts": artifacts, "baseline_build_identity": baseline_identity, "native_build": native_build,
                 "llama_build": llama_build, "source_model": manifest["source"], "llama_commit": LLAMA_COMMIT,
                 "native_compile_flags": build_flags(args.engine.resolve().parent),
-                "llama_compile_flags": build_flags(args.llama.resolve().parent.parent),
                 "compiler_versions": {"native": observation([native_build["CMAKE_CXX_COMPILER"], "--version"]),
                                       "llama": observation([llama_build["CMAKE_CXX_COMPILER"], "--version"])},
                 "model_manifest": manifest, "preparation": preparation, "environment": environment(locations),
@@ -325,7 +356,7 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
         stream.write(json.dumps(protocol, indent=2) + "\n")
 
 
-def check_artifacts(args: argparse.Namespace, protocol: dict, ablation: bool = False) -> None:
+def check_artifacts(args: argparse.Namespace, protocol: dict, locations: dict, ablation: bool = False) -> None:
     files = {"engine": args.engine, "llama": args.llama, "gguf": args.gguf}
     if not ablation:
         files.update({"weights": args.model and args.model / "model.safetensors",
@@ -337,10 +368,7 @@ def check_artifacts(args: argparse.Namespace, protocol: dict, ablation: bool = F
             raise ValueError(f"frozen artifact changed or missing: {name}")
         if name in {"engine", "llama"} and file_hash(path) != protocol["artifacts"][name]["sha256"]:
             raise ValueError(f"frozen binary changed: {name}")
-    for name, identity in protocol["llama_libraries"].items():
-        path = args.llama.resolve().parent / name
-        if stamp(path) != {k: identity[k] for k in ["bytes", "mtime_ns"]}:
-            raise ValueError(f"frozen shared library changed: {name}")
+    check_baseline_identity(args.llama, protocol, locations)
 
 
 
@@ -386,8 +414,6 @@ def main() -> None:
         path = getattr(args, name)
         if path:
             locations[path.resolve()] = alias
-    if args.llama:
-        locations[args.llama.resolve().parent.parent.parent] = "$LLAMA_ROOT"
     if args.stage == "freeze":
         freeze(args, locations)
         return
@@ -425,7 +451,7 @@ def main() -> None:
         return
     if context not in protocol["contexts"]:
         parser.error("supply one --contexts from the frozen matrix")
-    check_artifacts(args, protocol, args.stage == "ablation")
+    check_artifacts(args, protocol, locations, args.stage == "ablation")
     bundled = args.stage == "window"
     if bundled:
         check_quality_eligibility(protocol, args.output)
@@ -464,7 +490,8 @@ def main() -> None:
                 invocation_command = (command if engine == "native" else
                                       llama_command(args.llama, args.gguf, protocol, thread, context, candidate))
                 # subprocess.run waits for model exit before the next engine is loaded.
-                invocation = execute(invocation_command, stem, locations, deadline)
+                invocation = (execute(invocation_command, stem, locations, deadline) if engine == "native" else
+                              execute_baseline(invocation_command, args.llama, protocol, stem, locations, deadline))
                 invocation["process_cpu_set"] = cpus if engine == "native" else baseline_cpu_set(protocol, thread, candidate)
                 if (engine == "native" and bundled and not protocol["development"]
                         and invocation["data"] and invocation["data"].get("kernel") == "vnni"

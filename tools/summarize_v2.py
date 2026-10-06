@@ -9,6 +9,7 @@ from pathlib import Path
 
 from tools.measure_v2 import ABLATION_CELLS, ABLATION_LABELS, CONTEXTS, ROOT, THREADS, baseline_cpu_set, candidates, check_quality_eligibility, cpu_mask, digest, native_cpu_set, validate_quality_eligibility
 from tools.portable import portable
+from tools.quality_v2 import require_reader_identity
 
 BYTE_COMPONENTS = ["matrix_weights", "scales", "norm_bias", "embedding", "kv_read_min", "kv_write"]
 
@@ -99,6 +100,8 @@ def native_samples(invocation: dict, window: dict, protocol: dict, settings: dic
 def baseline_samples(invocation: dict, window: dict, protocol: dict, candidate: dict) -> tuple[list[float], dict]:
     if invocation["returncode"] != 0 or not isinstance(invocation["data"], list) or len(invocation["data"]) != 1:
         raise ValueError("baseline must have one successful CPU decode result")
+    for phase in ["before", "after"]:
+        require_reader_identity(protocol["baseline_build_identity"], invocation[f"baseline_identity_{phase}"])
     raw = invocation["data"][0]
     pinned = candidate["affinity"] == "pinned"
     expected = {"n_threads": window["threads"], "n_depth": window["context"], "n_gen": protocol["steps"],
@@ -207,7 +210,13 @@ def summarize_bandwidth(raw: dict, protocol: dict) -> dict:
 
 
 def summarize(directory: Path, allow_partial: bool = False, target_ratio: float = 1.0,
-              target_ceiling_percent: float = 50.0) -> dict:
+              target_short_best_ceiling_percent: float = 85.0,
+              target_long_all_ceiling_percent: float = 75.0) -> dict:
+    thresholds = {"native_over_best_baseline": target_ratio,
+                  "short_best_percent_of_ceiling": target_short_best_ceiling_percent,
+                  "long_all_percent_of_ceiling": target_long_all_ceiling_percent}
+    if any(not math.isfinite(value) or value <= 0 for value in thresholds.values()):
+        raise ValueError("target thresholds must be finite and positive")
     protocol = json.loads((directory / "protocol.json").read_text())
     if digest({k: v for k, v in protocol.items() if k != "id"}) != protocol["id"]:
         raise ValueError("frozen protocol digest mismatch")
@@ -264,8 +273,7 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
                         "native_over_best_baseline": ratio, "read_ceiling_tps": ceiling,
                         "read_GB_per_s": bw and bw["winner"]["GB_per_s"], "bandwidth_file": bw and bw["file"],
                         "percent_of_ceiling": percentage,
-                        "targets": {"native_over_best_baseline": ratio >= target_ratio,
-                                    "percent_of_ceiling": percentage is not None and percentage >= target_ceiling_percent},
+                        "targets": None,
                         "noisy_over_5_percent": winner["native_tps"]["noisy_over_5_percent"] or winner["baseline_tps"]["noisy_over_5_percent"] or bool(bw and bw["winner"]["GB_per_s"]["noisy_over_5_percent"])})
     expected_cells = {(t, c) for t in THREADS for c in CONTEXTS}
     cells = {(r["threads"], r["context"]) for r in results}
@@ -305,15 +313,51 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
         ordered = sorted(matched, key=lambda r: (ABLATION_LABELS.index(r["label"]) if r["label"] in ABLATION_LABELS else len(ABLATION_LABELS), r["label"]))
         ladders.append({"threads": thread, "context": context, "rungs": ordered,
                         "missing_labels": [label for label in ABLATION_LABELS if label not in {r["label"] for r in matched}]})
+    final = (complete and not protocol["development"] and protocol["steps"] >= 64
+             and protocol["repeats"] >= 5 and protocol["rounds"] == 2)
+    short = [r for r in results if r["context"] == 128]
+    long = [r for r in results if r["context"] == 4096]
+    target_predicates = {
+        "native_over_best_baseline": final and all(r["native_over_best_baseline"] >= target_ratio for r in results),
+        "short_best_percent_of_ceiling": final and any(r["percent_of_ceiling"] >= target_short_best_ceiling_percent for r in short),
+        "long_all_percent_of_ceiling": final and all(r["percent_of_ceiling"] >= target_long_all_ceiling_percent for r in long)}
+    if final:
+        for row in results:
+            row["targets"] = {
+                "native_over_best_baseline": row["native_over_best_baseline"] >= target_ratio,
+                "short_best_percent_of_ceiling": (row["percent_of_ceiling"] >= target_short_best_ceiling_percent
+                                                  if row["context"] == 128 else None),
+                "long_all_percent_of_ceiling": (row["percent_of_ceiling"] >= target_long_all_ceiling_percent
+                                                 if row["context"] == 4096 else None)}
+    scaling = []
+    for context in CONTEXTS:
+        by_thread = {r["threads"]: r for r in results if r["context"] == context}
+        if 12 not in by_thread or any(t not in by_thread for t in THREADS if t < 12):
+            continue
+        rate12 = by_thread[12]["native_tps"]["median"]
+        strongest = max((r for t, r in by_thread.items() if t < 12), key=lambda r: r["native_tps"]["median"])
+        reference = strongest["native_tps"]["median"]
+        scaling.append({"context": context, "native_12_tps": rate12,
+                        "native_6_tps": by_thread[6]["native_tps"]["median"],
+                        "12_over_6": rate12 / by_thread[6]["native_tps"]["median"],
+                        "strongest_lower_threads": strongest["threads"], "strongest_lower_tps": reference,
+                        "12_over_strongest_lower": rate12 / reference,
+                        "decrease_percent_vs_strongest_lower": max(0.0, 100 * (1 - rate12 / reference)),
+                        "below_strongest_lower": rate12 < reference})
     return {"schema": "cpu-decode-v2-summary", "protocol_id": protocol["id"], "development": protocol["development"],
-            "complete_final_matrix": complete and not protocol["development"], "missing_cells": sorted(expected_cells - cells),
+            "complete_final_matrix": final, "missing_cells": sorted(expected_cells - cells),
             "selection": protocol["selection"], "selection_bias": "winner selected and reported on the same samples; no independent holdout",
             "quality_eligibility": protocol.get("quality_eligibility"),
             "statistic": "median rates; min/max and 100*(max-min)/median spread; >5% disclosed, never discarded",
             "rates_kind": "MEAS", "read_ceiling_kind": "EXT",
-            "thresholds": {"native_over_best_baseline": target_ratio, "percent_of_ceiling": target_ceiling_percent},
-            "targets_all_cells": {key: complete and not protocol["development"] and all(r["targets"][key] for r in results)
-                                  for key in ["native_over_best_baseline", "percent_of_ceiling"]},
+            "thresholds": thresholds,
+            "threshold_basis": "user" if (target_ratio, target_short_best_ceiling_percent, target_long_all_ceiling_percent) == (1.0, 85.0, 75.0) else "custom",
+            "target_predicates": target_predicates,
+            "numeric_targets_met": all(target_predicates.values()),
+            "thread12_scaling": {"kind": "MEAS", "complete_final_matrix": final, "comparisons": scaling,
+                                 "acceptance": None,
+                                 "definition": "12-thread native median divided by 6-thread and strongest lower-thread native medians at each context; any decrease is reported, not assigned a collapse tolerance",
+                                 "limitation": "No numeric collapse cutoff was specified; numeric_targets_met does not establish no-collapse acceptance"},
             "bandwidth": list(bandwidth.values()), "results": results, "ablations": ablations, "failures": failures,
             "ablation_ladders": ladders,
             "complete_ablation_ladder": all(not ladder["missing_labels"] for ladder in ladders),
@@ -329,11 +373,15 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("results/v2/summary.json"))
     parser.add_argument("--allow-partial", action="store_true")
     parser.add_argument("--target-ratio", type=float, default=1.0)
-    parser.add_argument("--target-ceiling-percent", type=float, default=50.0)
+    parser.add_argument("--target-short-best-ceiling-percent", type=float, default=85.0,
+                        help="Required ceiling percentage at at least one context-128 cell (default: 85)")
+    parser.add_argument("--target-long-all-ceiling-percent", type=float, default=75.0,
+                        help="Required ceiling percentage at every context-4096 cell (default: 75)")
     args = parser.parse_args()
-    if not math.isfinite(args.target_ratio) or args.target_ratio <= 0 or not math.isfinite(args.target_ceiling_percent) or args.target_ceiling_percent <= 0:
+    thresholds = [args.target_ratio, args.target_short_best_ceiling_percent, args.target_long_all_ceiling_percent]
+    if any(not math.isfinite(value) or value <= 0 for value in thresholds):
         parser.error("target thresholds must be finite and positive")
-    summary = summarize(args.input, args.allow_partial, args.target_ratio, args.target_ceiling_percent)
+    summary = summarize(args.input, args.allow_partial, *thresholds)
     result_root = ROOT / "results"
     if args.output.resolve().is_relative_to(result_root) and not args.output.resolve().is_relative_to(result_root / "v2"):
         parser.error("v2 summary must not overwrite v1 results")

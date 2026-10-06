@@ -1,4 +1,5 @@
 #include "decode.hpp"
+#include "simd_math.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -8,6 +9,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <unistd.h>
@@ -117,6 +119,33 @@ void numeric_tests() {
     decode::AttentionWorkspace workspace(length, heads, dim);
     fails([&] { decode::attention(queries, keys, values, decode::CacheType::f32, attention_out, 0, heads, kvheads, dim, pool, workspace); }, "empty attention must fail");
 }
+#if defined(__x86_64__) || defined(__i386__)
+__attribute__((target("avx512f")))
+void exponential_tests() {
+    alignas(64) float input[16], output[16];
+    constexpr size_t samples = 160000;
+    for (size_t first = 0; first < samples; first += 16) {
+        for (size_t lane = 0; lane < 16; ++lane) input[lane] = -104.0f * float(first + lane) / float(samples - 1);
+        _mm512_store_ps(output, decode::detail::exp_nonpositive(_mm512_load_ps(input)));
+        float reduced = decode::detail::reduce_add(_mm512_load_ps(input));
+        float intrinsic = _mm512_reduce_add_ps(_mm512_load_ps(input));
+        require(std::memcmp(&reduced, &intrinsic, sizeof(float)) == 0, "float reduction preserves intrinsic finite addition tree");
+        for (size_t lane = 0; lane < 16; ++lane) {
+            float expected = std::exp(input[lane]);
+            require(std::isfinite(output[lane]) && output[lane] >= 0, "SIMD exp finite nonnegative");
+            if (expected >= std::numeric_limits<float>::min())
+                require(std::abs(double(output[lane]) - expected) / expected <= 2e-6, "SIMD exp relative error against scalar libm");
+            else near(output[lane], expected, 2 * std::numeric_limits<float>::denorm_min(), "SIMD exp subnormal absolute error");
+        }
+    }
+    std::fill(input, input + 16, 0);
+    input[0] = -std::numeric_limits<float>::infinity();
+    input[1] = std::numeric_limits<float>::quiet_NaN();
+    input[2] = -1000;
+    _mm512_store_ps(output, decode::detail::exp_nonpositive(_mm512_load_ps(input)));
+    require(output[0] == 0 && std::isnan(output[1]) && output[2] == 0 && output[3] == 1, "SIMD exp infinity/NaN/underflow/zero");
+}
+#endif
 struct Fixture {
     fs::path path;
     std::map<std::string, std::vector<float>> weights;
@@ -405,6 +434,55 @@ void group_kernel_tests(const fs::path& root) {
     decode::Engine engine((root / "odd-scales-int8").string(), decode::Kernel::scalar, 1, 8);
     for (float value : engine.step(5, true)) require(std::isfinite(value), "FP16 odd-scale count preserves FP32 tensor alignment");
 }
+void attention_edge_tests() {
+    for (size_t groups : {size_t(1), size_t(2), size_t(4), size_t(7), size_t(8), size_t(16)})
+    for (size_t dim : {size_t(17), size_t(32)}) {
+        constexpr size_t length = 65, kvheads = 2;
+        size_t heads = groups * kvheads;
+        std::vector<float> q(heads * dim), k(length * kvheads * dim), v(k.size()), expected(q.size()), actual(q.size()), first;
+        std::vector<uint16_t> kh(k.size()), vh(k.size());
+        for (size_t j = 0; j < q.size(); ++j) q[j] = std::sin(float(j) * .23f);
+        for (size_t j = 0; j < k.size(); ++j) {
+            k[j] = std::cos(float(j) * .19f); v[j] = std::sin(float(j) * .11f);
+            kh[j] = decode::float_half(k[j]); vh[j] = decode::float_half(v[j]);
+        }
+        for (auto type : {decode::CacheType::f16, decode::CacheType::f32}) {
+            const void* keys = type == decode::CacheType::f16 ? static_cast<const void*>(kh.data()) : k.data();
+            const void* values = type == decode::CacheType::f16 ? static_cast<const void*>(vh.data()) : v.data();
+            {
+                decode::ThreadPool pool(1); decode::AttentionWorkspace workspace(129, heads, dim);
+                decode::attention(q.data(), keys, values, type, expected.data(), length, heads, kvheads, dim, pool, workspace, true);
+            }
+            for (int threads : {1, 2, 6, 12}) {
+                decode::ThreadPool pool(threads); decode::AttentionWorkspace workspace(129, heads, dim);
+                decode::attention(q.data(), keys, values, type, actual.data(), length, heads, kvheads, dim, pool, workspace);
+                for (size_t j = 0; j < actual.size(); ++j) near(actual[j], expected[j], 3e-6, "all SIMD/fallback GQA groups and oversized workspace");
+                if (threads == 1) first = actual;
+                else require(std::memcmp(first.data(), actual.data(), actual.size() * sizeof(float)) == 0, "all GQA paths bitwise thread invariant");
+            }
+        }
+    }
+    for (size_t dim : {size_t(16), size_t(17)}) {
+        constexpr size_t length = 65;
+        std::vector<float> q(dim), k(length * dim), v(k.size(), 1), expected(dim), actual(dim);
+        q[0] = q[1] = std::numeric_limits<float>::max();
+        for (size_t t = 0; t < 64; ++t) k[t * dim] = k[t * dim + 1] = -1;
+        std::fill(v.begin() + 64 * dim, v.end(), 5);
+        decode::ThreadPool pool(2); decode::AttentionWorkspace reference(129, 1, dim), workspace(129, 1, dim);
+        decode::attention(q.data(), k.data(), v.data(), decode::CacheType::f32, expected.data(), length, 1, 1, dim, pool, reference, true);
+        decode::attention(q.data(), k.data(), v.data(), decode::CacheType::f32, actual.data(), length, 1, 1, dim, pool, workspace);
+        for (size_t j = 0; j < dim; ++j) near(actual[j], expected[j], 1e-6, "zero-mass negative-infinity block");
+        k[0] = std::numeric_limits<float>::quiet_NaN();
+        decode::attention(q.data(), k.data(), v.data(), decode::CacheType::f32, actual.data(), length, 1, 1, dim, pool, workspace);
+        for (float value : actual) require(std::isnan(value), "NaN score is not suppressed by neutral-block handling");
+        std::fill(q.begin(), q.end(), 0); std::fill(k.begin(), k.end(), 0);
+        float large = std::numeric_limits<float>::max() / 2;
+        std::fill(v.begin(), v.end(), large);
+        decode::attention(q.data(), k.data(), v.data(), decode::CacheType::f32, expected.data(), length, 1, 1, dim, pool, reference, true);
+        decode::attention(q.data(), k.data(), v.data(), decode::CacheType::f32, actual.data(), length, 1, 1, dim, pool, workspace);
+        for (size_t j = 0; j < dim; ++j) near(actual[j] / large, expected[j] / large, 3e-6, "finite weighted average does not overflow");
+    }
+}
 void optimized_tests(const fs::path& root) {
     for (uint32_t bits = 0; bits < 65536; ++bits) {
         if ((bits & 0x7c00) == 0x7c00 && (bits & 1023)) continue;
@@ -413,14 +491,15 @@ void optimized_tests(const fs::path& root) {
     require(decode::float_half(1.9998f) == 0x4000, "F16 mantissa carry");
     require(decode::float_half(1 + std::ldexp(1.0f, -11)) == 0x3c00, "F16 ties to even");
     require(decode::float_half(std::ldexp(1.0f, -25)) == 0, "F16 subnormal ties to even");
-    constexpr size_t length = 129, heads = 14, kvheads = 2, dim = 64;
-    std::vector<float> q(heads * dim), k(length * kvheads * dim), v(k.size()), reference(heads * dim), result(reference.size()), first;
+    constexpr size_t capacity = 4097, heads = 14, kvheads = 2, dim = 64;
+    std::vector<float> q(heads * dim), k(capacity * kvheads * dim), v(k.size()), reference(heads * dim), result(reference.size()), first;
     std::vector<uint16_t> kh(k.size()), vh(v.size());
     for (size_t j = 0; j < q.size(); ++j) q[j] = std::sin(float(j) * .13f) * 5;
     for (size_t j = 0; j < k.size(); ++j) {
         k[j] = std::cos(float(j) * .073f); v[j] = std::sin(float(j) * .17f);
         kh[j] = decode::float_half(k[j]); vh[j] = decode::float_half(v[j]);
     }
+    for (size_t length : {size_t(1), size_t(15), size_t(16), size_t(17), size_t(63), size_t(64), size_t(65), size_t(127), size_t(129), size_t(4097)})
     for (auto type : {decode::CacheType::f32, decode::CacheType::f16}) {
         const void* keys = type == decode::CacheType::f32 ? static_cast<const void*>(k.data()) : kh.data();
         const void* values = type == decode::CacheType::f32 ? static_cast<const void*>(v.data()) : vh.data();
@@ -469,7 +548,10 @@ int main() {
     if (!directory) { std::cerr << "cannot create temporary directory\n"; return 1; }
     fs::path root(directory);
     try {
-        numeric_tests(); engine_tests(root); affinity_tests(root); group_kernel_tests(root); optimized_tests(root); fs::remove_all(root);
+#if defined(__x86_64__) || defined(__i386__)
+        if (__builtin_cpu_supports("avx512f")) exponential_tests();
+#endif
+        numeric_tests(); engine_tests(root); affinity_tests(root); group_kernel_tests(root); attention_edge_tests(); optimized_tests(root); fs::remove_all(root);
         std::cout << "synthetic numerical and malformed-input tests passed\n"; return 0;
     } catch (const std::exception& error) {
         fs::remove_all(root); std::cerr << error.what() << '\n'; return 1;

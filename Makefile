@@ -1,56 +1,74 @@
 CACHE ?= external
+RESULTS ?= results/v2/reproduction
+RAW ?= $(CACHE)/quality-v2-$(shell uv run python -c 'import hashlib, sys; from pathlib import Path; print(hashlib.sha256(str(Path(sys.argv[1]).resolve()).encode()).hexdigest())' "$(RESULTS)")
 REVISION := 7ae557604adf67be50417f59c2c2f167def9a775
 LLAMA_COMMIT := 6c73b3e12dc501de35fe5f6979960d06921a2f6c
 HF_HUB_CACHE = $(shell uv run python -c 'from huggingface_hub.constants import HF_HUB_CACHE; print(HF_HUB_CACHE)')
 MODEL ?= $(HF_HUB_CACHE)/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/$(REVISION)
-QUANT ?= $(CACHE)/int8
+ROW_QUANT := $(CACHE)/int8-row
 LLAMA_ROOT := $(CACHE)/llama.cpp/$(LLAMA_COMMIT)
 LLAMA_BIN := $(LLAMA_ROOT)/build/bin/llama-bench
 GGUF := $(LLAMA_ROOT)/qwen-$(REVISION)-q8_0.gguf
 RUN := nice -n 19
+QUALITY_THREADS ?= 2
+CPU_SET = $(shell $(RUN) build/cpu-decode cpus | uv run python -c 'import json,sys; print(",".join(map(str,json.load(sys.stdin)["preferred_cpu_ids"][:$(QUALITY_THREADS)])))')
+SELECTED_LABEL = $(shell uv run python -c 'import json; print(json.load(open("$(RESULTS)/selection.json"))["chosen"]["label"])')
+SELECTED_MODEL = $(CACHE)/$(SELECTED_LABEL)
+KERNEL ?= simd512x4
+QUALITY_OPTIONS = --corpus $(RESULTS)/corpus.json --raw-dir $(RAW) --selection $(RESULTS)/selection.json --threads $(QUALITY_THREADS) --cpu-set $(CPU_SET) --affinity strict --attention blocked --scheduler pool
 
-.PHONY: build prepare test correctness model-test measure
+.PHONY: build prepare oracle calibration quality measure test model-test
 
 build:
-	$(RUN) cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+	$(RUN) uv sync --locked
+	$(RUN) cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPU_DECODE_NATIVE=ON
 	$(RUN) cmake --build build -j4
 
 prepare: build
-	$(RUN) uv sync --locked
-	$(RUN) uv run python -m tools.download_model --output results/model-manifest.json
-	$(RUN) uv run python -m tools.quantize --source $(MODEL) --output $(QUANT) --manifest results/quantized-manifest.json
-	$(RUN) uv run python -m tools.prepare_llama --model $(MODEL) --cache $(CACHE) --jobs 4 --output results/llama-preparation.json
-	$(MAKE) correctness
-
-correctness:
-	$(RUN) uv run python -m tools.reference --model $(MODEL) --quant-model $(QUANT) --engine build/cpu-decode --kernel simd512x4 --output results/correctness.json
-	$(RUN) uv run python -m tools.summarize_quality
-
-.PHONY: llama-quality
-llama-quality:
-	$(RUN) cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPU_DECODE_LLAMA_ROOT="$(LLAMA_ROOT)"
+	$(RUN) uv run python -m tools.download_model --output $(RESULTS)/model-manifest.json
+	$(RUN) uv run python -m tools.quantize --source $(MODEL) --output $(ROW_QUANT) --group-size 0 --scale-dtype f32 --manifest $(RESULTS)/row-manifest.json
+	@for format in 32:f16 64:f32 64:f16 128:f16; do \
+	  group=$${format%:*}; scale=$${format#*:}; label=g$$group$$scale; \
+	  $(RUN) uv run python -m tools.quantize --source $(MODEL) --output $(CACHE)/$$label --group-size $$group --scale-dtype $$scale --manifest $(RESULTS)/quantized-$$label.json || exit $$?; \
+	done
+	$(RUN) uv run python -m tools.prepare_llama --model $(MODEL) --cache $(CACHE) --jobs 4 --output $(RESULTS)/llama-preparation.json
+	$(RUN) cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPU_DECODE_NATIVE=ON -DCPU_DECODE_LLAMA_ROOT="$(LLAMA_ROOT)"
 	$(RUN) cmake --build build --target llama-logits -j4
-	$(RUN) uv run python -m tools.llama_quality --model "$(GGUF)" --reader build/llama-logits --reference-dir external/reference --artifact-manifest results/llama-preparation.json --threads 1 --output results/llama-quality.json
+	$(RUN) uv run python -m tools.quality_v2 prepare --model $(MODEL) --output-dir $(RESULTS) --raw-dir $(RAW)/sources
+
+oracle:
+	$(RUN) uv run python -m tools.quality_v2 oracle --model $(MODEL) --corpus $(RESULTS)/corpus.json --raw-dir $(RAW) --output $(RESULTS)/oracle-summary.json
+
+calibration: oracle
+	@for label in g32f16 g64f32 g64f16 g128f16; do \
+	  $(RUN) uv run python -m tools.quality_v2 evaluate --split calibration --model $(CACHE)/$$label --label $$label --kernel simd512x4 --kv f16 $(QUALITY_OPTIONS) --output $(RESULTS)/cal-$$label.json || exit $$?; \
+	done
+	$(RUN) uv run python -m tools.quality_v2 compare --split calibration --corpus $(RESULTS)/corpus.json --selection $(RESULTS)/selection.json --reports $(RESULTS)/cal-g32f16.json $(RESULTS)/cal-g64f32.json $(RESULTS)/cal-g64f16.json $(RESULTS)/cal-g128f16.json --output $(RESULTS)/calibration.json
+
+quality: calibration
+	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(ROW_QUANT) --label per-row --kernel simd512x4 --kv f16 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-row.json
+	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(SELECTED_MODEL) --label grouped-f16 --kernel simd512x4 --kv f16 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-f16.json
+	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(SELECTED_MODEL) --label grouped-f32 --kernel simd512x4 --kv f32 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-f32.json
+	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(SELECTED_MODEL) --label grouped-vnni --kernel vnni --kv f16 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-vnni.json
+	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --backend llama --model $(GGUF) --artifact-manifest $(RESULTS)/llama-preparation.json --label q8_0 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-q8.json
+	$(RUN) uv run python -m tools.quality_v2 compare --split heldout --corpus $(RESULTS)/corpus.json --selection $(RESULTS)/selection.json --reports $(RESULTS)/heldout-row.json $(RESULTS)/heldout-f16.json $(RESULTS)/heldout-f32.json $(RESULTS)/heldout-vnni.json $(RESULTS)/heldout-q8.json --output $(RESULTS)/quality.json
+
+measure:
+	$(RUN) uv run python -m tools.measure_v2 freeze --model $(SELECTED_MODEL) --model-manifest $(RESULTS)/quantized-$(SELECTED_LABEL).json --llama $(LLAMA_BIN) --gguf $(GGUF) --preparation $(RESULTS)/llama-preparation.json --kernel $(KERNEL) --quality $(RESULTS)/quality.json --output $(RESULTS)
+	@for threads in 1 2 4 6 12; do \
+	  for context in 128 1024 4096; do \
+	    for fa in on off auto; do for affinity in pinned unpinned defaults; do \
+	      $(RUN) uv run python -m tools.measure_v2 window --model $(SELECTED_MODEL) --llama $(LLAMA_BIN) --gguf $(GGUF) --threads $$threads --contexts $$context --candidate $$fa-$$affinity-poll50 --output $(RESULTS) || exit $$?; \
+	    done; done; \
+	  done; \
+	  $(RUN) uv run python -m tools.measure_v2 bandwidth --threads $$threads --output $(RESULTS) || exit $$?; \
+	done
+	$(RUN) uv run python -m tools.summarize_v2 --input $(RESULTS) --output $(RESULTS)/summary.json
+	$(RUN) uv run python -m tools.figure_v2 --input $(RESULTS)/summary.json --output $(RESULTS)/decode.svg
 
 model-test:
-	CPU_DECODE_MODEL=$(MODEL) CPU_DECODE_QUANT_MODEL=$(QUANT) CPU_DECODE_KERNEL=simd512x4 $(RUN) uv run pytest -q tests/test_reference.py
+	CPU_DECODE_MODEL=$(MODEL) CPU_DECODE_QUANT_MODEL=$(ROW_QUANT) CPU_DECODE_KERNEL=simd512x4 $(RUN) uv run pytest -q tests/test_reference.py
 
 test:
 	$(RUN) ctest --test-dir build --output-on-failure
 	$(RUN) uv run pytest -q tests
-
-measure:
-	$(RUN) uv run python -m tools.measure bandwidth --kernels simd256,simd512
-	@for context in 128 1024 4096; do \
-	  $(RUN) uv run python -m tools.measure engine --model $(QUANT) --contexts $$context || exit $$?; \
-	  $(RUN) uv run python -m tools.measure llama --model $(GGUF) --llama $(LLAMA_BIN) --contexts $$context || exit $$?; \
-	  $(RUN) uv run python -m tools.measure eager --model $(MODEL) --contexts $$context || exit $$?; \
-	done
-	$(RUN) uv run python -m tools.measure engine --model $(QUANT) --threads 6 --contexts 128 --kernels scalar,simd256,simd512,simd512x4 --output results/ablations/int8-cached
-	$(RUN) uv run python -m tools.measure engine --model $(MODEL) --threads 6 --contexts 128 --kernels scalar --output results/ablations/bf16-cached
-	$(RUN) uv run python -m tools.measure engine --model $(QUANT) --threads 6 --contexts 128 --kernels simd512x4 --rope direct --output results/ablations/int8-direct
-	$(RUN) uv run python -m tools.summarize
-
-.PHONY: traffic
-traffic:
-	$(RUN) uv run python -m tools.traffic --llama-root $(LLAMA_ROOT) --gguf $(GGUF)

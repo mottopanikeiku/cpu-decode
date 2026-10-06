@@ -137,14 +137,26 @@ static float dot512_impl(const Matrix& m, size_t row, const float* x) {
 template<bool Grouped>
 __attribute__((target("avx512f,avx512bw,f16c"), noinline))
 static float dot512x4_impl(const Matrix& m, size_t row, const float* x) {
+    if constexpr (Grouped) if (m.dtype != DType::i8) return dot512x4_impl<false>(m, row, x);
     size_t j = 0, start = row * m.cols;
     unsigned shift = Grouped ? unsigned(__builtin_ctzll(m.group_size)) : 0;
     __m512 a = _mm512_setzero_ps(), b = a, c = a, d = a;
     for (; j + 64 <= m.cols; j += 64) {
-        a = _mm512_fmadd_ps(load512<Grouped>(m, start + j, row, j, shift), _mm512_loadu_ps(x + j), a);
-        b = _mm512_fmadd_ps(load512<Grouped>(m, start + j + 16, row, j + 16, shift), _mm512_loadu_ps(x + j + 16), b);
-        c = _mm512_fmadd_ps(load512<Grouped>(m, start + j + 32, row, j + 32, shift), _mm512_loadu_ps(x + j + 32), c);
-        d = _mm512_fmadd_ps(load512<Grouped>(m, start + j + 48, row, j + 48, shift), _mm512_loadu_ps(x + j + 48), d);
+        if constexpr (Grouped) {
+            // Each group spans at least two vectors. Decode its scale once,
+            // rather than repeating half conversion and broadcast per vector.
+            __m512 first = _mm512_set1_ps(scale_fast(m, row, j, shift));
+            __m512 second = m.group_size == 32 ? _mm512_set1_ps(scale_fast(m, row, j + 32, shift)) : first;
+            a = _mm512_fmadd_ps(_mm512_mul_ps(load512<false>(m, start + j, row, j, shift), first), _mm512_loadu_ps(x + j), a);
+            b = _mm512_fmadd_ps(_mm512_mul_ps(load512<false>(m, start + j + 16, row, j + 16, shift), first), _mm512_loadu_ps(x + j + 16), b);
+            c = _mm512_fmadd_ps(_mm512_mul_ps(load512<false>(m, start + j + 32, row, j + 32, shift), second), _mm512_loadu_ps(x + j + 32), c);
+            d = _mm512_fmadd_ps(_mm512_mul_ps(load512<false>(m, start + j + 48, row, j + 48, shift), second), _mm512_loadu_ps(x + j + 48), d);
+        } else {
+            a = _mm512_fmadd_ps(load512<false>(m, start + j, row, j, shift), _mm512_loadu_ps(x + j), a);
+            b = _mm512_fmadd_ps(load512<false>(m, start + j + 16, row, j + 16, shift), _mm512_loadu_ps(x + j + 16), b);
+            c = _mm512_fmadd_ps(load512<false>(m, start + j + 32, row, j + 32, shift), _mm512_loadu_ps(x + j + 32), c);
+            d = _mm512_fmadd_ps(load512<false>(m, start + j + 48, row, j + 48, shift), _mm512_loadu_ps(x + j + 48), d);
+        }
     }
     for (; j + 16 <= m.cols; j += 16) a = _mm512_fmadd_ps(load512<Grouped>(m, start + j, row, j, shift), _mm512_loadu_ps(x + j), a);
     float total = _mm512_reduce_add_ps(_mm512_add_ps(_mm512_add_ps(a, b), _mm512_add_ps(c, d)));

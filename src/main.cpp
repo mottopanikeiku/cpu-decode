@@ -53,7 +53,7 @@ void usage() {
                  "cpu-decode bench --model DIR --tokens ID,ID --context N --steps N --repeats N [--output JSON --threads N --kernel ...]\n"
                  "Forward modes: --rope cached|direct --kv f16|f32 --attention blocked|scalar --scheduler pool|openmp --affinity strict|unpinned --cpu-set IDS.\n"
                  "Kernel defaults to auto (FP32 activations); vnni quantizes activations in groups of32.\n"
-                 "logits accepts --logits-start N to skip the head on priming positions. bench --interactive 1 uses run/quit lines.\n"
+                 "logits accepts --logits-start N to skip the head on priming positions.\n"
                  "Token IDs only; generation does not stop at EOS. logits writes PREFIX.bin float32 [positions,vocab] and PREFIX.json.\n";
 }
 }
@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
             if (argc != 2) throw std::runtime_error("cpus takes no arguments");
             emit(decode::cpu_topology(), ""); return 0;
         }
-        std::set<std::string> known{"--model", "--output", "--tokens", "--threads", "--kernel", "--steps", "--context", "--repeats", "--rope", "--kv", "--attention", "--scheduler", "--affinity", "--cpu-set", "--group-size", "--scale-dtype", "--logits-start", "--interactive"};
+        std::set<std::string> known{"--model", "--output", "--tokens", "--threads", "--kernel", "--steps", "--context", "--repeats", "--rope", "--kv", "--attention", "--scheduler", "--affinity", "--cpu-set", "--group-size", "--scale-dtype", "--logits-start"};
         std::map<std::string, std::string> options;
         for (int i = 2; i < argc; i += 2) {
             std::string key(argv[i]);
@@ -106,8 +106,6 @@ int main(int argc, char** argv) {
         engine_options.cache_type = kv == "f16" ? decode::CacheType::f16 : decode::CacheType::f32;
         engine_options.scalar_attention = attention == "scalar"; engine_options.persistent_pool = scheduler == "pool";
         if (!option("--cpu-set", "").empty()) engine_options.cpus = tokens(option("--cpu-set", ""));
-        std::string interactive = option("--interactive", "0");
-        if ((interactive != "0" && interactive != "1") || (interactive == "1" && command != "bench")) throw std::runtime_error("interactive must be0/1 and applies only to bench");
         size_t steps = number(option("--steps", "16"));
         if (steps > 1000000) throw std::runtime_error("too many steps");
         size_t context = command == "bench" ? number(required("--context")) : prompt.size();
@@ -168,53 +166,42 @@ int main(int argc, char** argv) {
             engine.rewind(context);
             result["context"] = context; result["steps"] = steps; result["repeats"] = repeats;
             result["warmup_steps"] = 1; result["samples"] = Json::array();
-            auto measure = [&] {
-                Json measured = result;
-                for (size_t r = 0; r < repeats; ++r) {
-                    engine.rewind(context);
-                    decode::Profile profile;
-                    std::vector<double> timings;
-                    std::vector<int> generated;
-                    timings.reserve(steps); generated.reserve(steps);
-                    next = seed;
-                    auto start = Clock::now();
-                    for (size_t i = 0; i < steps; ++i) {
-                        auto step_start = Clock::now();
-                        generated.push_back(next);
-                        const auto& logits = engine.step(next, true, &profile);
-                        auto argmax_start = Clock::now();
-                        next = argmax(logits);
-                        auto end = Clock::now();
-                        profile.seconds["argmax"] += std::chrono::duration<double>(end - argmax_start).count();
-                        timings.push_back(std::chrono::duration<double>(end - step_start).count());
-                    }
-                    double seconds = std::chrono::duration<double>(Clock::now() - start).count();
-                    double attributed = 0;
-                    for (const auto& operation : profile.seconds) attributed += operation.second;
-                    profile.seconds["timing_overhead_and_loop"] = std::max(0.0, seconds - attributed);
-                    Json bytes{{"matrix_weights", double(profile.matrix_weight_bytes) / steps}, {"scales", double(profile.scale_bytes) / steps},
-                               {"norm_bias", double(profile.norm_bias_bytes) / steps}, {"embedding", double(profile.embedding_bytes) / steps},
-                               {"kv_read_min", double(profile.kv_read_min_bytes) / steps}, {"kv_read_logical", double(profile.kv_read_logical_bytes) / steps},
-                               {"kv_write", double(profile.kv_write_bytes) / steps}, {"total_min", profile.json()["minimum_bytes"].get<double>() / steps}};
-                    bytes["lm_head"] = double(profile.lm_head_weight_bytes) / steps;
-                    bytes["lm_head_scales"] = double(profile.lm_head_scale_bytes) / steps;
-                    bytes["projection_weights"] = double(profile.matrix_weight_bytes - profile.lm_head_weight_bytes) / steps;
-                    measured["samples"].push_back({{"seconds", seconds}, {"tokens_per_second", steps / seconds}, {"step_seconds", timings},
-                        {"generated_tokens", generated}, {"operation_seconds", profile.seconds}, {"profile", profile.json()}, {"bytes_per_token", bytes}});
+            for (size_t r = 0; r < repeats; ++r) {
+                engine.rewind(context);
+                decode::Profile profile;
+                std::vector<double> timings;
+                std::vector<int> generated;
+                timings.reserve(steps); generated.reserve(steps);
+                next = seed;
+                auto start = Clock::now();
+                for (size_t i = 0; i < steps; ++i) {
+                    auto step_start = Clock::now();
+                    generated.push_back(next);
+                    const auto& logits = engine.step(next, true, &profile);
+                    auto argmax_start = Clock::now();
+                    next = argmax(logits);
+                    auto end = Clock::now();
+                    profile.seconds["argmax"] += std::chrono::duration<double>(end - argmax_start).count();
+                    timings.push_back(std::chrono::duration<double>(end - step_start).count());
                 }
-                measured["timing_scope"] = "decode forward including LM head and greedy argmax; excludes load/prefill and one warmup step; operation timers enabled";
-                measured["context_tokens"] = "provided token IDs repeated to context length";
-                return measured;
-            };
-            if (interactive == "1") {
-                result["ready"] = true; std::cout << result.dump() << std::endl;
-                std::string request;
-                while (std::getline(std::cin, request)) {
-                    if (request == "quit") break;
-                    if (request != "run") throw std::runtime_error("interactive request must be run or quit");
-                    std::cout << measure().dump() << std::endl;
-                }
-            } else emit(measure(), output);
+                double seconds = std::chrono::duration<double>(Clock::now() - start).count();
+                double attributed = 0;
+                for (const auto& operation : profile.seconds) attributed += operation.second;
+                profile.seconds["timing_overhead_and_loop"] = std::max(0.0, seconds - attributed);
+                Json profile_json = profile.json();
+                Json bytes{{"matrix_weights", double(profile.matrix_weight_bytes) / steps}, {"scales", double(profile.scale_bytes) / steps},
+                           {"norm_bias", double(profile.norm_bias_bytes) / steps}, {"embedding", double(profile.embedding_bytes) / steps},
+                           {"kv_read_min", double(profile.kv_read_min_bytes) / steps}, {"kv_read_logical", double(profile.kv_read_logical_bytes) / steps},
+                           {"kv_write", double(profile.kv_write_bytes) / steps}, {"total_min", profile_json["minimum_bytes"].get<double>() / steps}};
+                bytes["lm_head"] = double(profile.lm_head_weight_bytes) / steps;
+                bytes["lm_head_scales"] = double(profile.lm_head_scale_bytes) / steps;
+                bytes["projection_weights"] = double(profile.matrix_weight_bytes - profile.lm_head_weight_bytes) / steps;
+                result["samples"].push_back({{"seconds", seconds}, {"tokens_per_second", steps / seconds}, {"step_seconds", timings},
+                    {"generated_tokens", generated}, {"operation_seconds", profile.seconds}, {"profile", std::move(profile_json)}, {"bytes_per_token", bytes}});
+            }
+            result["timing_scope"] = "decode forward including LM head and greedy argmax; excludes load/prefill and one warmup step; operation timers enabled";
+            result["context_tokens"] = "provided token IDs repeated to context length";
+            emit(result, output);
         }
         return 0;
     } catch (const std::exception& error) {
