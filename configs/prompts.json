@@ -1,0 +1,12 @@
+{
+  "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+  "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+  "greedy_steps": 8,
+  "prompts": [
+    {"id": "factual", "text": "The capital of France is", "chat": false},
+    {"id": "code", "text": "def fibonacci(n):\n    if n < 2:\n        return n\n    return", "chat": false},
+    {"id": "plain", "text": "A small CPU reads model weights from memory. Therefore", "chat": false},
+    {"id": "chat", "chat": true, "messages": [{"role": "system", "content": "You are a helpful assistant. Answer briefly."}, {"role": "user", "content": "Why is the sky blue?"}]}
+  ],
+  "benchmark": {"seed_token_ids": [9707, 11, 420, 374, 264, 1296, 13], "contexts": [128, 1024, 4096], "threads": [1, 2, 4, 6, 12], "decode_steps": 16, "repeats": 3, "input_policy": "Repeat the exact seed IDs, truncate to context length; then greedy argmax for the fixed step count without EOS stopping. No BOS or chat wrapper. llama-bench uses its own synthetic IDs at matched shapes."}
+}

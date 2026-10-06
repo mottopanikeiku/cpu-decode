@@ -1,0 +1,87 @@
+{
+  "llama_repository": "https://github.com/ggml-org/llama.cpp.git",
+  "llama_commit": "6c73b3e12dc501de35fe5f6979960d06921a2f6c",
+  "source_model": {
+    "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "snapshot": "/home/alp/Projects/profile-program/cache/hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",
+    "stored_dtype": "bfloat16",
+    "files": {
+      "LICENSE": {
+        "bytes": 11343,
+        "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+      },
+      "README.md": {
+        "bytes": 4917,
+        "sha256": "b19c806a904db6dc878a0462e70b551f6b7ac78dfbb88c2eb966ca2b9109ae15",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "4b8373851d093eb9f3017443f27781c6971eff24"
+      },
+      "config.json": {
+        "bytes": 659,
+        "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "0dbb161213629a23f0fc00ef286e6b1e366d180f"
+      },
+      "generation_config.json": {
+        "bytes": 242,
+        "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+      },
+      "merges.txt": {
+        "bytes": 1671839,
+        "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+      },
+      "model.safetensors": {
+        "bytes": 988097824,
+        "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+        "upstream_algorithm": "sha256",
+        "upstream_digest": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+      },
+      "tokenizer.json": {
+        "bytes": 7031645,
+        "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+      },
+      "tokenizer_config.json": {
+        "bytes": 7305,
+        "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+      },
+      "vocab.json": {
+        "bytes": 2776833,
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+      }
+    }
+  },
+  "build": {
+    "type": "Release",
+    "native_cpu": true,
+    "gpu": false,
+    "jobs": 4
+  },
+  "converter_python": "/home/alp/Projects/profile-program/work/cpu-decode/.venv/bin/python3",
+  "bench_binary": "/home/alp/Projects/profile-program/cache/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/build/bin/llama-bench",
+  "quantization": "llama.cpp Q8_0, blocks of 32 weights; not the engine's per-output-channel int8 scheme",
+  "artifacts": {
+    "BF16": {
+      "path": "/home/alp/Projects/profile-program/cache/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-bf16.gguf",
+      "sha256": "794f9d6e09be1e0509d0c917e4aff89d837f3e16b852b59453894e61a9816ed2",
+      "bytes": 994157056
+    },
+    "Q8_0": {
+      "path": "/home/alp/Projects/profile-program/cache/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+      "sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7",
+      "bytes": 531068416
+    }
+  }
+}

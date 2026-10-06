@@ -12,6 +12,7 @@ dependencies = [
   "numpy==2.3.3",
   "sentencepiece==0.2.1",
   "pytest==8.4.2",
+  "protobuf==4.25.8",
 ]
 
 [tool.uv]
