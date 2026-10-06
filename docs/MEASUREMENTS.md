@@ -22,6 +22,44 @@ In the last same-window comparison, original → new strict median milliseconds/
 
 The empty fixed-task [dispatch probe](../tools/pool_dispatch.cpp) records [two-worker hot](../results/v2/dispatch-before/t2-hot.json) and [six-worker hot](../results/v2/dispatch-before/t6-hot.json) medians of **100.8 ns** and **457.2 ns** per dispatch. With a separately excluded 20 µs serial gap, they were [125.6 ns](../results/v2/dispatch-before/t2-gap20us.json) and [1,744.3 ns](../results/v2/dispatch-before/t6-gap20us.json). This synthetic probe includes a checksum, not model work; a 20 µs gap does not guarantee the bounded-spin workers have slept.
 
+### Transposed K and the shipped g64f16 development stages
+
+The [stage data](../results/v2/attention-stages.json) and
+[SVG generator](../tools/figure_attention.py) retain all six samples per stage:
+two independent native processes, three repeats, 16 measured steps,
+six threads, initial context 4096, strict CPU order and the same g64f16 weights.
+These are separately scheduled development windows, not interleaved stages or
+a strongest-baseline comparison.
+
+| Stage | Median tokens/s | Min–max | Rate spread | Attention ms/token |
+|---|---:|---:|---:|---:|
+| Original K layout | 52.470 | 50.674–53.588 | 5.55% | 5.348 |
+| Transposed K | 59.032 | 54.855–62.160 | 12.37% | 2.727 |
+| Masked SIMD tails | 59.146 | 53.140–61.455 | 14.06% | 2.914 |
+| Parallel head merge | 57.909 | 56.964–58.549 | 2.74% | 2.894 |
+| Singleton task claims, rejected | 56.467 | 54.370–59.678 | 9.40% | 3.204 |
+
+K storage is `[KV head][allocated block64][dimension][token64]`; V remains
+time-major. Allocation pads K's final block and records actual cache bytes.
+Scores vectorize over 16 tokens, avoiding horizontal dot-product reductions.
+Inactive lanes are masked from stores, maxima and softmax sums, including
+poisoned padding. Per-head merges run in parallel but traverse blocks in the
+same ascending order at every thread count. Local and merged coefficients
+are normalized before weighted averaging to avoid avoidable finite overflow.
+The singleton-claim trial is not shipped; the adaptive eight-task policy
+remains, and its extra trial API was removed.
+
+The AVX-512 exponential uses nearest-integer base-2 range reduction and a
+degree-seven polynomial on the reduced interval. The native dense test checks
+160,000 inputs: normal relative error ≤2e-6, subnormal absolute error ≤two
+minimum positive float subnormals; zero, negative infinity and NaN have
+explicit checks. This is a tested numerical bound, not an exhaustive proof
+over all float inputs or rounding modes. Attention checks cover every
+16-lane tail width, F16/F32, poisoned inactive keys, oversized K allocations,
+rejection of insufficient blocks, scalar-reference tolerance 3e-6, and
+bitwise results at 1/2/4/6/12 threads.
+
+
 ### Fixed settings and sampling
 
 Freeze native kernel, weight artifact, group size, scale dtype, scheduler, attention and RoPE **before** the final run. `freeze` verifies model/config/GGUF hashes, exact source-manifest equality, Release/native build settings, executable hashes and shared-library identities. It saves a digest-addressed `protocol.json`; subsequent windows reject changed artifacts. The full matrix is threads **1, 2, 4, 6, 12** × initial contexts **128, 1024, 4096**. Defaults are **64 measured tokens per repeat, five repeats per run request, two rounds and one untimed native warmup step**. Final aggregation rejects shorter sampling or development protocols.
@@ -42,7 +80,7 @@ Only **one model is resident at a time**. Each candidate uses **A B A B**: run o
 
 The baseline winner has the **highest median of its ten measured rates**, not a weaker convenient configuration. Ties use candidate ID. Compare **only the ten native samples interleaved with that winner**: equal invocation and sample counts. All other candidates/samples/commands/logs remain visible. Selection and reporting use the same samples, without a holdout; selection optimism favors the baseline. Both engines now use separate processes for each invocation. Native warms at the requested context; upstream warms before depth fill, so warmup placement still differs.
 
-Every externally scheduled window has a 1,740-second deadline including setup, below 30 minutes. Use **one candidate per command** if all nine will not fit; collect every frozen candidate exactly once per cell. Timeout, nonzero exit, malformed output, setting mismatch or incomplete ABAB is visibly retained and never counted as successful sampling. Duplicate candidates are rejected rather than selecting a favorable rerun. Any failed/missing candidate prevents final-matrix acceptance. Public tools do not start or nest a scheduler.
+Every externally scheduled window has a 1,740-second deadline including setup, below 30 minutes. Use **one candidate per command** if all nine will not fit; collect every frozen candidate exactly once per cell. Timeout, nonzero exit, malformed output, setting mismatch or incomplete ABAB is visibly retained and never counted as successful sampling. Duplicate candidates are rejected rather than selecting a favorable rerun. Any failed/missing candidate prevents final-matrix acceptance. The low-level measurement tools do not start or nest a scheduler; the unattended runner below accepts an explicit runtime prefix per window.
 
 ### Commands
 
@@ -91,6 +129,160 @@ Every rung records its weight hash, observed group size/scale dtype, flags, rate
 - Spreads are `100 × (max − min) / median`. **Every spread >5% is disclosed**, including losing baseline candidates. Samples are never discarded for noise. `decode.svg` is generated only from summary values, with native/best-baseline/estimated-ceiling curves, min–max bars and noise markers.
 
 Artifacts replace local directories with portable aliases (`$INT8`, `$GGUF`, `$ENGINE`, `$LLAMA_BENCH`, `$LLAMA_ROOT`, `$LLAMA_BUILD`, `$LLAMA_CXX_COMPILER`, `$BANDWIDTH`, `$HOME`, `$PYTHON`). The baseline root aliases come from resolved dependencies, not executable placement. Numeric CPU IDs, flags, hashes and observations are preserved. Nice 19 and exclusive scheduled benchmarking do not isolate the desktop, fix temperature/clocks or disable boost. Matched shapes still are not identical token trajectories: native uses the fixed seed sequence and greedy argmax, upstream uses synthetic tokens and excludes sampling. Operation instrumentation remains included in native timing.
+
+### Calibration-only format choice
+
+The [new decision](../results/v2/format-selection.json) uses all four existing
+native calibration reports plus a real [Q8_0 calibration](../results/v2/cal-q8_0.json):
+two windows, **512 teacher-forced positions**, the same pinned
+Qwen2.5-0.5B-Instruct revision and BF16-storage/FP32-arithmetic oracle. Every
+candidate has fresh F16 KV and two threads. Native settings are SIMD512x4,
+blocked attention, strict pool workers on CPUs 0,1; all four use the same
+recorded native binary. Q8_0 uses the pinned llama.cpp reader with flash
+attention auto. This compares complete numerical paths, not quantizers alone.
+
+Require native **mean KL < Q8_0**, **p99 KL < Q8_0**, and **top1 > Q8_0** on
+calibration. Among eligible formats choose the fewest weights-artifact bytes,
+then mean KL, p99 KL, negative top1, and label. Perplexity is reported but
+**is not a selection criterion**. No eligible format is an explicit error;
+heldout cannot choose a replacement.
+
+| Format | Matrix bits/weight | Weights artifact bytes | Mean KL (nats) | p99 KL (nats) | Top1 agreement | PPL | Decision |
+|---|---:|---:|---:|---:|---:|---:|---|
+| [g32f16](../results/v2/cal-g32f16.json) | 8.5 | 525,170,936 | 0.000715347 | 0.002411287 | 0.98046875 | 25.223541 | Eligible, larger |
+| [g64f32](../results/v2/cal-g64f32.json) | 8.5 | 525,171,728 | 0.000801546 | 0.002527370 | 0.982421875 | 25.220360 | Eligible, larger |
+| [g64f16](../results/v2/cal-g64f16.json) | 8.25 | 509,734,624 | 0.000801242 | 0.002620214 | 0.98046875 | 25.257738 | **Selected** |
+| [g128f16](../results/v2/cal-g128f16.json) | 8.125 | 502,016,336 | 0.001216109 | 0.004394612 | 0.96875 | 25.270526 | Rejected: top1 below Q8_0 |
+| [Q8_0](../results/v2/cal-q8_0.json) | 8.5 | 531,068,416 | 0.002363970 | 0.006974944 | 0.97265625 | 25.231974 | Baseline |
+
+Bits count matrix int8 plus scale storage; artifact bytes include the full
+safetensors/GGUF container, non-matrix tensors and metadata, not configuration
+or tokenizer files. The selected [g64f16 manifest](../results/v2/quantized-g64f16.json)
+binds `model.safetensors` SHA256
+`c70c215d96047722ac638b9677e761874e46c7d41b0b01068a94ef33b12fa049`.
+Its calibration PPL is slightly worse than Q8_0; this does not disqualify it
+under the specified three-metric rule.
+
+The [structured table](../results/v2/format-calibration.json) keeps exact values,
+all report hashes, native/Q8 artifact identities, oracle/source identities and
+binary/library records. The new decision's top-level `policy` is the rule
+above. The old rule remains inside the unchanged corpus/oracle identity and
+in historical `selection.json`/`calibration.json`; those are not overwritten.
+The calibration reports' legacy generic `scope` sentence says “held-out”;
+their `split`, window IDs and all 512 positions establish calibration scope.
+The tool now emits split-specific wording.
+
+To reproduce in a **fresh output/raw directory** after generating native
+calibration reports with identical settings:
+
+```sh
+nice -n 19 python -m tools.quality_v2 evaluate --split calibration --backend llama --model "$Q8_GGUF" --threads 2 --label q8_0-calibration --corpus "$RESULTS/corpus.json" --raw-dir "$RAW" --selection "$RESULTS/format-selection.json" --output "$RESULTS/cal-q8_0.json"
+nice -n 19 python -m tools.quality_v2 compare --split calibration --corpus "$RESULTS/corpus.json" --selection "$RESULTS/format-selection.json" --reports "$RESULTS/cal-g32f16.json" "$RESULTS/cal-g64f32.json" "$RESULTS/cal-g64f16.json" "$RESULTS/cal-g128f16.json" "$RESULTS/cal-q8_0.json" --output "$RESULTS/format-calibration.json"
+```
+
+Reader and preparation paths are configurable with `--reader` and
+`--artifact-manifest`. Outputs are exclusive; supply the exact new
+`--selection` path to every subsequent heldout evaluate/compare. The earlier
+g32f16 heldout records remain historical and do not measure the selected
+g64f16 artifact or the later native K-layout changes. Final-binary heldout
+quality and speed must use this same g64f16 artifact without reselection.
+
+### Unattended final run and resume
+
+[`tools/run_final_v2.py`](../tools/run_final_v2.py) collects the complete matrix
+in a dedicated `results/v2/final` directory. It needs only the prepared native
+and bandwidth binaries, pinned baseline binary/GGUF/preparation manifest,
+chosen quantized artifact/manifest, new format selection and final-binary
+heldout quality report. It does not build, recalibrate or regenerate quality.
+The current format choice is **g64f16**, not the historical g32f16 selection;
+the heldout summary must link the exact supplied selection hash and content.
+Both engines use F16 KV. Native kernel and affinity are explicit arguments;
+the runner never selects a quality format or an automatic kernel.
+
+Set the artifact variables to their prepared locations. `$BENCH_WRAPPER` is
+an optional, privately supplied command prefix, including its scheduling mode;
+leave it empty for public local reproduction at nice 19. The runner passes
+`PP_MEM=2000M` to the wrapper environment. The private wrapper must enforce
+that memory budget and exclusive measurement access; the public default
+does not implement a scheduler or enforce a memory limit. Do **not** wrap
+the entire unattended command in an exclusive benchmark slot: each candidate
+and each bandwidth window acquires its own slot.
+
+```sh
+nice -n 19 uv run python -m tools.run_final_v2 --model "$INT8_V2" --model-manifest results/v2/quantized-g64f16.json --format-selection results/v2/format-selection.json --engine build/cpu-decode --bandwidth build/read-bandwidth --llama "$LLAMA_BENCH" --gguf "$Q8_GGUF" --preparation results/llama-preparation.json --quality results/v2/quality-final.json --kernel simd512x4 --affinity strict --wrapper "$BENCH_WRAPPER" --output results/v2/final
+```
+
+`--wrapper` is split with shell-style quoting, but never evaluated by a shell.
+Its resolved spelling is hashed, not published. Each timing command appends
+`timeout --foreground --signal=TERM --kill-after=5s 1770s nice -n 19`
+**inside** that prefix: queue waits do not consume the timing deadline.
+The low-level 1,740-second window deadline remains; the extra hard limit plus
+termination grace is 1,775 seconds, below 30 minutes. The runner remains nice
+19 throughout. CPU discovery defaults to the allowed physical-first order;
+pass `--cpu-order` explicitly to preserve a different prepared order.
+Linux, the locked Python environment and the existing system tools
+(`nice`, `taskset`, `timeout`, `ldd`, compiler metadata tools) are required.
+
+The equivalent Make target has no build or calibration prerequisites:
+
+```sh
+nice -n 19 make final FINAL_MODEL="$INT8_V2" FINAL_LLAMA_BIN="$LLAMA_BENCH" FINAL_GGUF="$Q8_GGUF" FINAL_WRAPPER="$BENCH_WRAPPER"
+```
+
+Its `FINAL_FORMAT_SELECTION` defaults to `results/v2/format-selection.json`;
+`FINAL_LABEL` reads that file, and `FINAL_MANIFEST` follows the chosen label.
+Override `FINAL_MODEL` when artifacts live outside `$CACHE`.
+Other overrides are `FINAL_KERNEL`, `FINAL_AFFINITY`, `FINAL_CPU_ORDER`,
+`FINAL_PREPARATION`, `FINAL_QUALITY`, and `FINAL_OUTPUT`.
+`FINAL_OPTIONS=--plan` or adding `--plan`/`--dry-run` to the Python command
+prints the full command list without reading/loading models or starting
+subprocesses. The synthetic tests are in
+[`tests/test_final_runner.py`](../tests/test_final_runner.py).
+
+**INFERENCE from the command generator, not an executed timing estimate:**
+threads 1/2/4/6/12 × contexts 128/1024/4096 × nine candidates gives **135
+separate candidate windows**, plus **five bandwidth windows**. Each candidate
+retains ABAB, five repetitions per process, 64 measured tokens and ten samples
+per engine: **540 sequential model processes**, **1,350 samples and 86,400
+measured tokens per engine** across the sweep. Bandwidth has ten processes
+(two SIMD widths at each thread count). The sum of 140 low-level deadline
+limits is 67 hours 40 minutes; it is not a forecast. Actual wall time is
+**unknown**, including model load/prefix work and unbounded queue waits.
+
+Rerun the **identical command** to resume. `runner.json` binds selection,
+quality/preparation/manifests, tool hashes, runtime locations, wrapper and
+configuration. There is one successful `protocol.json` freeze, binding actual
+resolved upstream libraries (including the benchmark/common libraries),
+model/config/GGUF, all binaries, builds and CPUs. Resume checks those original
+identities rather than creating a new protocol. A changed identity is an error;
+retain the existing directory and use a new dedicated output only for a
+deliberately different experiment.
+
+Every command uses a fresh `attempts/UNIT/NNNNNN/` directory. Driver logs,
+in-flight stdout/stderr and completed invocation records survive interruption.
+`attempt.json` records accepted/failed/interrupted disposition, exit status
+when available, and its raw-directory link. Interrupt cleanup stops the
+driver's process group; resume also checks a recorded process start identity
+before stopping a still-running orphan. An incomplete ABAB is excluded as a
+whole: no sample stitching and no duplicate counting. A complete valid unit
+is atomically checkpointed, then published at the final directory root;
+resume restores publication if interrupted between those steps. Accepted
+raw files are hash-checked and skipped, never rerun because of a low rate or
+spread. Multiple accepted attempts for the same unit are an error.
+Failed attempts remain in place, and a later resume can collect a fresh full
+unit without overwriting them.
+
+The existing summarizer sees exactly one complete accepted sample set for
+each candidate and thread/context cell, with matching bandwidth at all five
+thread counts. Its candidate-level spreads, including every losing candidate
+above 5%, remain intact. Historical failed/interrupted attempts appear under
+`runner_attempts` in the derived summary with their raw links; they are not
+fabricated samples or silently erased. If any unit remains unsuccessful,
+the launch exits nonzero after retaining a partial summary with aggregate
+acceptance disabled. `decode.svg` is published only after all **15 × 9
+candidate units plus five bandwidth units** are complete. Derived summary/SVG
+versions are retained in their own attempt directories; the original v1,
+calibration and earlier heldout results are never overwritten.
 
 ## Archived v1 protocol
 

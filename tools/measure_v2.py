@@ -220,20 +220,31 @@ def execute(command: list[str], stem: Path, locations: dict, deadline: float,
     """Always retain output, including timeouts, malformed JSON and nonzero exits."""
     started = datetime.now(timezone.utc).isoformat()
     stdout, stderr, returncode, error = "", "", None, None
+    stdout_path, stderr_path = stem.with_suffix(".stdout.txt"), stem.with_suffix(".stderr.txt")
     try:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError("window deadline exhausted")
-        run = subprocess.run(command, cwd=ROOT, capture_output=True, text=True,
-                             timeout=remaining, env=env)
-        stdout, stderr, returncode = run.stdout, run.stderr, run.returncode
+        # Stream to disk so an interrupted window still retains in-flight output.
+        with stdout_path.open("x") as out, stderr_path.open("x") as err:
+            run = subprocess.run(command, cwd=ROOT, stdout=out, stderr=err, text=True,
+                                 timeout=remaining, env=env)
+        stdout = stdout_path.read_text()
+        stderr = stderr_path.read_text()
+        returncode = run.returncode
+        # Also supports subprocess adapters returning captured output.
+        if run.stdout is not None:
+            stdout = run.stdout
+        if run.stderr is not None:
+            stderr = run.stderr
     except subprocess.TimeoutExpired as exc:
-        stdout = exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else exc.stdout or ""
-        stderr = exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else exc.stderr or ""
+        stdout = (exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else exc.stdout or
+                  (stdout_path.read_text() if stdout_path.exists() else ""))
+        stderr = (exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else exc.stderr or
+                  (stderr_path.read_text() if stderr_path.exists() else ""))
         error = "window timeout; subprocess terminated"
     except (OSError, TimeoutError) as exc:
         error = str(exc)
-    stdout_path, stderr_path = stem.with_suffix(".stdout.txt"), stem.with_suffix(".stderr.txt")
     stdout_path.write_text(portable(stdout, locations))
     stderr_path.write_text(portable(stderr, locations))
     data = None

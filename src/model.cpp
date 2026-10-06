@@ -180,7 +180,7 @@ struct Engine::Impl {
     ThreadPool pool;
     Activation activation;
     std::unique_ptr<AttentionWorkspace> workspace;
-    size_t capacity, pos = 0;
+    size_t capacity, pos = 0, key_blocks = 0, cache_bytes = 0;
     Matrix embedding;
     std::vector<Layer> layers;
     std::vector<float> final_norm, x, norm, q, k, v, attn, projected, gate, logits;
@@ -193,8 +193,11 @@ struct Engine::Impl {
           activation(ktype == Kernel::vnni ? std::max(config.hidden, config.intermediate) : 0), capacity(cap) {
         if (threads < 1 || threads > 1024 || !capacity || capacity > config.max_positions) throw std::runtime_error("invalid thread count or context capacity");
         parse_kernel(kernel_name(kernel));
-        size_t cache = product(product(product(capacity, config.kv_heads * config.dim), config.layers), 2 * (options.cache_type == CacheType::f16 ? 2 : 4));
-        if (cache > 768ull * 1024 * 1024) throw std::runtime_error("KV cache exceeds 768MiB safety limit");
+        key_blocks = capacity / AttentionWorkspace::block_size + (capacity % AttentionWorkspace::block_size != 0);
+        size_t padded = product(key_blocks, AttentionWorkspace::block_size);
+        if (capacity > std::numeric_limits<size_t>::max() - padded) throw std::runtime_error("KV capacity overflow");
+        cache_bytes = product(product(product(capacity + padded, config.kv_heads * config.dim), config.layers), options.cache_type == CacheType::f16 ? 2 : 4);
+        if (cache_bytes > 768ull * 1024 * 1024) throw std::runtime_error("KV cache exceeds 768MiB safety limit");
         workspace = std::make_unique<AttentionWorkspace>(capacity, config.heads, config.dim);
         embedding = matrix("model.embed_tokens.weight", config.vocab, config.hidden);
         weight_dtype = embedding.dtype == DType::i8 ? "int8" : "bf16";
@@ -219,8 +222,9 @@ struct Engine::Impl {
             layer.kbias = vector(base + "self_attn.k_proj.bias", config.kv_heads * config.dim);
             layer.vbias = vector(base + "self_attn.v_proj.bias", config.kv_heads * config.dim);
             size_t count = product(capacity, config.kv_heads * config.dim);
-            if (options.cache_type == CacheType::f16) { layer.keys16.resize(count); layer.values16.resize(count); }
-            else { layer.keys32.resize(count); layer.values32.resize(count); }
+            size_t key_count = product(padded, config.kv_heads * config.dim);
+            if (options.cache_type == CacheType::f16) { layer.keys16.resize(key_count); layer.values16.resize(count); }
+            else { layer.keys32.resize(key_count); layer.values32.resize(count); }
             layers.push_back(std::move(layer));
         }
         final_norm = vector("model.norm.weight", config.hidden);
@@ -317,20 +321,23 @@ struct Engine::Impl {
                 rotate(q); rotate(k);
             });
             timed(p, "kv_write", [&] {
-                if (options.cache_type == CacheType::f16) {
-                    for (size_t j = 0; j < k.size(); ++j) {
-                        l.keys16[pos * k.size() + j] = float_half(k[j]);
-                        l.values16[pos * v.size() + j] = float_half(v[j]);
+                const size_t block = pos / AttentionWorkspace::block_size, lane = pos % AttentionWorkspace::block_size;
+                for (size_t kv = 0; kv < config.kv_heads; ++kv) for (size_t j = 0; j < config.dim; ++j) {
+                    size_t source = kv * config.dim + j;
+                    size_t key_index = ((kv * key_blocks + block) * config.dim + j) * AttentionWorkspace::block_size + lane;
+                    if (options.cache_type == CacheType::f16) {
+                        l.keys16[key_index] = float_half(k[source]);
+                        l.values16[pos * v.size() + source] = float_half(v[source]);
+                    } else {
+                        l.keys32[key_index] = k[source];
+                        l.values32[pos * v.size() + source] = v[source];
                     }
-                } else {
-                    std::copy(k.begin(), k.end(), l.keys32.begin() + pos * k.size());
-                    std::copy(v.begin(), v.end(), l.values32.begin() + pos * v.size());
                 }
             });
             timed(p, "attention", [&] {
                 const void* keys = options.cache_type == CacheType::f16 ? static_cast<const void*>(l.keys16.data()) : l.keys32.data();
                 const void* values = options.cache_type == CacheType::f16 ? static_cast<const void*>(l.values16.data()) : l.values32.data();
-                attention(q.data(), keys, values, options.cache_type, attn.data(), pos + 1, config.heads, config.kv_heads, config.dim, pool, *workspace, options.scalar_attention);
+                attention(q.data(), keys, values, options.cache_type, attn.data(), pos + 1, config.heads, config.kv_heads, config.dim, key_blocks, pool, *workspace, options.scalar_attention);
             });
             timed(p, "attention_output", [&] { multiply(l.o, attn.data(), projected.data(), p); });
             timed(p, "rmsnorm", [&] { residual_rmsnorm(x.data(), projected.data(), l.post_norm.data(), norm.data(), config.hidden, config.epsilon); });
@@ -392,7 +399,7 @@ Json Engine::metadata() const {
             {"kv_dtype", impl->options.cache_type == CacheType::f16 ? "f16" : "f32"},
             {"kv_capacity", impl->capacity},
             {"auxiliary_fp32_weight_bytes", (impl->config.layers * (3 * impl->config.hidden + 2 * impl->config.kv_heads * impl->config.dim) + impl->config.hidden) * 4},
-            {"kv_cache_bytes", impl->capacity * impl->config.kv_heads * impl->config.dim * impl->config.layers * 2 * (impl->options.cache_type == CacheType::f16 ? 2 : 4)},
+            {"kv_cache_bytes", impl->cache_bytes}, {"key_cache_layout", "kv/block64/dim/token"},
             {"tied_head", true}, {"vocab_size", impl->config.vocab}};
 }
 void quantize_model(const std::string& source, const std::string& output, size_t group_size, DType scale_dtype) {

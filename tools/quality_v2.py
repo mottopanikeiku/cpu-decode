@@ -4,20 +4,23 @@
 Public commands (set MODEL, GGUF, and format directories to local artifacts):
   nice -n 19 uv run python -m tools.quality_v2 prepare --model "$MODEL"
   nice -n 19 uv run python -m tools.quality_v2 oracle --model "$MODEL"
-  nice -n 19 uv run python -m tools.quality_v2 evaluate --split calibration --model "$GROUP32F16" --label g32f16 --output results/v2/cal-g32f16.json
+  nice -n 19 uv run python -m tools.quality_v2 evaluate --split calibration --model "$GROUP32F16" --label g32f16 --selection results/v2/format-selection.json --output results/v2/cal-g32f16.json
 Repeat calibration evaluate for 64F32,64F16,128F16 using identical settings, then:
-  nice -n 19 uv run python -m tools.quality_v2 compare --split calibration --reports results/v2/cal-*.json --output results/v2/calibration.json
-This exclusively creates results/v2/selection.json BEFORE any held-out candidate.
-Evaluate heldout with --selection results/v2/selection.json, separately for v1,
-the chosen format (F16 and FP32 KV, and desired kernels), and actual pinned Q8_0:
-  nice -n 19 uv run python -m tools.quality_v2 evaluate --split heldout --backend llama --model "$GGUF" --label q8_0 --output results/v2/heldout-q8_0.json
-  nice -n 19 uv run python -m tools.quality_v2 compare --split heldout --reports results/v2/heldout-*.json --output results/v2/quality.json
+  nice -n 19 uv run python -m tools.quality_v2 evaluate --split calibration --backend llama --model "$GGUF" --threads 2 --label q8_0-calibration --selection results/v2/format-selection.json --output results/v2/cal-q8_0.json
+  nice -n 19 uv run python -m tools.quality_v2 compare --split calibration --reports results/v2/cal-*.json --selection results/v2/format-selection.json --output results/v2/format-calibration.json
+This exclusively creates the supplied selection BEFORE any held-out candidate.
+Evaluate heldout with that same --selection, separately for v1, the chosen
+format (F16 and FP32 KV, and desired kernels), and actual pinned Q8_0.
+Use new output paths; historical selection, calibration and heldout files remain.
 Raw whole-vocabulary logits live in ignored external/quality-v2, never results/.
 All destinations under results/ must resolve inside results/v2/. The v1 baseline
 must match archived weight/configuration hashes and the oracle's pinned source.
 Q8_0 evaluation records resolved llama/ggml shared-library and upstream build
 hashes, rechecking the complete reader identity before and after every window.
-No numerical acceptance threshold is assumed. VNNI is retained only when its
+Format selection requires strictly lower calibration mean/p99 KL and strictly
+higher top1 than Q8_0, then minimizes weights artifact bytes. PPL is reported,
+not used to select a format. No passing format is an error, not a fallback.
+VNNI is retained only when its
 held-out mean KL, p99 KL, top1 agreement and perplexity are all at least as good
 as actual Q8_0.
 """
@@ -41,6 +44,13 @@ from tools.download_model import MODEL_ID, REVISION, file_hash, verify_snapshot
 from tools.portable import ROOT, portable
 from tools.prepare_llama import LLAMA_COMMIT, LLAMA_URL
 from tools.reference import load_oracle, project_last, versions
+
+FORMAT_SELECTION_POLICY = (
+    "Among 32F16,64F32,64F16,128F16, require calibration mean KL and p99 KL "
+    "strictly below actual Q8_0 and top1 strictly above; minimize weights artifact "
+    "bytes, then mean KL, p99 KL, negative top1, label; perplexity is report-only; "
+    "no fallback or heldout reselection"
+)
 
 
 def normalize_dtype(value: str) -> str:
@@ -236,7 +246,7 @@ def resolved_upstream_libraries(ldd_output: str) -> dict[str, Path]:
     for line in ldd_output.splitlines():
         match = re.match(r"\s*(lib(?:llama|ggml)[^ ]*)\s+=>\s+(/.*?)\s+\(0x[0-9a-fA-F]+\)", line)
         if match:
-            if not re.fullmatch(r"lib(?:llama|ggml|ggml-base|ggml-cpu)\.so(?:\.\d+)*", match.group(1)):
+            if not re.fullmatch(r"lib(?:llama|llama-bench-impl|llama-common|ggml|ggml-base|ggml-cpu)\.so(?:\.\d+)*", match.group(1)):
                 raise ValueError(f"Unknown upstream CPU reader dependency: {match.group(1)}")
             if match.group(1) in libraries:
                 raise ValueError("Duplicate upstream reader dependency")
@@ -303,9 +313,16 @@ def require_reader_identity(expected: dict, actual: dict) -> None:
 def read_selection(path: Path, corpus_hash: str) -> dict:
     selection = json.loads(path.read_text())
     if (selection["corpus_sha256"] != corpus_hash or selection["split"] != "calibration"
-            or selection["policy"] != POLICY["format_selection"]
+            or selection["policy"] not in (POLICY["format_selection"], FORMAT_SELECTION_POLICY)
             or (selection["chosen"]["group_size"], selection["chosen"]["scale_dtype"]) not in FORMAT_CHOICES):
         raise ValueError("Calibration decision does not match corpus/policy")
+    if selection["policy"] == FORMAT_SELECTION_POLICY:
+        selected = choose_format(selection["evidence"])
+        chosen = selection["chosen"]
+        if (chosen["label"] != selected["label"] or chosen["model_identity"] != selected["model_identity"]
+                or chosen["settings"] != selected["settings"] or chosen["aggregate"] != selected["aggregate"]
+                or chosen["weights_artifact_bytes"] != weights_artifact_bytes(selected)):
+            raise ValueError("Calibration decision differs from its Q8_0 comparison evidence")
     return selection
 
 
@@ -464,7 +481,7 @@ def evaluate(args) -> None:
         "oracle_identity": metadata["identity"], "settings": settings, "model_identity": identity, "binary_identity": pinned,
         "selection_sha256": file_hash(args.selection) if selection is not None else None,
         "aggregate": summarize(all_rows), "windows": records, "positions": all_rows,
-        "scope": "Teacher-forced held-out next-token likelihood, full-vocabulary KL(reference||candidate), fresh cache per window; no independent generation or tuning on heldout"}
+        "scope": f"Teacher-forced {args.split} next-token likelihood, full-vocabulary KL(reference||candidate), fresh cache per window; no independent generation or tuning on heldout"}
     if result["aggregate"]["positions"] != POLICY[f"{args.split}_windows"] * 256:
         raise ValueError("Incomplete scored corpus")
     if args.backend == "llama":
@@ -490,19 +507,77 @@ def validate_reports(reports: list[dict], corpus: dict, corpus_hash: str, split:
         raise ValueError("Reports do not use exactly the same oracle")
 
 
+def weights_artifact_bytes(report: dict) -> int:
+    files = report["model_identity"]["files"]
+    if report["backend"] == "native":
+        artifact = files["model.safetensors"]
+    elif report["backend"] == "llama" and len(files) == 1:
+        artifact = next(iter(files.values()))
+    else:
+        raise ValueError("Expected one Q8_0 weights artifact")
+    if type(artifact["bytes"]) is not int or artifact["bytes"] <= 0:
+        raise ValueError("Weights artifact bytes must be a positive integer")
+    return artifact["bytes"]
+
+
+def beats_q8_calibration(report: dict, baseline: dict) -> bool:
+    candidate, q8 = report["aggregate"], baseline["aggregate"]
+    return (candidate["mean_kl_reference_candidate_nats"] < q8["mean_kl_reference_candidate_nats"]
+        and candidate["p99_kl_reference_candidate_nats"] < q8["p99_kl_reference_candidate_nats"]
+        and candidate["top1_agreement"] > q8["top1_agreement"])
+
+
 def choose_format(reports: list[dict]) -> dict:
-    if len(reports) != len(FORMAT_CHOICES) or any(report["split"] != "calibration" or report["backend"] != "native" for report in reports):
-        raise ValueError("Selection requires exactly the four native calibration choices, never heldout")
-    choices = {(report["settings"]["group_size"], report["settings"]["scale_dtype"]) for report in reports}
+    native = [report for report in reports if report["backend"] == "native"]
+    baselines = [report for report in reports if report["backend"] == "llama"]
+    if (len(reports) != len(FORMAT_CHOICES) + 1 or len(native) != len(FORMAT_CHOICES)
+            or len(baselines) != 1 or any(report["split"] != "calibration" for report in reports)):
+        raise ValueError("Selection requires exactly the four native calibration choices and one Q8_0, never heldout")
+    choices = {(report["settings"]["group_size"], report["settings"]["scale_dtype"]) for report in native}
     if choices != set(FORMAT_CHOICES):
         raise ValueError("Calibration must cover 32F16,64F32,64F16,128F16")
     fixed = ("kernel", "kv_dtype", "attention", "scheduler", "affinity", "threads", "cpu_set", "weight_dtype")
-    if any(any(report["settings"][key] != reports[0]["settings"][key] for key in fixed) for report in reports):
+    if any(any(report["settings"][key] != native[0]["settings"][key] for key in fixed) for report in native):
         raise ValueError("Calibration choices must use identical execution settings")
-    if reports[0]["settings"]["weight_dtype"] != "int8":
+    if any(report["binary_identity"] != native[0]["binary_identity"] for report in native):
+        raise ValueError("Calibration choices must use the same native binary")
+    if any(report["oracle_identity"] != native[0]["oracle_identity"] for report in reports):
+        raise ValueError("Calibration choices and Q8_0 must use the same oracle/source")
+    if native[0]["settings"]["weight_dtype"] != "int8":
         raise ValueError("Calibration must measure int8 format choices")
-    return min(reports, key=lambda report: (report["aggregate"]["mean_kl_reference_candidate_nats"],
-        -report["aggregate"]["top1_agreement"], report["aggregate"]["next_token_cross_entropy_nats"], report["label"]))
+    baseline = baselines[0]
+    if (baseline["settings"]["weight_dtype"] != "Q8_0"
+            or baseline["settings"]["flash_attention"] != "auto"
+            or baseline["settings"]["kv_dtype"] != "f16"
+            or baseline["binary_identity"]["llama_commit"] != LLAMA_COMMIT):
+        raise ValueError("Calibration requires the actual pinned Q8_0 reader path")
+    if any(baseline["settings"][key] != native[0]["settings"][key] for key in ("threads", "kv_dtype")):
+        raise ValueError("Q8_0 calibration must match native threads and KV dtype")
+    for report in reports:
+        weights_artifact_bytes(report)
+    eligible = [report for report in native if beats_q8_calibration(report, baseline)]
+    if not eligible:
+        raise ValueError("No native format beats calibration Q8_0 on mean KL, p99 KL and top1; no fallback")
+    return min(eligible, key=lambda report: (weights_artifact_bytes(report),
+        report["aggregate"]["mean_kl_reference_candidate_nats"],
+        report["aggregate"]["p99_kl_reference_candidate_nats"],
+        -report["aggregate"]["top1_agreement"], report["label"]))
+
+
+def calibration_table(reports: list[dict]) -> list[dict]:
+    baseline = next(report for report in reports if report["backend"] == "llama")
+    table = []
+    for report in sorted(reports, key=lambda report: report["label"]):
+        settings, aggregate = report["settings"], report["aggregate"]
+        bits = (8.5 if report["backend"] == "llama" else
+            8 + (16 if settings["scale_dtype"] == "f16" else 32) / settings["group_size"])
+        table.append({"label": report["label"], "split": "calibration",
+            "matrix_bits_per_weight": bits, "weights_artifact_bytes": weights_artifact_bytes(report),
+            "mean_kl_reference_candidate_nats": aggregate["mean_kl_reference_candidate_nats"],
+            "p99_kl_reference_candidate_nats": aggregate["p99_kl_reference_candidate_nats"],
+            "top1_agreement": aggregate["top1_agreement"], "perplexity": aggregate["perplexity"],
+            "beats_q8_0": report["backend"] == "native" and beats_q8_calibration(report, baseline)})
+    return table
 
 
 def heldout_comparison(reports: list[dict], selection: dict) -> dict:
@@ -564,7 +639,11 @@ def compare(args) -> None:
     if args.output.exists():
         raise ValueError("Comparison output already exists")
     evidence = [{"label": report["label"], "report": path.name, "sha256": file_hash(path),
-        "settings": report["settings"], "aggregate": report["aggregate"]} for path, report in zip(args.reports, reports, strict=True)]
+        "split": report["split"], "backend": report["backend"],
+        "settings": report["settings"], "aggregate": report["aggregate"],
+        "model_identity": report["model_identity"], "binary_identity": report["binary_identity"],
+        "oracle_identity": report["oracle_identity"]} for path, report in zip(args.reports, reports, strict=True)]
+    evidence.sort(key=lambda entry: entry["label"])
     if args.split == "calibration":
         if args.selection.exists():
             raise ValueError("Calibration decision already exists; never reselect after heldout")
@@ -573,10 +652,14 @@ def compare(args) -> None:
         bits = 8 + (16 if settings["scale_dtype"] == "f16" else 32) / settings["group_size"]
         decision = {"split": "calibration", "corpus_sha256": corpus_hash,
             "oracle_identity": chosen["oracle_identity"],
-            "policy": POLICY["format_selection"], "chosen": {"label": chosen["label"],
+            "policy": FORMAT_SELECTION_POLICY, "chosen": {"label": chosen["label"],
                 "group_size": settings["group_size"], "scale_dtype": settings["scale_dtype"],
-                "matrix_bits_per_weight": bits, "model_identity": chosen["model_identity"],
-                "settings": settings, "aggregate": chosen["aggregate"]}, "evidence": evidence}
+                "matrix_bits_per_weight": bits, "weights_artifact_bytes": weights_artifact_bytes(chosen),
+                "model_identity": chosen["model_identity"],
+                "settings": settings, "aggregate": chosen["aggregate"]},
+            "scope": "512 calibration positions only; PPL reported, not a selection criterion; no heldout reselection",
+            "format_table": calibration_table(reports),
+            "baseline": next(entry for entry in evidence if entry["backend"] == "llama"), "evidence": evidence}
         write_json(args.selection, decision, exclusive=True)
         summary = decision
     else:
@@ -623,7 +706,8 @@ def main() -> None:
     comparison.add_argument("--reports", type=Path, nargs="+", required=True)
     for command in (evaluation, comparison):
         command.add_argument("--split", choices=("calibration", "heldout"), required=True)
-        command.add_argument("--selection", type=Path, default=Path("results/v2/selection.json"))
+        command.add_argument("--selection", type=Path, default=Path("results/v2/format-selection.json"),
+            help="Exact calibration decision path; use selection.json only to read historical decisions")
         command.add_argument("--output", type=Path, required=True)
     for command in (reference, evaluation, comparison):
         command.add_argument("--corpus", type=Path, default=Path("results/v2/corpus.json"))

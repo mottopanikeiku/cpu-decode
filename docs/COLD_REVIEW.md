@@ -177,3 +177,37 @@ A further source-only arithmetic review found two finite-input counterexamples i
 The author executed three native tests after the corrections and grouped-scale reuse, and 171 Python tests with two explicitly optional model skips after the measurement fixes. Native coverage includes 160,000 exponential inputs, finite reduction-tree agreement, negative-infinity/NaN/large-average cases, F16/F32 cache paths, SIMD GQA ratios and scalar fallback, and thread-count bitwise checks. The real-model reference suite separately passed all eleven tests after normalized attention was introduced; that run preceded the later cache-type specialization and scale-load reuse.
 
 A separate source-only reproduction review found that executable-parent paths did not prove the resolved llama/ggml library build, freezes could overwrite discovery records, raw quality windows could be overwritten, and a uniform ceiling test misrepresented the different short/long targets. Freeze and execution now bind and recheck actual resolved libraries, their build root and loader-environment identity; destination preflight rejects existing discovery/protocol and raw-window paths before subprocesses run. Summary thresholds are explicit: one best short-context cell at 85%, every long-context cell at 75%, and descriptive twelve-thread scaling without an invented numeric collapse threshold. These safeguards were exercised with synthetic tests, not a completed final performance matrix. Active upstream hot-kernel tracing, final held-out candidate results and final throughput acceptance are not established by this review.
+
+## Transposed attention and unattended runner review
+
+Two independent source-only reviews covered the transposed K allocation,
+write/index contracts, masked SIMD softmax, numerical tests, and the final
+runner's protocol, sample validation and interruption handling. Neither
+reviewer ran models, tests or benchmarks.
+
+No definite transposition/masking defect was found. Suggested coverage gaps
+for poisoned inactive keys, every 16-lane tail width and insufficient
+allocated key blocks were added to the native tests. Actual-model cache
+write/rewind coverage remains separate from those direct attention fixtures.
+Parallel merges preserve ascending block order within each independent head.
+
+The runner review found two P2 defects, both corrected:
+
+1. A numbered attempt directory interrupted before its first checkpoint
+   prevented resume. Recovery now retains it as interrupted, excludes it
+   from sampling and starts a new numbered directory; partial checkpoint
+   bytes remain available.
+2. Non-VNNI quality could be from an earlier binary despite using the same
+   format selection. Final execution now requires exactly one matching
+   chosen-format F16 report, verifies its linked file hash and fields, and
+   compares its engine hash with the timing binary.
+
+Synthetic regressions cover both recovery paths and mutations to the
+binary, linked report, model/settings and duplicate matching evidence.
+Parent execution of the exact CI commands passed three CTest checks and
+229 Python tests, with two explicitly optional model checks skipped.
+Each measured native attention stage also passed its three CTest checks;
+the rejected singleton-claim API was subsequently removed. These are
+parent-executed outcomes, not independent reviewer reproduction. The quiet
+full final matrix and final-binary heldout confirmation remain distinct.
+

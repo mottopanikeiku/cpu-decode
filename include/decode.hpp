@@ -75,7 +75,7 @@ struct AttentionWorkspace {
 };
 void attention(const float* q, const void* keys, const void* values, CacheType type,
                float* out, size_t length, size_t heads, size_t kv_heads,
-               size_t head_dim, ThreadPool& pool, AttentionWorkspace& workspace, bool scalar = false);
+               size_t head_dim, size_t key_blocks, ThreadPool& pool, AttentionWorkspace& workspace, bool scalar = false);
 struct Profile {
     Profile();
     std::map<std::string, double, std::less<>> seconds;

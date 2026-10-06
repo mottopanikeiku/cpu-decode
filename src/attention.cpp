@@ -22,9 +22,13 @@ struct Work {
     const void* values;
     CacheType type;
     float* out;
-    size_t length, heads, kv_heads, dim, active_blocks;
+    size_t length, heads, kv_heads, dim, active_blocks, key_blocks;
     AttentionWorkspace& workspace;
 };
+size_t key_index(const Work& w, size_t kv, size_t position, size_t column) noexcept {
+    constexpr size_t width = AttentionWorkspace::block_size;
+    return ((kv * w.key_blocks + position / width) * w.dim + column) * width + position % width;
+}
 void scalar_head(void* context, size_t h) noexcept {
     auto& w = *static_cast<Work*>(context);
     size_t stride = w.kv_heads * w.dim, kv = h / (w.heads / w.kv_heads);
@@ -32,7 +36,7 @@ void scalar_head(void* context, size_t h) noexcept {
     float maximum = -std::numeric_limits<float>::infinity();
     for (size_t t = 0; t < w.length; ++t) {
         float dot = 0;
-        for (size_t j = 0; j < w.dim; ++j) dot += w.q[h * w.dim + j] * cache_value(w.keys, w.type, t * stride + kv * w.dim + j);
+        for (size_t j = 0; j < w.dim; ++j) dot += w.q[h * w.dim + j] * cache_value(w.keys, w.type, key_index(w, kv, t, j));
         probability[t] = dot / std::sqrt(float(w.dim)); maximum = std::max(maximum, probability[t]);
     }
     float sum = 0;
@@ -51,7 +55,7 @@ void block_scalar(Work& w, size_t task) noexcept {
         float dots[64]{};
         // One K load/conversion per element, reused across every query in this KV group.
         for (size_t j = 0; j < w.dim; ++j) {
-            float key = cache_value(w.keys, w.type, t * stride + kv * w.dim + j);
+            float key = cache_value(w.keys, w.type, key_index(w, kv, t, j));
             for (size_t g = 0; g < groups; ++g) dots[g] += key * w.q[(kv * groups + g) * w.dim + j];
         }
         for (size_t g = 0; g < groups; ++g) {
@@ -93,20 +97,25 @@ void block_simd_typed(Work& w, size_t task) noexcept {
     size_t slot = (kv * w.workspace.blocks + block) * Groups, stride = w.kv_heads * w.dim;
     float scale = 1 / std::sqrt(float(w.dim));
     for (size_t g = 0; g < Groups; ++g) w.workspace.maxima[slot + g] = -std::numeric_limits<float>::infinity();
-    for (size_t t = begin; t < end; ++t) {
+    const size_t key_start = (kv * w.key_blocks + block) * w.dim * AttentionWorkspace::block_size;
+    const __m512 multiplier = _mm512_set1_ps(scale), neutral = _mm512_set1_ps(-std::numeric_limits<float>::infinity());
+    for (size_t t = begin; t < end; t += 16) {
         __m512 dots[Groups];
         for (auto& dot : dots) dot = _mm512_setzero_ps();
-        size_t j = 0;
-        // The caller guarantees a positive multiple-of-16 head dimension.
-        do {
-            __m512 key = load_cache<Type>(w.keys, t * stride + kv * w.dim + j);
-            for (size_t g = 0; g < Groups; ++g) dots[g] = _mm512_fmadd_ps(key, _mm512_loadu_ps(w.q + (kv * Groups + g) * w.dim + j), dots[g]);
-            j += 16;
-        } while (j < w.dim);
+        for (size_t j = 0; j < w.dim; ++j) {
+            // Each lane is a token; one transposed K load serves every query
+            // in this KV group, without a horizontal dot-product reduction.
+            __m512 key = load_cache<Type>(w.keys, key_start + j * AttentionWorkspace::block_size + t - begin);
+            for (size_t g = 0; g < Groups; ++g)
+                dots[g] = _mm512_fmadd_ps(key, _mm512_set1_ps(w.q[(kv * Groups + g) * w.dim + j]), dots[g]);
+        }
+        size_t valid = std::min(size_t(16), end - t);
+        __mmask16 mask = valid == 16 ? __mmask16(0xffff) : __mmask16((1u << valid) - 1);
         for (size_t g = 0; g < Groups; ++g) {
-            float score = detail::reduce_add(dots[g]) * scale;
-            w.workspace.scores[(kv * Groups + g) * w.workspace.capacity + t] = score;
-            w.workspace.maxima[slot + g] = std::max(w.workspace.maxima[slot + g], score);
+            __m512 scores = _mm512_mul_ps(dots[g], multiplier);
+            _mm512_mask_storeu_ps(w.workspace.scores.data() + (kv * Groups + g) * w.workspace.capacity + t, mask, scores);
+            float maximum = _mm512_reduce_max_ps(_mm512_mask_mov_ps(neutral, mask, scores));
+            w.workspace.maxima[slot + g] = std::max(w.workspace.maxima[slot + g], maximum);
         }
     }
     for (size_t g = 0; g < Groups; ++g) {
@@ -114,20 +123,24 @@ void block_simd_typed(Work& w, size_t task) noexcept {
         float block_maximum = w.workspace.maxima[slot + g];
         if (block_maximum == -std::numeric_limits<float>::infinity()) block_maximum = 0;
         __m512 lanes = _mm512_setzero_ps(), maximum = _mm512_set1_ps(block_maximum);
-        size_t t = begin;
-        for (; t + 16 <= end; t += 16) {
-            __m512 p = detail::exp_nonpositive(_mm512_sub_ps(_mm512_loadu_ps(probability + t), maximum));
-            _mm512_storeu_ps(probability + t, p);
+        for (size_t t = begin; t < end; t += 16) {
+            size_t valid = std::min(size_t(16), end - t);
+            __mmask16 mask = __mmask16(0xffffu >> (16 - valid));
+            __m512 scores = _mm512_mask_loadu_ps(neutral, mask, probability + t);
+            __m512 p = _mm512_maskz_mov_ps(mask, detail::exp_nonpositive(_mm512_sub_ps(scores, maximum)));
+            _mm512_mask_storeu_ps(probability + t, mask, p);
             lanes = _mm512_add_ps(lanes, p);
         }
         float sum = _mm512_reduce_add_ps(lanes);
-        for (; t < end; ++t) { probability[t] = std::exp(probability[t] - block_maximum); sum += probability[t]; }
         w.workspace.sums[slot + g] = sum;
         float scalar_inverse = sum == 0 ? 0 : 1 / sum;
         __m512 inverse = _mm512_set1_ps(scalar_inverse);
-        t = begin;
-        for (; t + 16 <= end; t += 16) _mm512_storeu_ps(probability + t, _mm512_mul_ps(_mm512_loadu_ps(probability + t), inverse));
-        for (; t < end; ++t) probability[t] *= scalar_inverse;
+        for (size_t t = begin; t < end; t += 16) {
+            size_t valid = std::min(size_t(16), end - t);
+            __mmask16 mask = __mmask16(0xffffu >> (16 - valid));
+            __m512 p = _mm512_mul_ps(_mm512_maskz_loadu_ps(mask, probability + t), inverse);
+            _mm512_mask_storeu_ps(probability + t, mask, p);
+        }
     }
     for (size_t j = 0; j < w.dim; j += 16) {
         __m512 accumulators[Groups];
@@ -148,32 +161,29 @@ void block_simd(Work& w, size_t task) noexcept {
     else block_simd_typed<Groups, CacheType::f32>(w, task);
 }
 __attribute__((target("avx512f")))
-void merge_simd(Work& w) noexcept {
-    size_t groups = w.heads / w.kv_heads;
-    for (size_t h = 0; h < w.heads; ++h) {
-        size_t kv = h / groups, g = h % groups;
-        float maximum = -std::numeric_limits<float>::infinity();
-        for (size_t b = 0; b < w.active_blocks; ++b)
-            maximum = std::max(maximum, w.workspace.maxima[(kv * w.workspace.blocks + b) * groups + g]);
-        float denominator = 0;
-        std::fill(w.out + h * w.dim, w.out + (h + 1) * w.dim, 0);
-        for (size_t b = 0; b < w.active_blocks; ++b) {
-            size_t slot = (kv * w.workspace.blocks + b) * groups + g;
-            float factor = std::exp(w.workspace.maxima[slot] - maximum);
-            // Reuse each local sum as its globally rescaled mass.
-            w.workspace.sums[slot] *= factor;
-            denominator += w.workspace.sums[slot];
-        }
-        // Local weighted averages and normalized merge coefficients keep
-        // finite averages from overflowing an unnormalized intermediate.
-        for (size_t b = 0; b < w.active_blocks; ++b) {
-            size_t slot = (kv * w.workspace.blocks + b) * groups + g;
-            __m512 multiplier = _mm512_set1_ps(w.workspace.sums[slot] / denominator);
-            for (size_t j = 0; j < w.dim; j += 16) {
-                float* output = w.out + h * w.dim + j;
-                _mm512_storeu_ps(output, _mm512_fmadd_ps(_mm512_loadu_ps(w.workspace.weighted.data() + slot * w.dim + j),
-                                                       multiplier, _mm512_loadu_ps(output)));
-            }
+void merge_simd_head(Work& w, size_t h) noexcept {
+    size_t groups = w.heads / w.kv_heads, kv = h / groups, g = h % groups;
+    float maximum = -std::numeric_limits<float>::infinity();
+    for (size_t b = 0; b < w.active_blocks; ++b)
+        maximum = std::max(maximum, w.workspace.maxima[(kv * w.workspace.blocks + b) * groups + g]);
+    float denominator = 0;
+    std::fill(w.out + h * w.dim, w.out + (h + 1) * w.dim, 0);
+    for (size_t b = 0; b < w.active_blocks; ++b) {
+        size_t slot = (kv * w.workspace.blocks + b) * groups + g;
+        float factor = std::exp(w.workspace.maxima[slot] - maximum);
+        // Reuse each local sum as its globally rescaled mass.
+        w.workspace.sums[slot] *= factor;
+        denominator += w.workspace.sums[slot];
+    }
+    // Local weighted averages and normalized merge coefficients keep
+    // finite averages from overflowing an unnormalized intermediate.
+    for (size_t b = 0; b < w.active_blocks; ++b) {
+        size_t slot = (kv * w.workspace.blocks + b) * groups + g;
+        __m512 multiplier = _mm512_set1_ps(w.workspace.sums[slot] / denominator);
+        for (size_t j = 0; j < w.dim; j += 16) {
+            float* output = w.out + h * w.dim + j;
+            _mm512_storeu_ps(output, _mm512_fmadd_ps(_mm512_loadu_ps(w.workspace.weighted.data() + slot * w.dim + j),
+                                                   multiplier, _mm512_loadu_ps(output)));
         }
     }
 }
@@ -193,38 +203,42 @@ void block(void* context, size_t task) noexcept {
 #endif
     block_scalar(w, task);
 }
+void merge(void* context, size_t h) noexcept {
+    auto& w = *static_cast<Work*>(context);
+#if defined(__x86_64__) || defined(__i386__)
+    if (!(w.dim % 16) && __builtin_cpu_supports("avx512f")) { merge_simd_head(w, h); return; }
+#endif
+    size_t groups = w.heads / w.kv_heads, kv = h / groups, g = h % groups;
+    float maximum = -std::numeric_limits<float>::infinity();
+    for (size_t b = 0; b < w.active_blocks; ++b)
+        maximum = std::max(maximum, w.workspace.maxima[(kv * w.workspace.blocks + b) * groups + g]);
+    float denominator = 0;
+    std::fill(w.out + h * w.dim, w.out + (h + 1) * w.dim, 0);
+    for (size_t b = 0; b < w.active_blocks; ++b) {
+        size_t slot = (kv * w.workspace.blocks + b) * groups + g;
+        float factor = std::exp(w.workspace.maxima[slot] - maximum);
+        w.workspace.sums[slot] *= factor;
+        denominator += w.workspace.sums[slot];
+    }
+    for (size_t b = 0; b < w.active_blocks; ++b) {
+        size_t slot = (kv * w.workspace.blocks + b) * groups + g;
+        float factor = w.workspace.sums[slot] / denominator;
+        for (size_t j = 0; j < w.dim; ++j)
+            w.out[h * w.dim + j] += w.workspace.weighted[slot * w.dim + j] * factor;
+    }
+}
 }
 void attention(const float* q, const void* keys, const void* values, CacheType type,
-               float* out, size_t length, size_t heads, size_t kv_heads, size_t dim,
+               float* out, size_t length, size_t heads, size_t kv_heads, size_t dim, size_t key_blocks,
                ThreadPool& pool, AttentionWorkspace& workspace, bool scalar) {
     if (!length || !kv_heads || heads % kv_heads || !dim || heads / kv_heads > 64 ||
-        workspace.capacity < length || workspace.heads != heads || workspace.dim != dim)
+        workspace.capacity < length || workspace.heads != heads || workspace.dim != dim ||
+        key_blocks < length / AttentionWorkspace::block_size + (length % AttentionWorkspace::block_size != 0))
         throw std::runtime_error("invalid attention dimensions");
-    Work work{q, keys, values, type, out, length, heads, kv_heads, dim, (length + AttentionWorkspace::block_size - 1) / AttentionWorkspace::block_size, workspace};
+    Work work{q, keys, values, type, out, length, heads, kv_heads, dim, (length + AttentionWorkspace::block_size - 1) / AttentionWorkspace::block_size, key_blocks, workspace};
     if (scalar) { pool.run(heads, scalar_head, &work); return; }
     pool.run(kv_heads * work.active_blocks, block, &work);
-#if defined(__x86_64__) || defined(__i386__)
-    if (!(dim % 16) && __builtin_cpu_supports("avx512f")) { merge_simd(work); return; }
-#endif
-    const size_t groups = heads / kv_heads;
-    // Block boundaries and this ascending merge order never depend on thread count.
-    for (size_t h = 0; h < heads; ++h) {
-        size_t kv = h / groups, g = h % groups;
-        float maximum = -std::numeric_limits<float>::infinity();
-        for (size_t b = 0; b < work.active_blocks; ++b) maximum = std::max(maximum, workspace.maxima[(kv * workspace.blocks + b) * groups + g]);
-        float denominator = 0;
-        std::fill(out + h * dim, out + (h + 1) * dim, 0);
-        for (size_t b = 0; b < work.active_blocks; ++b) {
-            size_t slot = (kv * workspace.blocks + b) * groups + g;
-            float factor = std::exp(workspace.maxima[slot] - maximum);
-            workspace.sums[slot] *= factor;
-            denominator += workspace.sums[slot];
-        }
-        for (size_t b = 0; b < work.active_blocks; ++b) {
-            size_t slot = (kv * workspace.blocks + b) * groups + g;
-            float factor = workspace.sums[slot] / denominator;
-            for (size_t j = 0; j < dim; ++j) out[h * dim + j] += workspace.weighted[slot * dim + j] * factor;
-        }
-    }
+    // Each head merges fixed blocks in ascending order, independent of workers.
+    pool.run(heads, merge, &work);
 }
 } // namespace decode

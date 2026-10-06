@@ -468,7 +468,7 @@ def resolved_baseline_fixture(tmp_path, monkeypatch):
         "CMAKE_BUILD_TYPE:STRING=Release\nCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++\nGGML_NATIVE:BOOL=ON\nGGML_BACKEND_DL:BOOL=OFF\n")
     (build / "compile_commands.json").write_text("[]")
     libraries = {}
-    for name in ["libllama.so", "libggml.so", "libggml-base.so", "libggml-cpu.so"]:
+    for name in ["libllama.so", "libllama-bench-impl.so", "libllama-common.so.0", "libggml.so", "libggml-base.so", "libggml-cpu.so"]:
         libraries[name] = library_dir / name
         libraries[name].write_bytes(name.encode())
     def fake_ldd(command, **kwargs):
@@ -479,7 +479,8 @@ def resolved_baseline_fixture(tmp_path, monkeypatch):
     return executable, build, libraries, fake_ldd
 
 
-def test_resolved_library_hash_not_adjacent_file_or_stamp(tmp_path, monkeypatch):
+@pytest.mark.parametrize("library_name", ["libggml-cpu.so", "libllama-bench-impl.so", "libllama-common.so.0"])
+def test_resolved_library_hash_not_adjacent_file_or_stamp(tmp_path, monkeypatch, library_name):
     executable, build, libraries, _ = resolved_baseline_fixture(tmp_path, monkeypatch)
     locations = {tmp_path: "$FIXTURE"}
     identity = reader_build_identity(executable)
@@ -487,7 +488,7 @@ def test_resolved_library_hash_not_adjacent_file_or_stamp(tmp_path, monkeypatch)
     assert check_baseline_identity(executable, p, locations) == p["baseline_build_identity"]
     (executable.parent / "libggml-cpu.so").write_bytes(b"unused neighbor")
     check_baseline_identity(executable, p, locations)
-    library = libraries["libggml-cpu.so"]
+    library = libraries[library_name]
     old = library.stat()
     original = library.read_bytes()
     library.write_bytes(b"x" * len(original))

@@ -24,15 +24,5 @@ inline __m512 exp_nonpositive(__m512 x) {
     p = _mm512_fmadd_ps(p, r, _mm512_set1_ps(1.0f));
     return _mm512_mask_mov_ps(_mm512_scalef_ps(p, n), underflow, _mm512_setzero_ps());
 }
-// Float-typed quarters preserve the same pairwise addition tree without
-// reinterpretation as double vectors at the reduction boundary.
-__attribute__((target("avx512f"), always_inline))
-inline float reduce_add(__m512 x) {
-    __m128 lower = _mm_add_ps(_mm512_castps512_ps128(x), _mm512_extractf32x4_ps(x, 2));
-    __m128 upper = _mm_add_ps(_mm512_extractf32x4_ps(x, 1), _mm512_extractf32x4_ps(x, 3));
-    __m128 sum = _mm_add_ps(lower, upper);
-    sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
-    return _mm_cvtss_f32(_mm_add_ss(sum, _mm_shuffle_ps(sum, sum, 0x55)));
-}
 } // namespace decode::detail
 #endif

@@ -21,7 +21,7 @@ from tools.corpus_v2 import (
 )
 from tools.download_model import file_hash
 from tools.quality_v2 import (
-    archived_v1_identity, checked_logits, choose_format, compare, evaluate, heldout_comparison, log_probabilities,
+    FORMAT_SELECTION_POLICY, archived_v1_identity, checked_logits, choose_format, compare, evaluate, heldout_comparison, log_probabilities,
     oracle, position_metric, preflight_native_model, read_selection, require_reader_identity,
     resolved_upstream_libraries, summarize, upstream_build_identity,
     validate_case, validate_heldout_settings, validate_reports,
@@ -187,39 +187,171 @@ def calibration_choices():
             "kv_dtype": "f16", "kernel": "scalar", "attention": "blocked",
             "scheduler": "pool", "affinity": "strict", "threads": 1, "cpu_set": [0]}
         reports.append({"label": f"g{group}{dtype}", "split": "calibration", "backend": "native",
-            "settings": settings, "aggregate": summarize([dict(row, kl_reference_candidate_nats=0.01 * (index + 1))]),
-            "model_identity": {"sha256": f"weights-{group}-{dtype}"}})
+            "settings": settings,
+            "aggregate": dict(summarize([dict(row, kl_reference_candidate_nats=0.01 * (index + 1))]),
+                top1_agreement=0.9),
+            "oracle_identity": {"fixture": "same oracle/source"},
+            "binary_identity": {"engine_binary_sha256": "same native binary"},
+            "model_identity": {"sha256": f"weights-{group}-{dtype}", "files": {
+                "config.json": {"bytes": 1, "sha256": "same config"},
+                "model.safetensors": {"bytes": 800 + (16 if dtype == "f16" else 32) * 128 // group,
+                    "sha256": f"artifact-{group}-{dtype}"}}}})
     return reports
 
 
-def test_calibration_selects_predetermined_budget_choices_not_heldout():
+def calibration_sweep():
     reports = calibration_choices()
-    assert choose_format(reports)["label"] == "g32f16"
+    reports.append({"label": "q8_0-calibration", "split": "calibration", "backend": "llama",
+        "settings": {"weight_dtype": "Q8_0", "kv_dtype": "f16", "flash_attention": "auto", "threads": 1},
+        "aggregate": dict(reports[0]["aggregate"], mean_kl_reference_candidate_nats=0.1,
+            p99_kl_reference_candidate_nats=0.2, top1_agreement=0.8),
+        "oracle_identity": reports[0]["oracle_identity"],
+        "binary_identity": {"llama_commit": quality_v2.LLAMA_COMMIT},
+        "model_identity": {"sha256": "q8 model", "files": {
+            "q8.gguf": {"bytes": 900, "sha256": "q8 artifact"}}}})
+    return reports
+
+
+def test_calibration_selects_smallest_eligible_artifact_not_best_kl_or_heldout():
+    reports = calibration_sweep()
+    assert choose_format(reports)["label"] == "g128f16"
     assert all(8 + (16 if dtype == "f16" else 32) / group <= 8.5 for group, dtype in FORMAT_CHOICES)
     reports[0]["split"] = "heldout"
     with pytest.raises(ValueError, match="never heldout"):
         choose_format(reports)
-    reports = calibration_choices()
-    reports[-1]["settings"]["threads"] = 2
+    with pytest.raises(ValueError, match="exactly the four"):
+        choose_format(calibration_sweep()[:-1])
+    with pytest.raises(ValueError, match="exactly the four"):
+        choose_format(calibration_sweep() + [calibration_sweep()[-1]])
+
+
+@pytest.mark.parametrize("key", ["kernel", "kv_dtype", "attention", "scheduler", "affinity",
+    "threads", "cpu_set", "weight_dtype"])
+def test_calibration_native_execution_settings_must_match(key):
+    reports = calibration_sweep()
+    reports[1]["settings"][key] = "changed"
     with pytest.raises(ValueError, match="identical execution"):
         choose_format(reports)
-    with pytest.raises(ValueError, match="exactly the four"):
-        choose_format(reports[:-1])
 
 
-def test_calibration_tie_breaks_top1_then_cross_entropy_then_label():
-    reports = calibration_choices()
-    for report in reports:
-        report["aggregate"]["mean_kl_reference_candidate_nats"] = 0.1
-    reports[2]["aggregate"]["top1_agreement"] = 1
+@pytest.mark.parametrize("changed", ["native-binary", "oracle", "q8-threads", "q8-kv", "q8-format", "q8-pin"])
+def test_calibration_q8_source_binary_and_settings_matching(changed):
+    reports = calibration_sweep()
+    if changed == "native-binary":
+        reports[1]["binary_identity"] = {"engine_binary_sha256": "changed"}
+    elif changed == "oracle":
+        reports[-1]["oracle_identity"] = {"fixture": "different source"}
+    elif changed == "q8-pin":
+        reports[-1]["binary_identity"]["llama_commit"] = "changed"
+    else:
+        key = {"q8-threads": "threads", "q8-kv": "kv_dtype", "q8-format": "weight_dtype"}[changed]
+        reports[-1]["settings"][key] = "changed"
+    with pytest.raises(ValueError):
+        choose_format(reports)
+
+
+@pytest.mark.parametrize("metric", ["mean_kl_reference_candidate_nats",
+    "p99_kl_reference_candidate_nats", "top1_agreement"])
+def test_calibration_requires_strict_superiority_on_each_metric_without_fallback(metric):
+    reports = calibration_sweep()
+    for report in reports[:-1]:
+        report["aggregate"][metric] = reports[-1]["aggregate"][metric]
+    with pytest.raises(ValueError, match="No native format.*no fallback"):
+        choose_format(reports)
+    # The smaller artifact is excluded when it ties, even with lower KL otherwise.
+    reports = calibration_sweep()
+    reports[3]["aggregate"][metric] = reports[-1]["aggregate"][metric]
+    assert choose_format(reports)["label"] == "g64f16"
+
+
+def test_calibration_ties_use_bytes_mean_kl_p99_top1_label_never_ppl():
+    reports = calibration_sweep()
+    for report in reports[:-1]:
+        report["model_identity"]["files"]["model.safetensors"]["bytes"] = 1000
+    assert choose_format(reports) is reports[0]
+    for report in reports[:-1]:
+        report["aggregate"]["mean_kl_reference_candidate_nats"] = 0.01
+    reports[2]["aggregate"]["p99_kl_reference_candidate_nats"] = 0.001
     assert choose_format(reports) is reports[2]
-    for report in reports:
-        report["aggregate"]["top1_agreement"] = 1
-    reports[3]["aggregate"]["next_token_cross_entropy_nats"] = 0.1
+    for report in reports[:-1]:
+        report["aggregate"]["p99_kl_reference_candidate_nats"] = 0.001
+    reports[3]["aggregate"]["top1_agreement"] = 1
     assert choose_format(reports) is reports[3]
+    for report in reports[:-1]:
+        report["aggregate"]["top1_agreement"] = 1
+    reports[3]["aggregate"]["next_token_cross_entropy_nats"] = 0
+    reports[3]["aggregate"]["perplexity"] = 1
+    expected = min(reports[:-1], key=lambda report: report["label"])
+    assert choose_format(reports) is expected
+    assert choose_format(list(reversed(reports))) is expected
+
+
+def comparison_sweep_files(tmp_path):
+    corpus = load_manifest(CORPUS)
+    reports = calibration_sweep()
+    paths = []
     for report in reports:
-        report["aggregate"]["next_token_cross_entropy_nats"] = 0.1
-    assert choose_format(reports)["label"] == min(report["label"] for report in reports)
+        rows = report_alignment_rows(corpus, "calibration")
+        if report["backend"] == "llama":
+            metric = position_metric(np.log([0.6, 0.4]), np.log([0.4, 0.6]), 0)
+            rows = [dict(row, **{key: value for key, value in metric.items() if key != "target"})
+                for row in rows]
+        report.update(corpus_sha256=CORPUS_SHA256, positions=rows, aggregate=summarize(rows))
+        path = tmp_path / f"cal-{report['label']}.json"
+        write_json(path, report, exclusive=True)
+        paths.append(path)
+    return paths
+
+
+def test_comparison_uses_supplied_selection_and_output_root_preserves_prior_decision(tmp_path):
+    prior = tmp_path / "selection.json"
+    write_json(prior, selected_decision(), exclusive=True)
+    before = prior.read_bytes()
+    root = tmp_path / "new-run"
+    args = Namespace(output=root / "format-calibration.json", split="calibration", corpus=CORPUS,
+        selection=root / "format-selection.json", reports=comparison_sweep_files(tmp_path))
+    compare(args)
+    decision = read_selection(args.selection, CORPUS_SHA256)
+    assert decision["policy"] == FORMAT_SELECTION_POLICY
+    assert decision["chosen"]["label"] == "g128f16"
+    assert json.loads(args.output.read_text()) == decision
+    assert len(decision["format_table"]) == 5
+    assert {entry["backend"] for entry in decision["evidence"]} == {"native", "llama"}
+    assert decision["baseline"]["report"] == "cal-q8_0-calibration.json"
+    assert prior.read_bytes() == before
+    with pytest.raises(ValueError, match="already exists"):
+        compare(args)
+    # Same shipped weights remain required, even if another heldout format is better.
+    with pytest.raises(ValueError, match="not selected"):
+        validate_heldout_settings(calibration_choices()[0]["settings"],
+            calibration_choices()[0]["model_identity"], decision)
+    decision["chosen"]["label"] = "g32f16"
+    write_json(root / "altered.json", decision)
+    with pytest.raises(ValueError, match="differs from"):
+        read_selection(root / "altered.json", CORPUS_SHA256)
+
+
+def test_comparison_no_passing_format_creates_no_selection_or_summary(tmp_path):
+    paths = comparison_sweep_files(tmp_path)
+    baseline = json.loads(paths[-1].read_text())
+    baseline["positions"] = report_alignment_rows(load_manifest(CORPUS), "calibration")
+    baseline["aggregate"] = summarize(baseline["positions"])
+    write_json(paths[-1], baseline)
+    args = Namespace(output=tmp_path / "format-calibration.json", split="calibration", corpus=CORPUS,
+        selection=tmp_path / "format-selection.json", reports=paths)
+    with pytest.raises(ValueError, match="No native format.*no fallback"):
+        compare(args)
+    assert not args.selection.exists()
+    assert not args.output.exists()
+
+
+def test_calibration_closed_at_supplied_selection_before_model_reads(tmp_path):
+    selection = tmp_path / "format-selection.json"
+    write_json(selection, selected_decision())
+    args = Namespace(output=tmp_path / "new-report.json", raw_dir=tmp_path / "raw",
+        corpus=CORPUS, split="calibration", selection=selection)
+    with pytest.raises(ValueError, match="closed after format selection"):
+        evaluate(args)
 
 
 def selected_decision():

@@ -248,9 +248,9 @@ void projections(const Projection* items, size_t count, const float* x, Kernel k
     pool.run(tasks, [](void* ptr, size_t task) noexcept {
         auto& w = *static_cast<Work*>(ptr);
         auto dot_row = [&](const Matrix& matrix, size_t row) noexcept {
-#ifdef DECODE_X86
+    #ifdef DECODE_X86
             if (w.kernel == Kernel::vnni) return dot_vnni(matrix, row, *w.activation);
-#endif
+    #endif
             return w.function(matrix, row, w.x);
         };
         if (w.swiglu) {

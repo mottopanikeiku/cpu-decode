@@ -1,0 +1,57 @@
+[
+  {
+    "stage": "before",
+    "label": "Original K layout",
+    "file": "results/v2/attention-stages/before/ablation-t6-c4096-original.json",
+    "samples": 6,
+    "median_tokens_per_second": 52.4696927445005,
+    "min_tokens_per_second": 50.67357822180346,
+    "max_tokens_per_second": 53.58773341682124,
+    "spread_percent": 5.5539780063286495,
+    "median_attention_ms_per_token": 5.347925312500001
+  },
+  {
+    "stage": "transposed",
+    "label": "Transposed K",
+    "file": "results/v2/attention-stages/transposed/ablation-t6-c4096-transposed.json",
+    "samples": 6,
+    "median_tokens_per_second": 59.031978466291676,
+    "min_tokens_per_second": 54.855300408658614,
+    "max_tokens_per_second": 62.160268394985266,
+    "spread_percent": 12.374594543697905,
+    "median_attention_ms_per_token": 2.7267726562499988
+  },
+  {
+    "stage": "masked-exp",
+    "label": "Masked SIMD tails",
+    "file": "results/v2/attention-stages/masked-exp/ablation-t6-c4096-masked-exp.json",
+    "samples": 6,
+    "median_tokens_per_second": 59.145836840482445,
+    "min_tokens_per_second": 53.13998544475871,
+    "max_tokens_per_second": 61.455101947254064,
+    "spread_percent": 14.05866743406032,
+    "median_attention_ms_per_token": 2.9144575312499983
+  },
+  {
+    "stage": "parallel-merge",
+    "label": "Parallel head merge",
+    "file": "results/v2/attention-stages/parallel-merge/ablation-t6-c4096-parallel-merge.json",
+    "samples": 6,
+    "median_tokens_per_second": 57.90921447993718,
+    "min_tokens_per_second": 56.96444409705627,
+    "max_tokens_per_second": 58.54863346080676,
+    "spread_percent": 2.735642985278857,
+    "median_attention_ms_per_token": 2.893940000000001
+  },
+  {
+    "stage": "claim1",
+    "label": "Singleton claims (rejected)",
+    "file": "results/v2/attention-stages/claim1/ablation-t6-c4096-claim1.json",
+    "samples": 6,
+    "median_tokens_per_second": 56.4665014771483,
+    "min_tokens_per_second": 54.369609573906494,
+    "max_tokens_per_second": 59.677679139235714,
+    "spread_percent": 9.40038682488124,
+    "median_attention_ms_per_token": 3.2044259062500005
+  }
+]
