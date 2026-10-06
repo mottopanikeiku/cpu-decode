@@ -17,7 +17,7 @@
   },
   "python_fast": {
     "command": "nice -n 19 uv run pytest -q tests",
-    "passed": 13,
+    "passed": 14,
     "skipped": 2,
     "skip_reason": "Real model integrations require explicit CPU_DECODE_MODEL",
     "covers": "Dense versus memory-bounded FP32 oracle, KL calculations, pinned-source rejection, explicit missing-engine rejection, matched table arithmetic and portable metadata"

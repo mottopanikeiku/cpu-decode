@@ -7,7 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def portable(value: Any, locations: Mapping[Path | str, str] | None = None) -> Any:
     substitutions = {str(ROOT): "."}
-    substitutions.update({str(path): name for path, name in (locations or {}).items()})
+    # Never replace relative words: a directory named "a" must not edit a hash.
+    substitutions.update({str(Path(path).resolve()): name for path, name in (locations or {}).items()})
     substitutions = sorted(substitutions.items(), key=lambda item: len(item[0]), reverse=True)
 
     def convert(item: Any) -> Any:

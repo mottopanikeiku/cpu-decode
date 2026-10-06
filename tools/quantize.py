@@ -41,8 +41,8 @@ def main() -> None:
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     locations = {args.source.resolve(): "$MODEL", args.output.resolve(): "$INT8", args.engine.resolve(): "build/cpu-decode"}
     for flag, name in [("--model", "$MODEL"), ("--output", "$INT8")]:
-        locations[manifest["command"][manifest["command"].index(flag) + 1]] = name
-    locations[manifest["command"][0]] = "build/cpu-decode"
+        manifest["command"][manifest["command"].index(flag) + 1] = name
+    manifest["command"][0] = "build/cpu-decode"
     manifest["source"] = source
     manifest["weights"]["path"] = "model.safetensors"
     manifest = portable(manifest, locations)

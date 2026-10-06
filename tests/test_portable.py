@@ -23,3 +23,15 @@ def test_nested_locations_keep_numeric_observations_and_input_unchanged():
 def test_stderr_and_null_values_are_portable():
     assert portable(f"warning at {ROOT}/src/model.cpp") == "warning at ./src/model.cpp"
     assert portable([None, 0, False, 0.125]) == [None, 0, False, 0.125]
+
+
+def test_relative_aliases_cannot_rewrite_hashes_or_command_words():
+    record = {
+        "sha256": "a" * 64,
+        "command": ["quantize", "--model", "a", "--output", "a/int8"],
+        "absolute_model": str((Path("a") / "weights").resolve()),
+    }
+    result = portable(record, {Path("a"): "$MODEL", Path("a/int8"): "$INT8"})
+    assert result["sha256"] == record["sha256"]
+    assert result["command"] == record["command"]
+    assert result["absolute_model"] == "$MODEL/weights"
