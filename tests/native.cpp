@@ -80,7 +80,8 @@ void numeric_tests() {
             baseline[r] = float(type == decode::DType::i8 ? sum * scales[r] : sum);
         }
         for (auto kernel : kernels()) for (int threads : {1, 2}) {
-            decode::matvec(m, input.data(), result.data(), kernel, threads);
+            decode::ThreadPool pool(threads);
+            decode::matvec(m, input.data(), result.data(), kernel, pool);
             for (size_t r = 0; r < rows; ++r) near(result[r], baseline[r], 3e-6, "matvec tail and dtype");
         }
     }
@@ -90,11 +91,13 @@ void numeric_tests() {
     fails([&] { decode::parse_kernel("fake"); }, "unknown kernel must fail");
     constexpr size_t length = 3, heads = 4, kvheads = 2, dim = 4;
     float queries[heads * dim], keys[length * kvheads * dim], values[length * kvheads * dim];
-    float attention_out[heads * dim], scores[length * heads];
+    float attention_out[heads * dim];
     for (size_t j = 0; j < heads * dim; ++j) queries[j] = float(j % 5) - 2;
     for (size_t j = 0; j < length * kvheads * dim; ++j) { keys[j] = float(j % 7) * 0.1f; values[j] = float(j % 11) - 4; }
     for (int threads : {1, 2}) {
-        decode::attention(queries, keys, values, attention_out, scores, length, heads, kvheads, dim, threads);
+        decode::ThreadPool pool(threads);
+        decode::AttentionWorkspace workspace(length, heads, dim);
+        decode::attention(queries, keys, values, decode::CacheType::f32, attention_out, length, heads, kvheads, dim, pool, workspace);
         for (size_t h = 0; h < heads; ++h) {
             double p[length], sum = 0;
             for (size_t t = 0; t < length; ++t) {
@@ -109,17 +112,19 @@ void numeric_tests() {
             }
         }
     }
-    fails([&] { decode::attention(queries, keys, values, attention_out, scores, 0, heads, kvheads, dim, 1); }, "empty attention must fail");
+    decode::ThreadPool pool(1);
+    decode::AttentionWorkspace workspace(length, heads, dim);
+    fails([&] { decode::attention(queries, keys, values, decode::CacheType::f32, attention_out, 0, heads, kvheads, dim, pool, workspace); }, "empty attention must fail");
 }
 struct Fixture {
     fs::path path;
     std::map<std::string, std::vector<float>> weights;
     std::map<std::string, std::vector<size_t>> shapes;
-    explicit Fixture(const fs::path& directory, size_t hidden = 8, size_t heads = 2) : path(directory) {
+    explicit Fixture(const fs::path& directory, size_t hidden = 8, size_t heads = 2, size_t intermediate = 12, size_t capacity = 32) : path(directory) {
         fs::create_directories(path);
         Json config{{"model_type", "qwen2"}, {"tie_word_embeddings", true}, {"hidden_act", "silu"},
-            {"hidden_size", hidden}, {"intermediate_size", 12}, {"num_hidden_layers", 1}, {"num_attention_heads", heads},
-            {"num_key_value_heads", 1}, {"vocab_size", 11}, {"max_position_embeddings", 32}, {"rms_norm_eps", 1e-6}, {"rope_theta", 10000}};
+            {"hidden_size", hidden}, {"intermediate_size", intermediate}, {"num_hidden_layers", 1}, {"num_attention_heads", heads},
+            {"num_key_value_heads", 1}, {"vocab_size", 11}, {"max_position_embeddings", capacity}, {"rms_norm_eps", 1e-6}, {"rope_theta", 10000}};
         std::ofstream(path / "config.json") << config.dump();
         add("model.embed_tokens.weight", {11, hidden}); add("model.norm.weight", {hidden}, true);
         std::string b = "model.layers.0.";
@@ -129,7 +134,7 @@ struct Fixture {
             add(b + "self_attn." + name + ".weight", {rows, hidden});
             if (std::string(name) != "o_proj") add(b + "self_attn." + name + ".bias", {rows});
         }
-        add(b + "mlp.gate_proj.weight", {12, hidden}); add(b + "mlp.up_proj.weight", {12, hidden}); add(b + "mlp.down_proj.weight", {hidden, 12});
+        add(b + "mlp.gate_proj.weight", {intermediate, hidden}); add(b + "mlp.up_proj.weight", {intermediate, hidden}); add(b + "mlp.down_proj.weight", {hidden, intermediate});
         Json header; uint64_t offset = 0;
         for (const auto& item : weights) {
             uint64_t bytes = item.second.size() * 2;
@@ -207,7 +212,8 @@ void engine_tests(const fs::path& root) {
     Fixture fixture(root / "bf16");
     auto check = [&](const fs::path& model) {
         for (bool cached : {true, false}) for (auto kernel : kernels()) {
-            decode::Engine engine(model.string(), kernel, 1, 8, cached); Reference reference(fixture); decode::Profile profile;
+            decode::EngineOptions options; options.cached_rope = cached; options.cache_type = decode::CacheType::f32;
+            decode::Engine engine(model.string(), kernel, 1, 8, options); Reference reference(fixture); decode::Profile profile;
             for (int token : {1, 4, 2}) {
                 Vec expected = reference.step(token); const auto& actual = engine.step(token, true, &profile);
                 for (size_t j = 0; j < expected.size(); ++j) near(actual[j], expected[j], 3e-6, "complete tiny Qwen forward");
@@ -251,7 +257,7 @@ void engine_tests(const fs::path& root) {
           bad.write(encoded.data(), encoded.size()); uint64_t payload = 0; bad.write(reinterpret_cast<const char*>(&payload), 8); }
         fails([&] { decode::Engine engine((root / "bad").string(), decode::Kernel::scalar, 1, 4); }, message, expected);
     };
-    malformed({{"x", {{"dtype", "F16"}, {"shape", {1}}, {"data_offsets", {0, 2}}}}}, "unsupported dtype rejected");
+    malformed({{"x", {{"dtype", "F64"}, {"shape", {1}}, {"data_offsets", {0, 8}}}}}, "unsupported dtype rejected");
     malformed({{"x", {{"dtype", "BF16"}, {"shape", {-1}}, {"data_offsets", {0, 2}}}}}, "negative shape rejected");
     malformed({{"x", {{"dtype", "BF16"}, {"shape", {1}}, {"data_offsets", {0, 100}}}}}, "out-of-bounds offsets rejected");
     malformed({{"x", {{"dtype", "F32"}, {"shape", {1}}, {"data_offsets", {1, 5}}}}}, "unaligned offsets rejected");
@@ -262,6 +268,121 @@ void engine_tests(const fs::path& root) {
     { Json config; std::ifstream(root / "bf16/config.json") >> config; config["num_attention_heads"] = 3; std::ofstream(root / "bad/config.json") << config.dump(); }
     fails([&] { decode::Engine engine((root / "bad").string(), decode::Kernel::scalar, 1, 4); }, "invalid architecture rejected");
 }
+void group_kernel_tests(const fs::path& root) {
+    constexpr size_t rows = 3, cols = 128;
+    std::vector<float> weights(rows * cols), input(cols), actual(rows), expected(rows);
+    std::vector<int8_t> bytes(weights.size());
+    for (size_t j = 0; j < weights.size(); ++j) weights[j] = std::sin(float(j) * .37f) * .4f;
+    for (size_t j = 0; j < input.size(); ++j) input[j] = std::cos(float(j) * .19f) * .7f;
+    for (size_t group : {size_t(32), size_t(64), size_t(128)}) for (auto dtype : {decode::DType::f16, decode::DType::f32}) {
+        if (group == 32 && dtype == decode::DType::f32) continue;
+        size_t groups = cols / group;
+        std::vector<float> scales(rows * groups); std::vector<uint16_t> halves(scales.size());
+        for (size_t row = 0; row < rows; ++row) for (size_t g = 0; g < groups; ++g) {
+            float& scale = scales[row * groups + g];
+            decode::quantize_row(weights.data() + row * cols + g * group, group, bytes.data() + row * cols + g * group, scale);
+            if (dtype == decode::DType::f16) {
+                halves[row * groups + g] = decode::float_half(scale); scale = decode::half_float(halves[row * groups + g]);
+                for (size_t j = 0; j < group; ++j) bytes[row * cols + g * group + j] = int8_t(std::clamp(std::round(weights[row * cols + g * group + j] / scale), -127.0f, 127.0f));
+            }
+        }
+        const void* stored = dtype == decode::DType::f16 ? static_cast<const void*>(halves.data()) : scales.data();
+        decode::Matrix matrix{bytes.data(), stored, rows, cols, decode::DType::i8, group, dtype};
+        for (size_t row = 0; row < rows; ++row) {
+            double total = 0;
+            for (size_t j = 0; j < cols; ++j) total += double(bytes[row * cols + j]) * scales[row * groups + j / group] * input[j];
+            expected[row] = float(total);
+        }
+        for (auto kernel : kernels()) {
+            decode::ThreadPool pool(2);
+            decode::matvec(matrix, input.data(), actual.data(), kernel, pool);
+            for (size_t row = 0; row < rows; ++row) near(actual[row], expected[row], 5e-6, "group-scale SIMD against slow dequantized dot");
+        }
+        bool available = true; decode::Kernel vnni = decode::Kernel::scalar;
+        try { vnni = decode::parse_kernel("vnni"); } catch (const std::exception&) { available = false; }
+        if (available) {
+            std::vector<int> activations(cols); std::vector<float> activation_scales(cols / 32);
+            for (size_t begin = 0; begin < cols; begin += 32) {
+                float maximum = 0; for (size_t j = begin; j < begin + 32; ++j) maximum = std::max(maximum, std::abs(input[j]));
+                float scale = maximum == 0 ? 1 : maximum / 127; activation_scales[begin / 32] = scale;
+                for (size_t j = begin; j < begin + 32; ++j) activations[j] = int(std::clamp(std::round(input[j] / scale), -127.0f, 127.0f));
+            }
+            for (size_t row = 0; row < rows; ++row) {
+                float total = 0;
+                for (size_t begin = 0; begin < cols; begin += 32) {
+                    int dot = 0;
+                    for (size_t j = begin; j < begin + 32; ++j) dot += int(bytes[row * cols + j]) * activations[j];
+                    total += float(dot) * (activation_scales[begin / 32] * scales[row * groups + begin / group]);
+                }
+                expected[row] = total;
+            }
+            decode::ThreadPool pool(2);
+            decode::matvec(matrix, input.data(), actual.data(), vnni, pool);
+            require(std::memcmp(actual.data(), expected.data(), rows * 4) == 0, "VNNI signed correction equals slow integer dot");
+        }
+    }
+    Fixture odd_scales(root / "odd-scales", 32, 1, 64, 8);
+    decode::quantize_model((root / "odd-scales").string(), (root / "odd-scales-int8").string(), 32, decode::DType::f16);
+    decode::Engine engine((root / "odd-scales-int8").string(), decode::Kernel::scalar, 1, 8);
+    for (float value : engine.step(5, true)) require(std::isfinite(value), "FP16 odd-scale count preserves FP32 tensor alignment");
+}
+void optimized_tests(const fs::path& root) {
+    for (uint32_t bits = 0; bits < 65536; ++bits) {
+        if ((bits & 0x7c00) == 0x7c00 && (bits & 1023)) continue;
+        require(decode::float_half(decode::half_float(uint16_t(bits))) == bits, "F16 exact finite/infinity roundtrip");
+    }
+    require(decode::float_half(1.9998f) == 0x4000, "F16 mantissa carry");
+    require(decode::float_half(1 + std::ldexp(1.0f, -11)) == 0x3c00, "F16 ties to even");
+    require(decode::float_half(std::ldexp(1.0f, -25)) == 0, "F16 subnormal ties to even");
+    constexpr size_t length = 129, heads = 14, kvheads = 2, dim = 64;
+    std::vector<float> q(heads * dim), k(length * kvheads * dim), v(k.size()), reference(heads * dim), result(reference.size()), first;
+    std::vector<uint16_t> kh(k.size()), vh(v.size());
+    for (size_t j = 0; j < q.size(); ++j) q[j] = std::sin(float(j) * .13f) * 5;
+    for (size_t j = 0; j < k.size(); ++j) {
+        k[j] = std::cos(float(j) * .073f); v[j] = std::sin(float(j) * .17f);
+        kh[j] = decode::float_half(k[j]); vh[j] = decode::float_half(v[j]);
+    }
+    for (auto type : {decode::CacheType::f32, decode::CacheType::f16}) {
+        const void* keys = type == decode::CacheType::f32 ? static_cast<const void*>(k.data()) : kh.data();
+        const void* values = type == decode::CacheType::f32 ? static_cast<const void*>(v.data()) : vh.data();
+        {
+            decode::ThreadPool pool(1); decode::AttentionWorkspace workspace(length, heads, dim);
+            decode::attention(q.data(), keys, values, type, reference.data(), length, heads, kvheads, dim, pool, workspace, true);
+        }
+        for (int threads : {1, 2, 4, 6, 12}) {
+            decode::ThreadPool pool(threads); decode::AttentionWorkspace workspace(length, heads, dim);
+            decode::attention(q.data(), keys, values, type, result.data(), length, heads, kvheads, dim, pool, workspace);
+            for (size_t j = 0; j < result.size(); ++j) near(result[j], reference[j], 3e-6, "blocked GQA vs scalar reference across block tail");
+            if (threads == 1) first = result;
+            else require(std::memcmp(first.data(), result.data(), result.size() * 4) == 0, "attention bitwise thread invariant");
+        }
+    }
+    Fixture fixture(root / "wide", 448, 7, 64, 160);
+    decode::quantize_model((root / "wide").string(), (root / "grouped").string(), 32, decode::DType::f16);
+    fails([&] { decode::quantize_model((root / "wide").string(), (root / "over-budget").string(), 32, decode::DType::f32); }, "group budget rejected");
+    for (const auto& path : {root / "wide", root / "grouped"}) for (auto type : {decode::CacheType::f32, decode::CacheType::f16}) {
+        auto available = kernels();
+        if (path.filename() == "grouped") {
+            try { available.push_back(decode::parse_kernel("vnni")); } catch (const std::exception&) { std::cout << "skip unavailable vnni\\n"; }
+        }
+        for (auto kernel : available) {
+            std::vector<float> baseline;
+            for (int threads : {1, 2, 4, 6, 12}) {
+                std::vector<float> actual;
+                {
+                    decode::EngineOptions options; options.cache_type = type;
+                    decode::Engine engine(path.string(), kernel, threads, 129, options);
+                    for (size_t position = 0; position < 129; ++position) {
+                        const auto& row = engine.step(int((position * 7 + 3) % 11), true);
+                        actual.insert(actual.end(), row.begin(), row.end());
+                    }
+                }
+                if (threads == 1) baseline = actual;
+                else require(baseline.size() == actual.size() && std::memcmp(baseline.data(), actual.data(), actual.size() * 4) == 0, "complete logits bitwise identical at1,2,4,6,12 threads");
+            }
+        }
+    }
+}
 }
 int main() {
     char name[] = "/tmp/cpu-decode-tests-XXXXXX";
@@ -269,7 +390,7 @@ int main() {
     if (!directory) { std::cerr << "cannot create temporary directory\n"; return 1; }
     fs::path root(directory);
     try {
-        numeric_tests(); engine_tests(root); fs::remove_all(root);
+        numeric_tests(); engine_tests(root); group_kernel_tests(root); optimized_tests(root); fs::remove_all(root);
         std::cout << "synthetic numerical and malformed-input tests passed\n"; return 0;
     } catch (const std::exception& error) {
         fs::remove_all(root); std::cerr << error.what() << '\n'; return 1;

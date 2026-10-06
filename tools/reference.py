@@ -139,7 +139,7 @@ def compare_engine(args, oracle: dict, model: Path, label: str) -> dict:
     cases = []
     for case in oracle["prompts"]:
         prefix = args.raw_dir / f"{case['id']}-{label}"
-        common = [str(args.engine.resolve()), "--model", str(model.resolve()), "--threads", str(args.threads), "--kernel", args.kernel]
+        common = [str(args.engine.resolve()), "--model", str(model.resolve()), "--threads", str(args.threads), "--kernel", args.kernel, "--kv", "f32"]
         command = [common[0], "logits", *common[1:], "--tokens", ",".join(map(str, case["tokens"])), "--output", str(prefix)]
         subprocess.run(command, check=True)
         metadata = json.loads(prefix.with_suffix(".json").read_text())
