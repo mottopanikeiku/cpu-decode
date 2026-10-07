@@ -16,6 +16,15 @@ No new performance numbers are measured here. Later, on an idle machine, run `ni
 
 Set `MODEL` to the pinned BF16 snapshot and `INT8` to the unchanged g64f16 artifact. Build normally, with `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2`, and sync the locked Python environment with `uv sync --locked --python 3.12`. Set `OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=2`; use one model process at a time.
 
+To fetch the pinned snapshot and create only the transferred g64f16 artifact, choose a fresh `INT8` directory and run:
+
+```sh
+nice -n 19 uv run python -m tools.download_model --output results/v3/source-model.json
+nice -n 19 uv run python -m tools.quantize --source "$MODEL" --output "$INT8" --group-size 64 --scale-dtype f16 --manifest results/v3/quantized-model.json
+```
+
+The centered/plain-int8 comparison also differs during the first 64 queries because centered keys have a raw FP32 warmup. I do not isolate that warmup's contribution from subsequent centering.
+
 ```sh
 uv run python -m tools.lookup_v3 prepare --tokenizer "$MODEL"
 for case in $(seq 0 11); do nice -n 19 uv run python -m tools.lookup_v3 measure --model "$INT8" --case "$case"; done
