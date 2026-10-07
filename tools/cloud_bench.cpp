@@ -20,6 +20,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 #include <sched.h>
 
@@ -309,6 +310,8 @@ public:
             throw std::runtime_error("llama rewind did not preserve exact prefix");
         position_ = llama_pos(context); // Never rely on automatic position tracking.
     }
+    void park() { ggml_threadpool_pause(pool_.get()); }
+    void activate() { ggml_threadpool_resume(pool_.get()); }
     Json metadata() {
         std::lock_guard<std::mutex> lock(logs_.mutex);
         logs_.capture = false;
@@ -352,6 +355,7 @@ void serve(const Config& config) {
     // Full untimed 128-token forward + head + greedy warmup, final token included.
     for (int i = 0; i < steps; ++i) next = backend.step(next, true);
     backend.rewind(config.context);
+    if constexpr (std::is_same_v<Backend, Llama>) backend.park();
     Json metadata = backend.metadata();
     metadata["backend"] = config.backend;
     metadata["model"] = std::filesystem::path(config.model).filename().string();
@@ -364,6 +368,7 @@ void serve(const Config& config) {
     metadata["requested_kernel"] = config.kernel;
     metadata["requested_flash"] = config.flash;
     metadata["requested_poll"] = 50;
+    metadata["idle_policy"] = config.backend == "llama" ? "ggml_pool_paused" : "confirmed_external_SIGSTOP";
     metadata["caller_binding"] = config.backend == "native" ?
         "public v2 CpuBinding held for worker lifetime; per-operator affinity syscalls avoided" :
         "GGML strict caller remains pinned";
@@ -379,7 +384,10 @@ void serve(const Config& config) {
         const std::string command = request.at("command").get<std::string>();
         if (command == "exit") return;
         if (command != "run") throw std::runtime_error("command must be run or exit");
+        if constexpr (std::is_same_v<Backend, Llama>) backend.activate();
+        std::cerr << "cloud-bench: rewind begin\n" << std::flush;
         backend.rewind(config.context);
+        std::cerr << "cloud-bench: rewind complete; decode begin\n" << std::flush;
         next = seed;
         const auto start = Clock::now();
         for (int i = 0; i < steps; ++i) {
@@ -388,7 +396,10 @@ void serve(const Config& config) {
         }
         const double seconds = std::chrono::duration<double>(Clock::now() - start).count();
         if (!std::isfinite(seconds) || seconds <= 0) throw std::runtime_error("nonfinite or nonpositive elapsed time");
-        emit({{"seconds", seconds}, {"tokens", generated}, {"next_token", next}});
+        if constexpr (std::is_same_v<Backend, Llama>) backend.park();
+        std::cerr << "cloud-bench: decode complete; idle\n" << std::flush;
+        emit({{"seconds", seconds}, {"tokens", generated}, {"next_token", next},
+              {"idle_pool_pause_requested", config.backend == "llama"}});
     }
 }
 } // namespace

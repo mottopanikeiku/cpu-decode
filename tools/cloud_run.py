@@ -74,6 +74,8 @@ class Worker:
         self.process = None
         self.stopped = False
         self.closed = False
+        self.cooperative_idle = config.get("backend") == "llama"
+        self.config = config
         try:
             self.process = subprocess.Popen(
                 ["taskset", "-c", ",".join(map(str, config["cpu_set"])), str(binary)],
@@ -83,6 +85,8 @@ class Worker:
             self.ready = self.receive()
             if self.ready.get("event") != "ready":
                 raise ValueError("Benchmark worker did not finish load/prefill/warmup")
+            if self.cooperative_idle and self.ready["metadata"].get("idle_policy") != "ggml_pool_paused":
+                raise ValueError("Baseline did not request its real GGML pool pause")
             self.stop()
         except BaseException:
             self.abort()
@@ -92,11 +96,22 @@ class Worker:
         self.process.stdin.write(json.dumps(value, allow_nan=False) + "\n")
         self.process.stdin.flush()
 
-    def receive(self):
+    def receive(self, timeout=1200):
         with selectors.DefaultSelector() as selector:
             selector.register(self.process.stdout, selectors.EVENT_READ)
-            if not selector.select(timeout=1200):
-                raise TimeoutError("Benchmark worker response exceeded 20 minutes")
+            if not selector.select(timeout=timeout):
+                tasks = {}
+                for task in Path(f"/proc/{self.process.pid}/task").glob("*"):
+                    tasks[task.name] = {}
+                    for name in ("status", "wchan", "stat"):
+                        try:
+                            tasks[task.name][name] = (task / name).read_text()
+                        except OSError as error:
+                            tasks[task.name][name] = {"error": str(error)}
+                self.log.flush()
+                detail = Path(self.log.name).read_text()[-6000:]
+                raise TimeoutError(f"Benchmark worker response exceeded {timeout} seconds; "
+                                   f"config={self.config}; tasks={json.dumps(tasks)}\n{detail}")
         line = self.process.stdout.readline()
         if not line:
             self.log.flush()
@@ -105,6 +120,8 @@ class Worker:
         return json.loads(line)
 
     def stop(self):
+        if self.cooperative_idle:
+            return
         if not self.stopped:
             os.killpg(self.process.pid, signal.SIGSTOP)
             _, status = os.waitpid(self.process.pid, os.WUNTRACED)
@@ -115,10 +132,13 @@ class Worker:
             self.stopped = True
 
     def sample(self):
-        os.killpg(self.process.pid, signal.SIGCONT)
-        self.stopped = False
+        if not self.cooperative_idle:
+            os.killpg(self.process.pid, signal.SIGCONT)
+            self.stopped = False
         self.send({"command": "run"})
-        result = self.receive()
+        result = self.receive(timeout=120)
+        if self.cooperative_idle and result.get("idle_pool_pause_requested") is not True:
+            raise ValueError("Baseline did not request its GGML pool pause after decode")
         self.stop()
         if not isinstance(result.get("seconds"), (int, float)) or result["seconds"] <= 0:
             raise ValueError("Invalid worker timing result")
@@ -224,10 +244,22 @@ def prepare(source: Path, work: Path, output: Path, design: dict, *, assets: Pat
                    "-DGGML_CUDA=OFF", "-DGGML_VULKAN=OFF", "-DGGML_CPU_REPACK=ON", "-DLLAMA_CURL=OFF",
                    "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DCMAKE_CXX_FLAGS=-march=native"]
     run(["cmake", "-S", str(llama_source), "-B", str(llama_root / "build"), *llama_flags])
-    run(["cmake", "--build", str(llama_root / "build"), "--target", "llama-bench", "llama-quantize", "-j4"])
-    run([str(python), "-m", "tools.prepare_llama", "--model", str(model), "--cache", str(cache),
-         "--jobs", "4", "--reuse-build", "--output", str(output / "llama-preparation.json")], source)
-    preparation = json.loads((output / "llama-preparation.json").read_text())
+    if assets is None:
+        run(["cmake", "--build", str(llama_root / "build"), "--target", "llama-bench", "llama-quantize", "-j4"])
+        run([str(python), "-m", "tools.prepare_llama", "--model", str(model), "--cache", str(cache),
+             "--jobs", "4", "--reuse-build", "--output", str(output / "llama-preparation.json")], source)
+        preparation = json.loads((output / "llama-preparation.json").read_text())
+    else:
+        run(["cmake", "--build", str(llama_root / "build"), "--target", "llama", "-j4"])
+        preparation = json.loads((llama_root / f"preparation-{revision}.json").read_text())
+        for name in ("upstream_binaries", "converter_python", "bench_binary"):
+            preparation.pop(name, None)
+        preparation["build"] = {"type": "Release", "native_cpu": True, "gpu": False,
+                                "jobs": 4, "reused": False, "targets": ["llama"]}
+        for artifact in preparation["artifacts"].values():
+            path = llama_root / Path(artifact["path"]).name
+            artifact.update(sha256=sha(path), bytes=path.stat().st_size)
+        save(output / "llama-preparation.json", preparation)
     expected = json.loads((source / "results/llama-preparation.json").read_text())
     comparison = {}
     for name in ("BF16", "Q8_0"):
@@ -245,7 +277,7 @@ def prepare(source: Path, work: Path, output: Path, design: dict, *, assets: Pat
         "native_weights_sha256": sha(native / "model.safetensors"),
         "config_sha256": sha(native / "config.json"), "gguf_hash_comparison": comparison,
         "native_binary_sha256": sha(build / "cpu-decode"), "driver_sha256": sha(build / "cloud-bench"),
-        "llama_binary_sha256": sha(llama_root / "build/bin/llama-bench"),
+        "llama_binary_sha256": sha(llama_root / "build/bin/llama-bench") if assets is None else None,
         "shared_library_sha256": {path.name: sha(path) for path in sorted((llama_root / "build/bin").glob("lib*.so"))},
         "source_cpp_sha256": {str(path.relative_to(source)): sha(path) for path in sorted((source / "src").glob("*.cpp"))},
         "driver_source_sha256": sha(source / "tools/cloud_bench.cpp")}
@@ -326,6 +358,7 @@ def compare(source: Path, work: Path, output: Path, design_path: Path, *,
             cpus = topology["preferred_cpu_ids"][:threads]
             common = {"threads": threads, "context": context, "steps": design["steps"],
                       "tokens": design["seed_tokens"], "cpu_set": cpus, "poll": 50}
+            print(f"CLOUD_PHASE native load/prefill/warmup t{threads} c{context}", flush=True)
             native = Worker(binary, {**common, "backend": "native", "model": str(native_model),
                                      "kernel": kernel, "flash": "auto"}, output / f"t{threads}-c{context}-native.stderr.txt")
             workers.append(native)
@@ -335,12 +368,17 @@ def compare(source: Path, work: Path, output: Path, design_path: Path, *,
             baseline_choices = []
             pilot = {"threads": threads, "context": context, "native": [], "llama": {}}
             for _ in range(3):
+                print(f"CLOUD_PHASE native pilot {_ + 1}/3 t{threads} c{context}", flush=True)
                 pilot["native"].append(native.sample())
             for flash in ("on", "off", "auto"):
+                print(f"CLOUD_PHASE llama {flash} load/prefill/warmup t{threads} c{context}", flush=True)
                 baseline = Worker(binary, {**common, "backend": "llama", "model": str(gguf),
                                            "kernel": kernel, "flash": flash}, output / f"t{threads}-c{context}-llama-{flash}.stderr.txt")
                 workers.append(baseline)
-                samples = [baseline.sample() for _ in range(3)]
+                samples = []
+                for sample_index in range(3):
+                    print(f"CLOUD_PHASE llama {flash} pilot {sample_index + 1}/3 t{threads} c{context}", flush=True)
+                    samples.append(baseline.sample())
                 pilot["llama"][flash] = {"metadata": baseline.ready["metadata"], "samples": samples}
                 baseline_choices.append((statistics.median(sample["seconds"] for sample in samples), flash, baseline))
             _, selected, baseline = min(baseline_choices, key=lambda choice: choice[0])

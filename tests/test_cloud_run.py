@@ -12,19 +12,19 @@ from tools.cloud_run import Worker, close_workers
 
 @pytest.fixture
 def protocol_worker(tmp_path):
-    def make(name="worker", ready="ready", exit_code=0):
+    def make(name="worker", ready="ready", exit_code=0, cooperative=False):
         script = tmp_path / name
         script.write_text(f"#!{sys.executable}\n" + f'''
 import json, sys, threading, time
 for _ in range(3):
     threading.Thread(target=lambda: time.sleep(60), daemon=True).start()
 json.loads(sys.stdin.readline())
-print(json.dumps({{"event": {ready!r}, "metadata": {{}}}}), flush=True)
+print(json.dumps({{"event": {ready!r}, "metadata": {{"idle_policy": "ggml_pool_paused"}} if {cooperative!r} else {{}}}}), flush=True)
 for line in sys.stdin:
     command = json.loads(line)["command"]
     if command == "exit":
         sys.exit({exit_code})
-    print(json.dumps({{"seconds": 1, "tokens": [42] * 128, "next_token": 42}}), flush=True)
+    print(json.dumps({{"seconds": 1, "tokens": [42] * 128, "next_token": 42, "idle_pool_pause_requested": {cooperative!r}}}), flush=True)
 ''')
         script.chmod(0o700)
         return script
@@ -119,3 +119,21 @@ def test_abort_reaps_a_stopped_worker(protocol_worker, tmp_path):
     with pytest.raises(ProcessLookupError):
         os.killpg(worker.process.pid, 0)
     worker.abort()
+
+
+def test_cooperative_baseline_stays_on_command_pipe_without_external_stop(protocol_worker, tmp_path):
+    worker = Worker(protocol_worker(cooperative=True), {**config(), "backend": "llama"}, tmp_path / "cooperative.log")
+    try:
+        assert worker.cooperative_idle and not worker.stopped
+        assert worker.sample()["idle_pool_pause_requested"] is True
+        assert not worker.stopped
+        for task in Path(f"/proc/{worker.process.pid}/task").iterdir():
+            assert "T (stopped)" not in (task / "status").read_text()
+    finally:
+        worker.close()
+    assert worker.process.returncode == 0 and worker.closed
+
+
+def test_cooperative_baseline_requires_explicit_pool_idle_contract(protocol_worker, tmp_path):
+    with pytest.raises(ValueError, match="real GGML pool pause"):
+        Worker(protocol_worker(), {**config(), "backend": "llama"}, tmp_path / "wrong-idle.log")

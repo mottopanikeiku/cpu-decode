@@ -27,6 +27,23 @@ fresh on its actual host. I never reuse the preparation CPU's native builds.
 If I rent a GPU container for its CPU instructions, I record that request and
 still disable all GPU layers, backends and operation offload.
 
+My first VNNI runtime pilot returned no complete cell: a baseline response
+timed out after twenty minutes. I did not recover its flash setting or sample
+index, and source review did not establish a cause. Before another attempt,
+I changed baseline idle control to GGML's public pool pause/resume API:
+the caller blocks on the command pipe and the real pool is paused after each
+complete window, then resumed before rewind. I no longer externally suspend
+GGML's pthreads; native still uses confirmed process-group suspension.
+These calls and diagnostic writes are outside the decode clock. I do not
+claim that this change proves why the earlier attempt stalled.
+
+I bound sample responses to two minutes and readiness to twenty minutes.
+A timeout aborts the cell, not an outlier filter. Failure logs stay in the
+Volume's separate diagnostics directory; they are not decode results.
+Offline timing rebuilds only the upstream libraries used by the driver,
+not unused converters or benchmark front ends. I still verify both cached
+GGUF hashes and record the actual freshly built library hashes.
+
 A separate full first-cell runtime pilot determines the final booking:
 `ceil(pilot function minutes × 6 × 1.3)`. Its pairs never enter the final
 six-cell inference. I keep threads 1/2/4, initial contexts 128/4096, 128 full
@@ -74,6 +91,9 @@ retrieves committed observations and regenerates the summary on one CPU
 core/512 MiB, without running either decoder. Volume commits occur inside
 the function before client streaming, following
 [Modal's persistence semantics](https://modal.com/docs/guide/volumes).
+After committing my results, I use `--cleanup-assets --minutes 3` on the same
+Volume to delete its model/weight caches while retaining result checkpoints.
+That cleanup requests one CPU core/512 MiB and performs no inference.
 
 
 ### Earlier AVX2 partial comparison

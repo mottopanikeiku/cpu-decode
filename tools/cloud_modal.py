@@ -148,6 +148,19 @@ def recover(run_name: str, volume_name: str, runtime_pilot: bool):
     return pack_outputs(checkpoint, raw)
 
 
+@app.function(image=image, cpu=1, memory=512, timeout=180,
+              max_containers=1, single_use_containers=True)
+def remove_asset_cache(volume_name: str):
+    removed = []
+    for name in ("hf", "artifacts"):
+        path = Path("/cache") / name
+        if path.exists():
+            shutil.rmtree(path)
+            removed.append(name)
+    modal.Volume.from_name(volume_name).commit()
+    return {"removed_asset_directories": removed, "results_retained": True}
+
+
 @app.function(image=image, cpu=8, memory=8192, timeout=1800,
               max_containers=1, single_use_containers=True)
 def execute(gpu: str, minutes: int, runtime_pilot: bool, deadline: float | None,
@@ -231,6 +244,18 @@ def execute(gpu: str, minutes: int, runtime_pilot: bool, deadline: float | None,
                 pass
             runner.wait()
         runner.stdout.close()
+        if runner.returncode:
+            diagnostics = Path("/cache/diagnostics") / run_name / container_run_id
+            diagnostics.mkdir(parents=True, exist_ok=True)
+            for path in output.glob("*.stderr.txt"):
+                shutil.copyfile(path, diagnostics / path.name)
+            (diagnostics / "failure.json").write_text(json.dumps({
+                "container_run_id": container_run_id, "startup": startup,
+                "runner_returncode": runner.returncode,
+                "design_sha256": hashlib.sha256(Path("/assets/tools/cloud_vnni_design.json").read_bytes()).hexdigest(),
+                "function_wall_minutes": (time.monotonic() - started) / 60,
+            }, indent=2, allow_nan=False) + "\n")
+            modal.Volume.from_name(volume_name).commit()
     raw = annotate(json.loads((output / "raw.json").read_text()), started, gpu, startup)
     (output / "raw.json").write_text(json.dumps(raw, indent=2, allow_nan=False) + "\n")
     summary_command = [str(source / ".venv/bin/python"), "-m", "tools.cloud_summary",
@@ -248,7 +273,8 @@ def execute(gpu: str, minutes: int, runtime_pilot: bool, deadline: float | None,
 def main(output: str = "results/v2/cloud-vnni/final", gpu: str = "none", minutes: int = 30,
          volume_name: str = "cpu-decode-day-vnni-assets", retries: int = 5,
          runtime_pilot: bool = False, deadline_utc: str = "",
-         run_name: str = "", recover_only: bool = False, resume: bool = False):
+         run_name: str = "", recover_only: bool = False, resume: bool = False,
+         cleanup_assets: bool = False):
     if gpu not in GPU_HOURLY or not 1 <= retries <= 5 or not 1 <= minutes <= 240:
         raise ValueError("Choose a supported GPU, 1..5 startup attempts and 1..240 booked minutes")
     if not volume_name.startswith("cpu-decode-day-"):
@@ -270,6 +296,9 @@ def main(output: str = "results/v2/cloud-vnni/final", gpu: str = "none", minutes
             raise ValueError("Refusing to overwrite unrelated files")
     destination.mkdir(parents=True, exist_ok=True)
     volume = modal.Volume.from_name(volume_name)
+    if cleanup_assets:
+        print(remove_asset_cache.with_options(timeout=minutes * 60, volumes={"/cache": volume}).remote(volume_name))
+        return
     run_name = run_name or ("runtime-pilot" if runtime_pilot else "vnni-final")
     if not run_name.replace("-", "").replace("_", "").isalnum():
         raise ValueError("Use an alphanumeric checkpoint name with optional hyphens or underscores")
