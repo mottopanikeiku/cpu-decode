@@ -28,6 +28,6 @@
   "uncertainty": "20,000 fixed-seed ABBA-block bootstrap resamples, seed 20261007, 95% percentile interval for the paired median ratio. Resample eight whole blocks, preserving each AB and BA pair. Intervals are per-cell, not simultaneous; cloud host variation is not fully controlled.",
   "decision": "Native win only if the ratio interval is entirely above 1; llama win only if entirely below 1; otherwise inconclusive. Do not omit losing, noisy or inconclusive cells or discard performance outliers.",
   "environment": "Record lscpu text/JSON, CPU flags, process affinity, cgroup quota, compiler/CMake versions, library/build settings, model/config/binary hashes and container resources.",
-  "resources": {"provider": "Modal", "gpu": "none", "cpu_cores": 8, "memory_gib": 8, "max_containers": 1, "timeout_minutes": 70, "allocation_usd": 0.60},
-  "limits": "One container only. Complete by 07:45 PDT; no new runs after 08:00 PDT. Model downloads and native compilation happen in the cloud. No laptop timing claims."
+  "resources": {"provider": "Modal", "gpu": "none", "cpu_cores": 8, "memory_gib": 8, "max_containers": 1, "timeout_minutes": 60, "allocation_usd": 0.60},
+  "limits": "Collect the complete matrix in one measured container, without pooling samples across containers. Complete by 07:45 PDT; no new runs after 08:00 PDT. Model downloads and native compilation happen in the cloud. No laptop timing claims."
 }

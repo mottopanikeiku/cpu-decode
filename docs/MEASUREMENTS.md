@@ -4,6 +4,47 @@
 
 The v2 tools write only under `results/v2`; the original results and the archived protocol below are unchanged. This is still single-stream decode on one pinned Qwen2.5-0.5B-Instruct model, not prompt processing, batched serving or a downstream-task benchmark. Native and llama.cpp use F16 K/V and native CPU Release builds. The baseline is the verified Q8_0 GGUF and commit in `results/llama-preparation.json`, converted from the same BF16 snapshot as the native artifact. Formats need not be numerically identical: native group size/scale dtype and quality are recorded separately.
 
+### Separate cloud CPU comparison
+
+I keep this comparison separate from the laptop matrix. The
+[committed design](../tools/cloud_design.json) fixes the v2 source, model,
+g64f16 weights and upstream commit before measurement. I build both paths with
+`-march=native` inside one running CPU-only container. I request `vnni16` only
+when the reported CPU flags support it; otherwise I record the resolved
+FP32 dispatcher fallback. This transfers the format choice, not a new quality
+evaluation on the cloud CPU.
+
+I measure threads 1/2/4 at initial contexts 128/4096. Both engines prefill the
+same repeated seed IDs and warm all 128 decode steps. Each sample rewinds to
+the original prefix and measures 128 complete token forwards, including the
+LM head, greedy argmax and final consumed token. Load, prefill, warmup, rewind
+and JSON are excluded. Both models stay resident; I confirm the inactive
+process group's suspension with `waitpid` before activating the other.
+Each engine follows its own greedy trajectory without EOS stopping; I retain
+the token IDs and check repeat consistency, not cross-engine equality.
+
+I choose flash on/off/auto using three separate pilot observations per setting
+and cell, breaking median-time ties in that order. Pilot data stays visible
+but does not enter final inference. The baseline uses F16 KV, strict matching
+CPU sets, poll50 and repacking, with `GGML_OPENMP=OFF` for its real persistent
+CPU pool. This is not the strongest-of-nine laptop baseline.
+
+Eight ABBA quartets produce sixteen chronological pairs per cell. I report
+the median paired ratio `llama_seconds/native_seconds`, each engine's median
+and min/max throughput, and a 95% percentile interval from 20,000 whole-ABBA
+bootstrap draws with seed 20261007. An interval above 1 favors native, below 1
+favors llama.cpp, and one touching 1 is inconclusive. I retain every cell and
+do not remove performance outliers. These are per-cell intervals, not a
+simultaneous test; host load, boost and NUMA placement remain uncontrolled.
+I do not measure a cloud read-bandwidth ceiling.
+
+The [Modal launcher](../tools/cloud_modal.py) runs one ephemeral CPU container:
+eight requested cores, 8 GiB, no GPU and a 60-minute limit. It returns raw
+samples, preparation manifests, CPU flags/topology, settings and hashes.
+Run it with `uvx --from modal==1.5.3 modal run tools/cloud_modal.py --output results/v2/cloud`
+using an authenticated Modal account and a fresh destination. The
+[summarizer](../tools/cloud_summary.py) rejects an incomplete six-cell matrix.
+
 ### Development checks against the unchanged original engine
 
 These are short diagnostics, not the final comparison: two rounds, three repeats per invocation, 16 measured tokens, two threads and context 128. Each process exits before the next model loads. The original binary comes from commit `d98ba9c`; native v2 uses the unchanged per-row artifact, F16 KV and blocked attention. Commands, binary/source hashes, affinity, individual samples and operation timings are retained in each directory. This does not establish the calibrated grouped format's speed or quality.

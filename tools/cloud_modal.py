@@ -33,7 +33,7 @@ def cutoff_seconds():
     return (now.replace(hour=7, minute=45, second=0, microsecond=0) - now).total_seconds()
 
 
-@app.function(image=image, cpu=8, memory=8192, timeout=4200, max_containers=1)
+@app.function(image=image, cpu=8, memory=8192, timeout=3600, max_containers=1)
 def execute():
     started = time.time()
     design = json.loads(Path("/assets/tools/cloud_design.json").read_text())
@@ -49,15 +49,15 @@ def execute():
                 (["git", "fetch", "--depth", "1", "origin", design["native_commit"]], source),
                 (["git", "checkout", "--detach", design["native_commit"]], source)]
     for command, cwd in commands:
-        subprocess.run(command, cwd=cwd, check=True, timeout=min(4200, cutoff_seconds()))
+        subprocess.run(command, cwd=cwd, check=True, timeout=min(3600, cutoff_seconds()))
     shutil.copyfile("/assets/CMakeLists.txt", source / "CMakeLists.txt")
     for file in Path("/assets/tools").iterdir():
         shutil.copyfile(file, source / "tools" / file.name)
     subprocess.run(["uv", "sync", "--locked"], cwd=source, check=True,
-                   timeout=min(4200 - (time.time() - started), cutoff_seconds()))
+                   timeout=min(3600 - (time.time() - started), cutoff_seconds()))
     subprocess.run([str(source / ".venv/bin/python"), "-m", "tools.cloud_run", "--source", str(source),
                     "--work", str(work), "--output", str(output), "--design", str(source / "tools/cloud_design.json")],
-                   cwd=source, check=True, timeout=min(4200 - (time.time() - started), cutoff_seconds()))
+                   cwd=source, check=True, timeout=min(3600 - (time.time() - started), cutoff_seconds()))
     raw_path = output / "raw.json"
     raw = json.loads(raw_path.read_text())
     cost = raw["cost"]
@@ -66,7 +66,7 @@ def execute():
     raw_path.write_text(json.dumps(raw, indent=2, allow_nan=False) + "\n")
     subprocess.run([str(source / ".venv/bin/python"), "-m", "tools.cloud_summary", "--input", str(raw_path),
                     "--output", str(output / "summary.json"), "--csv", str(output / "table.csv")],
-                   cwd=source, check=True, timeout=min(4200 - (time.time() - started), cutoff_seconds()))
+                   cwd=source, check=True, timeout=min(3600 - (time.time() - started), cutoff_seconds()))
     payload = io.BytesIO()
     with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(output.iterdir()):

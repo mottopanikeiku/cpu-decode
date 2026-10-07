@@ -275,8 +275,10 @@ public:
         pool_params.poll = 50;
         pool_params.paused = false;
         pool_.reset(ggml_threadpool_new(&pool_params));
-        if (!pool_ || ggml_threadpool_get_n_threads(pool_.get()) != config.threads)
+        if (!pool_)
             throw std::runtime_error("cannot create requested llama CPU pool");
+        // This pin declares a pool-size getter without defining it. The
+        // post-warmup OS affinity snapshot checks the real worker threads.
         // One persistent pool serves both generation and single-token prefill.
         llama_attach_threadpool(context_.get(), pool_.get(), pool_.get());
         batch_.n_tokens = 1;
@@ -324,7 +326,7 @@ public:
                 {"stored_weight_bytes", llama_model_size(model_.get())}, {"vocab_size", vocab_},
                 {"profile", nullptr}, {"no_perf", true}, {"n_gpu_layers", 0}, {"offload_kqv", false},
                 {"op_offload", false}, {"affinity", "strict"}, {"threadpool", "ggml persistent strict"},
-                {"threadpool_threads", ggml_threadpool_get_n_threads(pool_.get())}, {"shared_batch_pool", true}};
+                {"shared_batch_pool", true}};
     }
 };
 
