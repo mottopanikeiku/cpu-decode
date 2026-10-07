@@ -1,5 +1,39 @@
 # Measurement protocol
 
+## Batched decoding and int8 KV
+
+I added a layer-major `Engine::batch(tokens, head_start)` path. Its four-column projection tiles reuse each weight load across token columns, while each row keeps the single-token reduction order. Attention remains causal: I store and attend to each new token in order within each layer. The returned flat vector contains only rows `tokens[head_start:]` and is reused on the next batch call. `head_start == tokens.size()` skips the vocabulary projection; an empty batch is a no-op. Invalid token IDs, head ranges and capacity are checked before cache writes.
+
+Prompt lookup searches earlier occurrences of the longest suffix first, then the most recent occurrence. I verify one already-known greedy token plus up to four draft tokens in a batched pass. At the first mismatch I keep the model's greedy prediction, rewind the cache past the accepted inputs, and discard the remaining drafts. This is exact greedy decoding for the selected cache/kernel, not sampling and not an accuracy improvement. [Twelve public prompts](../configs/lookup-prompts.json), equally split between copying/editing/quoted summarization and open-ended writing, were committed before measurement. I report accepted tokens divided by all proposed draft tokens, including unused drafts after the first mismatch; I do not average prompt-level percentages.
+
+`i8` stores symmetric per-token/per-head int8 K/V with FP32 scales. `i8-centered` uses the channel-wise per-head mean of exactly the first 64 post-RoPE key vectors. Before that boundary I retain raw FP32 prefix keys; values are int8 from the start. At the boundary I quantize all prefix residuals, then subtract the fixed mean from later keys. The shared query-dot-mean shift cancels in softmax and is omitted. This is a causal prefix estimate, not the unavailable mean of all future keys. I keep the raw prefix for replay below the boundary; no full-cache FP32 copy exists. Allocated bytes include key padding, value data, both scale arrays, the mean, and the raw prefix. They exclude attention and model workspaces and are not measured peak memory.
+
+The [long-context inputs](../results/v3/long-context-inputs.json) concatenate the unchanged eight heldout Austen windows. I score 32 positions near 2k and 32 near 4k against the original BF16-storage/FP32-arithmetic oracle, using the existing `quality_v2` KL and top-1 functions. The oracle uses unmodified Transformers layers, FP32 KV and causal 128-token chunks; an offline synthetic test compares that chunked mask against a dense full-sequence forward. F32 native KV isolates cache error from weight/activation error. This small teacher-forced test does not establish long-context task accuracy.
+
+No new performance numbers are measured here. Later, on an idle machine, run `nice -n 19 uv run python -m tools.time_v3 --model "$INT8" --case 0 --output results/v3/timing-copy.json`, then repeat for case 6 and each cache type. It alternates fresh processes and reports medians/ranges for prefill and decode separately after an untimed full-generation warmup. The matched decode comparison uses batched prefill in both conditions; a third condition isolates prefill batching. Load and output writing are excluded. Batch and int8-KV operation-level profiling are explicitly unsupported rather than assigned estimated traffic counters.
+
+### Repeating the new comparisons
+
+Set `MODEL` to the pinned BF16 snapshot and `INT8` to the unchanged g64f16 artifact. Build normally, with `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2`, and sync the locked Python environment with `uv sync --locked --python 3.12`. Set `OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=2`; use one model process at a time.
+
+```sh
+uv run python -m tools.lookup_v3 prepare --tokenizer "$MODEL"
+for case in $(seq 0 11); do nice -n 19 uv run python -m tools.lookup_v3 measure --model "$INT8" --case "$case"; done
+uv run python -m tools.lookup_v3 summarize
+```
+
+```sh
+uv run python -m tools.kv_quality_v3 prepare
+for layer in $(seq 0 23); do nice -n 19 uv run python -m tools.kv_quality_v3 oracle-layer --model "$MODEL" --layer "$layer"; done
+nice -n 19 uv run python -m tools.kv_quality_v3 oracle-head --model "$MODEL"
+for kv in f32 f16 i8 i8-centered; do nice -n 19 uv run python -m tools.kv_quality_v3 native --model "$INT8" --kv "$kv"; done
+nice -n 19 uv run python -m tools.kv_quality_v3 compare
+```
+
+The oracle keeps one widened layer at a time and passes a small hidden-state file to the next process. It removes that previous hidden-state file after writing the next; raw vocabulary logits stay in ignored `external/quality-v3`. To repeat the head step, choose a fresh `--raw` directory rather than overwrite its exclusive output. The public summaries retain source, binary, weight and logit hashes plus per-position numerical metrics, not wall-clock observations.
+
+`ctest --test-dir build --output-on-failure` includes batched-forward, prefix-boundary replay and int8-cache checks. `CPU_DECODE_QUANT_MODEL="$INT8" CPU_DECODE_KERNEL=vnni16 uv run pytest -q tests/test_v3.py` additionally compares real fixed-prompt greedy tokens and sparse logits between the single-token and batch paths.
+
 ## v2: matched F16 KV and the best measured CPU baseline
 
 The v2 tools write only under `results/v2`; the original results and the archived protocol below are unchanged. This is still single-stream decode on one pinned Qwen2.5-0.5B-Instruct model, not prompt processing, batched serving or a downstream-task benchmark. Native and llama.cpp use F16 K/V and native CPU Release builds. The baseline is the verified Q8_0 GGUF and commit in `results/llama-preparation.json`, converted from the same BF16 snapshot as the native artifact. Formats need not be numerically identical: native group size/scale dtype and quality are recorded separately.

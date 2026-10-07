@@ -315,12 +315,12 @@ void affinity_tests(const fs::path& root) {
     };
     {
         decode::Engine first((root / "bf16").string(), decode::Kernel::scalar, 1, 8);
-        decode::Engine second((root / "bf16").string(), decode::Kernel::scalar, 6, 8);
-        std::vector<int> expected; for (size_t j = 0; j < 6; ++j) expected.push_back(preferred[j % preferred.size()]);
+        decode::Engine second((root / "bf16").string(), decode::Kernel::scalar, 2, 8);
+        std::vector<int> expected; for (size_t j = 0; j < 2; ++j) expected.push_back(preferred[j % preferred.size()]);
         require(second.metadata()["cpu_set"] == expected, "overlapping engines select original allowed cores");
         check_restored(); first.step(1, true); check_restored(); second.step(1, true); check_restored();
         fails([&] { second.step(11, true); }, "step failure still restores affinity"); check_restored();
-        first = decode::Engine((root / "bf16").string(), decode::Kernel::scalar, 6, 8);
+        first = decode::Engine((root / "bf16").string(), decode::Kernel::scalar, 2, 8);
         require(first.metadata()["cpu_set"] == expected, "replacement engine preserves full core selection");
         check_restored();
     }

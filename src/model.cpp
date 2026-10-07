@@ -1,4 +1,5 @@
 #include "decode.hpp"
+#include "kv_cache.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -160,8 +161,7 @@ struct Config {
 struct Layer {
     Matrix q, k, v, o, gate, up, down;
     std::vector<float> input_norm, post_norm, qbias, kbias, vbias;
-    std::vector<float> keys32, values32;
-    std::vector<uint16_t> keys16, values16;
+    std::unique_ptr<KvCache> cache;
 };
 template<class F> void timed(Profile* profile, const char* name, F&& fn) {
     if (!profile) { fn(); return; }
@@ -180,11 +180,17 @@ struct Engine::Impl {
     ThreadPool pool;
     Activation activation;
     std::unique_ptr<AttentionWorkspace> workspace;
-    size_t capacity, pos = 0, key_blocks = 0, cache_bytes = 0;
+    size_t capacity, pos = 0, cache_bytes = 0;
     Matrix embedding;
     std::vector<Layer> layers;
     std::vector<float> final_norm, x, norm, q, k, v, attn, projected, gate, logits;
     std::vector<float> inverse_frequency, rope_cos, rope_sin;
+    // Hidden rows survive across layers; all other intermediates are fixed tiles.
+    // Grow only to the largest requested batch, bounded by context capacity.
+    std::vector<float> batch_x, batch_logits;
+    std::vector<float> batch_norm, batch_q, batch_k, batch_v, batch_attn, batch_projected, batch_gate;
+    std::vector<float> batch_rope_cos, batch_rope_sin;
+    std::vector<Activation> batch_activations;
     uint64_t stored_bytes = 0, stored_scales = 0;
     std::string weight_dtype;
     Impl(const std::string& directory, Kernel ktype, int nthreads, size_t cap, EngineOptions opts)
@@ -193,11 +199,9 @@ struct Engine::Impl {
           activation(std::max(config.hidden, config.intermediate), ktype), capacity(cap) {
         if (threads < 1 || threads > 1024 || !capacity || capacity > config.max_positions) throw std::runtime_error("invalid thread count or context capacity");
         parse_kernel(kernel_name(kernel));
-        key_blocks = capacity / AttentionWorkspace::block_size + (capacity % AttentionWorkspace::block_size != 0);
-        size_t padded = product(key_blocks, AttentionWorkspace::block_size);
-        if (capacity > std::numeric_limits<size_t>::max() - padded) throw std::runtime_error("KV capacity overflow");
-        cache_bytes = product(product(product(capacity + padded, config.kv_heads * config.dim), config.layers), options.cache_type == CacheType::f16 ? 2 : 4);
+        cache_bytes = product(KvCache::allocation_bytes(options.cache_type, capacity, config.kv_heads, config.dim), config.layers);
         if (cache_bytes > 768ull * 1024 * 1024) throw std::runtime_error("KV cache exceeds 768MiB safety limit");
+        cache_bytes = 0;
         workspace = std::make_unique<AttentionWorkspace>(capacity, config.heads, config.dim);
         embedding = matrix("model.embed_tokens.weight", config.vocab, config.hidden);
         weight_dtype = embedding.dtype == DType::i8 ? "int8" : "bf16";
@@ -221,10 +225,8 @@ struct Engine::Impl {
             layer.qbias = vector(base + "self_attn.q_proj.bias", config.hidden);
             layer.kbias = vector(base + "self_attn.k_proj.bias", config.kv_heads * config.dim);
             layer.vbias = vector(base + "self_attn.v_proj.bias", config.kv_heads * config.dim);
-            size_t count = product(capacity, config.kv_heads * config.dim);
-            size_t key_count = product(padded, config.kv_heads * config.dim);
-            if (options.cache_type == CacheType::f16) { layer.keys16.resize(key_count); layer.values16.resize(count); }
-            else { layer.keys32.resize(key_count); layer.values32.resize(count); }
+            layer.cache = std::make_unique<KvCache>(options.cache_type, capacity, config.heads, config.kv_heads, config.dim);
+            cache_bytes += layer.cache->bytes();
             layers.push_back(std::move(layer));
         }
         final_norm = vector("model.norm.weight", config.hidden);
@@ -232,6 +234,13 @@ struct Engine::Impl {
         k.resize(config.kv_heads * config.dim); v.resize(k.size()); attn.resize(config.hidden);
         projected.resize(config.hidden); gate.resize(config.intermediate);
         logits.resize(config.vocab);
+        batch_norm.resize(product(projection_columns, config.hidden));
+        batch_q.resize(batch_norm.size()); batch_attn.resize(batch_norm.size()); batch_projected.resize(batch_norm.size());
+        batch_k.resize(product(projection_columns, config.kv_heads * config.dim)); batch_v.resize(batch_k.size());
+        batch_gate.resize(product(projection_columns, config.intermediate));
+        batch_activations.reserve(projection_columns);
+        for (size_t c = 0; c < projection_columns; ++c)
+            batch_activations.emplace_back(std::max(config.hidden, config.intermediate), kernel);
         inverse_frequency.resize(config.dim / 2); rope_cos.resize(config.dim / 2); rope_sin.resize(config.dim / 2);
         for (size_t j = 0; j < inverse_frequency.size(); ++j)
             inverse_frequency[j] = 1.0f / std::pow(config.theta, float(2 * j) / float(config.dim));
@@ -283,6 +292,8 @@ struct Engine::Impl {
     const std::vector<float>& step(int token, bool head, Profile* p) {
         if (token < 0 || size_t(token) >= config.vocab) throw std::runtime_error("token ID outside vocabulary");
         if (pos >= capacity) throw std::runtime_error("context capacity exceeded");
+        if (p && (options.cache_type == CacheType::i8 || options.cache_type == CacheType::i8_centered))
+            throw std::runtime_error("int8 KV profiling is unsupported; measure externally");
         timed(p, "embedding", [&] {
             for (size_t j = 0; j < config.hidden; ++j) {
                 size_t offset = size_t(token) * config.hidden + j;
@@ -320,24 +331,9 @@ struct Engine::Impl {
                 };
                 rotate(q); rotate(k);
             });
-            timed(p, "kv_write", [&] {
-                const size_t block = pos / AttentionWorkspace::block_size, lane = pos % AttentionWorkspace::block_size;
-                for (size_t kv = 0; kv < config.kv_heads; ++kv) for (size_t j = 0; j < config.dim; ++j) {
-                    size_t source = kv * config.dim + j;
-                    size_t key_index = ((kv * key_blocks + block) * config.dim + j) * AttentionWorkspace::block_size + lane;
-                    if (options.cache_type == CacheType::f16) {
-                        l.keys16[key_index] = float_half(k[source]);
-                        l.values16[pos * v.size() + source] = float_half(v[source]);
-                    } else {
-                        l.keys32[key_index] = k[source];
-                        l.values32[pos * v.size() + source] = v[source];
-                    }
-                }
-            });
+            timed(p, "kv_write", [&] { l.cache->store(pos, k.data(), v.data()); });
             timed(p, "attention", [&] {
-                const void* keys = options.cache_type == CacheType::f16 ? static_cast<const void*>(l.keys16.data()) : l.keys32.data();
-                const void* values = options.cache_type == CacheType::f16 ? static_cast<const void*>(l.values16.data()) : l.values32.data();
-                attention(q.data(), keys, values, options.cache_type, attn.data(), pos + 1, config.heads, config.kv_heads, config.dim, key_blocks, pool, *workspace, options.scalar_attention);
+                l.cache->attend(q.data(), attn.data(), pos + 1, pool, *workspace, options.scalar_attention);
             });
             timed(p, "attention_output", [&] { multiply(l.o, attn.data(), projected.data(), p); });
             timed(p, "rmsnorm", [&] { residual_rmsnorm(x.data(), projected.data(), l.post_norm.data(), norm.data(), config.hidden, config.epsilon); });
@@ -367,6 +363,98 @@ struct Engine::Impl {
         ++pos;
         return logits;
     }
+    const std::vector<float>& batch(const std::vector<int>& tokens, size_t head_start, Profile* profile) {
+        if (profile) throw std::runtime_error("batch profiling is unsupported; measure externally");
+        if (head_start > tokens.size()) throw std::runtime_error("head_start outside batch");
+        if (tokens.size() > capacity - pos) throw std::runtime_error("context capacity exceeded");
+        for (int token : tokens)
+            if (token < 0 || size_t(token) >= config.vocab) throw std::runtime_error("token ID outside vocabulary");
+        // Check all sizes and allocate before any cache writes or position changes.
+        const size_t hidden = config.hidden, kv_width = config.kv_heads * config.dim;
+        const size_t x_count = product(tokens.size(), hidden);
+        const size_t logits_count = product(tokens.size() - head_start, config.vocab);
+        if (x_count > batch_x.size()) {
+            batch_x.reserve(x_count);
+            batch_x.resize(x_count);
+        }
+        if (logits_count > batch_logits.capacity()) batch_logits.reserve(logits_count);
+        batch_logits.resize(logits_count);
+        if (options.cached_rope) {
+            const size_t angles = product(tokens.size(), config.dim / 2);
+            if (angles > batch_rope_cos.size()) {
+                batch_rope_cos.reserve(angles); batch_rope_sin.reserve(angles);
+                batch_rope_cos.resize(angles); batch_rope_sin.resize(angles);
+            }
+            for (size_t t = 0; t < tokens.size(); ++t) for (size_t j = 0; j < inverse_frequency.size(); ++j) {
+                float angle = float(pos + t) * inverse_frequency[j];
+                batch_rope_cos[t * inverse_frequency.size() + j] = std::cos(angle);
+                batch_rope_sin[t * inverse_frequency.size() + j] = std::sin(angle);
+            }
+        }
+        for (size_t t = 0; t < tokens.size(); ++t) for (size_t j = 0; j < hidden; ++j) {
+            size_t offset = size_t(tokens[t]) * hidden + j;
+            batch_x[t * hidden + j] = embedding.dtype == DType::bf16
+                ? bf16_float(static_cast<const uint16_t*>(embedding.data)[offset])
+                : float(static_cast<const int8_t*>(embedding.data)[offset]) * matrix_scale(embedding, size_t(tokens[t]), j);
+        }
+        auto multiply_batch = [&](const BatchProjection* items, size_t count, const float* input,
+                                  size_t columns, size_t stride, bool swiglu = false) {
+            batch_projections(items, count, input, columns, stride, kernel, pool, batch_activations.data(), swiglu);
+        };
+        auto rotate = [&](float* data, size_t heads, size_t position) {
+            if (!options.cached_rope) { rope(data, heads, config.dim, position, config.theta); return; }
+            for (size_t h = 0; h < heads; ++h) for (size_t j = 0; j < config.dim / 2; ++j) {
+                size_t a = h * config.dim + j, b = a + config.dim / 2;
+                float first = data[a], second = data[b];
+                size_t angle = (position - pos) * inverse_frequency.size() + j;
+                data[a] = first * batch_rope_cos[angle] - second * batch_rope_sin[angle];
+                data[b] = second * batch_rope_cos[angle] + first * batch_rope_sin[angle];
+            }
+        };
+        // Each complete layer processes every token before the next layer starts.
+        // Causal attention is sequential within a tile, including prefix-mean freezing.
+        for (Layer& l : layers) for (size_t begin = 0; begin < tokens.size(); begin += projection_columns) {
+            size_t columns = std::min(projection_columns, tokens.size() - begin);
+            for (size_t c = 0; c < columns; ++c)
+                rmsnorm(batch_x.data() + (begin + c) * hidden, l.input_norm.data(),
+                        batch_norm.data() + c * hidden, hidden, config.epsilon);
+            BatchProjection qkv[]{{&l.q, batch_q.data(), hidden, l.qbias.data()},
+                                  {&l.k, batch_k.data(), kv_width, l.kbias.data()},
+                                  {&l.v, batch_v.data(), kv_width, l.vbias.data()}};
+            multiply_batch(qkv, 3, batch_norm.data(), columns, hidden);
+            for (size_t c = 0; c < columns; ++c) {
+                size_t position = pos + begin + c;
+                rotate(batch_q.data() + c * hidden, config.heads, position);
+                rotate(batch_k.data() + c * kv_width, config.kv_heads, position);
+                l.cache->store(position, batch_k.data() + c * kv_width, batch_v.data() + c * kv_width);
+                l.cache->attend(batch_q.data() + c * hidden, batch_attn.data() + c * hidden,
+                                position + 1, pool, *workspace, options.scalar_attention);
+            }
+            BatchProjection output{&l.o, batch_projected.data(), hidden};
+            multiply_batch(&output, 1, batch_attn.data(), columns, hidden);
+            for (size_t c = 0; c < columns; ++c)
+                residual_rmsnorm(batch_x.data() + (begin + c) * hidden,
+                                 batch_projected.data() + c * hidden, l.post_norm.data(),
+                                 batch_norm.data() + c * hidden, hidden, config.epsilon);
+            BatchProjection mlp[]{{&l.gate, batch_gate.data(), config.intermediate},
+                                  {&l.up, nullptr, 0}};
+            multiply_batch(mlp, 2, batch_norm.data(), columns, hidden, true);
+            BatchProjection down{&l.down, batch_projected.data(), hidden};
+            multiply_batch(&down, 1, batch_gate.data(), columns, config.intermediate);
+            for (size_t c = 0; c < columns; ++c) for (size_t j = 0; j < hidden; ++j)
+                batch_x[(begin + c) * hidden + j] += batch_projected[c * hidden + j];
+        }
+        for (size_t begin = head_start; begin < tokens.size(); begin += projection_columns) {
+            size_t columns = std::min(projection_columns, tokens.size() - begin);
+            for (size_t c = 0; c < columns; ++c)
+                rmsnorm(batch_x.data() + (begin + c) * hidden, final_norm.data(),
+                        batch_norm.data() + c * hidden, hidden, config.epsilon);
+            BatchProjection head{&embedding, batch_logits.data() + (begin - head_start) * config.vocab, config.vocab};
+            multiply_batch(&head, 1, batch_norm.data(), columns, hidden);
+        }
+        pos += tokens.size();
+        return batch_logits;
+    }
 };
 Engine::Engine(const std::string& dir, Kernel kernel, int threads, size_t capacity, EngineOptions options) : impl(std::make_unique<Impl>(dir, kernel, threads, capacity, std::move(options))) {}
 Engine::~Engine() = default;
@@ -380,6 +468,10 @@ void Engine::rewind(size_t position) {
 const std::vector<float>& Engine::step(int token, bool head, Profile* profile) {
     CpuBinding binding(impl->options.strict_affinity ? impl->pool.cpus()[0] : -1);
     return impl->step(token, head, profile);
+}
+const std::vector<float>& Engine::batch(const std::vector<int>& tokens, size_t head_start, Profile* profile) {
+    CpuBinding binding(impl->options.strict_affinity ? impl->pool.cpus()[0] : -1);
+    return impl->batch(tokens, head_start, profile);
 }
 size_t Engine::vocab_size() const { return impl->config.vocab; }
 size_t Engine::position() const { return impl->pos; }
@@ -397,7 +489,13 @@ Json Engine::metadata() const {
             {"attention", impl->options.scalar_attention ? "scalar" : "blocked"},
             {"attention_block_size", AttentionWorkspace::block_size},
             {"fused_operations", {"qkv_bias", "gate_up_silu", "attention_residual_rmsnorm"}},
-            {"kv_dtype", impl->options.cache_type == CacheType::f16 ? "f16" : "f32"},
+            {"kv_dtype", impl->options.cache_type == CacheType::f16 ? "f16" :
+                         impl->options.cache_type == CacheType::f32 ? "f32" :
+                         impl->options.cache_type == CacheType::i8 ? "i8" : "i8_centered"},
+            {"kv_key_mean_prefix", impl->options.cache_type == CacheType::i8_centered ? KvCache::key_mean_prefix : 0},
+            {"kv_centered_warmup_keys", impl->options.cache_type == CacheType::i8_centered ? "raw fp32 below 64 tokens" : "none"},
+            {"batch_projection_columns", projection_columns}, {"batch_profile", "unsupported"},
+            {"step_profile", (impl->options.cache_type == CacheType::f16 || impl->options.cache_type == CacheType::f32) ? "supported" : "unsupported"},
             {"kv_capacity", impl->capacity},
             {"auxiliary_fp32_weight_bytes", (impl->config.layers * (3 * impl->config.hidden + 2 * impl->config.kv_heads * impl->config.dim) + impl->config.hidden) * 4},
             {"kv_cache_bytes", impl->cache_bytes}, {"key_cache_layout", "kv/block64/dim/token"},

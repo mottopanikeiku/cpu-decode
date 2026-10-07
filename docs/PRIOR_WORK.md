@@ -32,3 +32,9 @@ selection rule. The texts supply next-token evaluation targets, not weight
 training data for this project. Calibration selects the quantized format;
 the held-out book is not used for tuning. This does not assert that the model
 vendor excluded either book from its original training data.
+
+## Prompt lookup and mean-centered keys
+
+I build on [prompt lookup decoding](https://github.com/apoorvumang/prompt-lookup-decoding) and the [Transformers assisted-decoding implementation](https://huggingface.co/docs/transformers/en/assisted_decoding): draft from repeated context, verify multiple candidates, and discard everything after the first rejected greedy token. The decoding idea is not new. My contribution here is a small C++ implementation with a genuinely layer-major batched forward, exact single-path comparisons, and separate copy-heavy/open-ended acceptance counts.
+
+The key-centering experiment follows my [attention-numerics study](https://github.com/mottopanikeiku/attention-numerics): a shared key component contributes a query-dependent constant to every score and therefore cancels in softmax. I test a fixed causal prefix mean before int8 rounding, not a claim that all key distributions have the same mean or that rotation is universally helpful. I publish both uncentered and centered outcomes on unchanged heldout text.
