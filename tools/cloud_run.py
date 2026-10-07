@@ -20,7 +20,9 @@ import time
 
 def save(path: Path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")
+    temporary.replace(path)
 
 
 def sha(path: Path):
@@ -177,11 +179,13 @@ def close_workers(workers):
         raise first_error
 
 
-def prepare(source: Path, work: Path, output: Path, design: dict):
+def prepare(source: Path, work: Path, output: Path, design: dict, *, assets: Path | None = None):
     python = source / ".venv/bin/python"
     cache = work / "artifacts"
     cache.mkdir(parents=True, exist_ok=True)
-    hf = work / "hf"
+    hf = assets / "hf" if assets is not None else work / "hf"
+    if assets is not None:
+        os.environ["HF_HUB_OFFLINE"] = "1"
     run([str(python), "-m", "tools.download_model", "--hf-home", str(hf),
          "--output", str(output / "source-model.json")], source)
     model = hf / "hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots" / design["model_revision"]
@@ -189,15 +193,30 @@ def prepare(source: Path, work: Path, output: Path, design: dict):
     native_flags = ["-DCMAKE_BUILD_TYPE=Release", "-DCPU_DECODE_NATIVE=ON", "-DCMAKE_CXX_FLAGS=-march=native"]
     run(["cmake", "-S", str(source), "-B", str(build), *native_flags])
     run(["cmake", "--build", str(build), "--target", "cpu-decode", "-j4"])
-    native = cache / "g64f16"
-    run([str(python), "-m", "tools.quantize", "--source", str(model), "--output", str(native),
-         "--engine", str(build / "cpu-decode"), "--group-size", "64", "--scale-dtype", "f16",
-         "--manifest", str(output / "native-preparation.json")], source)
+    if assets is None:
+        native = cache / "g64f16"
+        run([str(python), "-m", "tools.quantize", "--source", str(model), "--output", str(native),
+             "--engine", str(build / "cpu-decode"), "--group-size", "64", "--scale-dtype", "f16",
+             "--manifest", str(output / "native-preparation.json")], source)
+    else:
+        native = assets / "artifacts/g64f16"
+        shutil.copyfile(assets / "manifests/native-preparation.json", output / "native-preparation.json")
     if sha(native / "model.safetensors") != design["native_weights_sha256"]:
         raise ValueError("Cloud g64f16 weights differ from the existing v2 format")
     llama_root = cache / "llama.cpp" / design["llama_commit"]
     llama_source = llama_root / "source"
-    clone(design["llama_repository"], design["llama_commit"], llama_source)
+    if assets is None:
+        clone(design["llama_repository"], design["llama_commit"], llama_source)
+    else:
+        staged_llama = assets / "artifacts/llama.cpp" / design["llama_commit"]
+        shutil.copytree(staged_llama / "source", llama_source)
+        if capture(["git", "rev-parse", "HEAD"], llama_source).strip() != design["llama_commit"]:
+            raise ValueError("Cached upstream source differs from the fixed commit")
+        revision = design["model_revision"]
+        for name in (f"qwen-{revision}-bf16.gguf", f"qwen-{revision}-q8_0.gguf"):
+            (llama_root / name).symlink_to(staged_llama / name)
+        shutil.copyfile(staged_llama / f"preparation-{revision}.json",
+                        llama_root / f"preparation-{revision}.json")
     llama_flags = ["-DCMAKE_BUILD_TYPE=Release", "-DGGML_NATIVE=ON", "-DGGML_OPENMP=OFF",
                    "-DGGML_CUDA=OFF", "-DGGML_VULKAN=OFF", "-DGGML_CPU_REPACK=ON", "-DLLAMA_CURL=OFF",
                    "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DCMAKE_CXX_FLAGS=-march=native"]
@@ -229,13 +248,21 @@ def prepare(source: Path, work: Path, output: Path, design: dict):
         "driver_source_sha256": sha(source / "tools/cloud_bench.cpp")}
 
 
-def compare(source: Path, work: Path, output: Path, design_path: Path):
+def compare(source: Path, work: Path, output: Path, design_path: Path, *,
+            assets: Path | None = None, require_vnni: bool = False,
+            runtime_pilot: bool = False, budget_minutes: int | None = None,
+            requested_gpu: str = "none"):
     start = time.monotonic()
     design = json.loads(design_path.read_text())
     output.mkdir(parents=True, exist_ok=True)
     os.environ.update({"OMP_NUM_THREADS": "4", "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "4"})
     env = environment()
-    binary, native_model, gguf, artifacts = prepare(source, work, output, design)
+    if require_vnni:
+        from .cloud_host import snapshot
+        env["startup_cpu"] = snapshot()
+        if not env["startup_cpu"]["supports_vnni16"]:
+            raise ValueError("Timing container does not expose every required vnni16 CPU flag")
+    binary, native_model, gguf, artifacts = prepare(source, work, output, design, assets=assets)
     topology = json.loads(capture([str(source / "build-cloud/cpu-decode"), "cpus"]))
     env["native_cpu_discovery"] = topology
     if len(topology["preferred_cpu_ids"]) < max(design["threads"]):
@@ -244,11 +271,20 @@ def compare(source: Path, work: Path, output: Path, design_path: Path):
     selected = topology["preferred_cpu_ids"][:max(design["threads"])]
     if len({exposed[cpu] for cpu in selected}) != len(selected):
         raise ValueError("Selected cloud CPUs are not distinct exposed physical cores")
-    kernel = "vnni16" if {"avx512_vnni", "avx512bw", "f16c"}.issubset(env["flags"]) else "auto"
+    kernel = "vnni16" if require_vnni or {"avx512_vnni", "avx512bw", "f16c"}.issubset(env["flags"]) else "auto"
+    resources = dict(design["resources"])
+    resources.update(gpu=requested_gpu, cpu_cores=8, memory_gib=8)
+    if budget_minutes is not None:
+        resources["timeout_minutes"] = budget_minutes
+    if not resources["timeout_minutes"]:
+        raise ValueError("The comparison needs an explicit positive booked duration")
     result = {"design_sha256": sha(design_path), "design": design, "environment": env,
-              "artifacts": artifacts, "resources": design["resources"], "pilot": [], "cells": []}
+              "artifacts": artifacts, "resources": resources, "pilot": [], "cells": [],
+              "run_mode": "runtime-pilot" if runtime_pilot else "full-matrix",
+              "offline_model_assets": assets is not None}
     expected_tokens = {}
-    for threads, context in design["cell_order"]:
+    cell_order = design["cell_order"][:1] if runtime_pilot else design["cell_order"]
+    for threads, context in cell_order:
         workers = []
         cell_start = time.monotonic()
         try:
@@ -258,6 +294,9 @@ def compare(source: Path, work: Path, output: Path, design_path: Path):
             native = Worker(binary, {**common, "backend": "native", "model": str(native_model),
                                      "kernel": kernel, "flash": "auto"}, output / f"t{threads}-c{context}-native.stderr.txt")
             workers.append(native)
+            if require_vnni and (native.ready["metadata"]["kernel"] != "vnni16"
+                                 or native.ready["metadata"]["activation_dtype"] != "int16"):
+                raise ValueError("Accepted CPU did not execute the actual vnni16/int16 path")
             baseline_choices = []
             pilot = {"threads": threads, "context": context, "native": [], "llama": {}}
             for _ in range(3):
@@ -289,7 +328,7 @@ def compare(source: Path, work: Path, output: Path, design_path: Path):
                                          * max(1, threads / other_threads) for other_threads, _ in remaining_cells)
                 pilot["runtime_projection"] = {
                     "estimated_remaining_minutes": remaining_seconds / 60,
-                    "remaining_function_minutes": design["resources"]["timeout_minutes"] - (time.monotonic() - start) / 60,
+                    "remaining_function_minutes": resources["timeout_minutes"] - (time.monotonic() - start) / 60,
                     "assumptions": "Use first long-context pilot and setup for all remaining cells; scale 1-thread work by 2 and assume no gain at 4 threads. This is a planning estimate, not a timing result or upper bound."}
             for block in range(design["pairs_per_cell"] // 2):
                 first_native = native.sample()
@@ -306,6 +345,7 @@ def compare(source: Path, work: Path, output: Path, design_path: Path):
                             raise ValueError("Greedy trajectory changed between rewound repeats")
                         expected_tokens[key] = trajectory
                     cell["pairs"].append({"id": block * 2 + offset, "block": block, "order": order, "native": a, "llama": b})
+            cell["elapsed_cell_seconds"] = time.monotonic() - cell_start
             result["cells"].append(cell)
             save(output / "raw.json", result)
             print("CLOUD_CELL_COMPLETE", flush=True)
@@ -327,9 +367,16 @@ def main():
     parser.add_argument("--work", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--design", type=Path, required=True)
+    parser.add_argument("--assets", type=Path, help="Previously verified CPU-prepared model Volume; use models offline")
+    parser.add_argument("--require-vnni", action="store_true")
+    parser.add_argument("--runtime-pilot", action="store_true", help="Measure only the first complete cell; never pool it into final inference")
+    parser.add_argument("--budget-minutes", type=int)
+    parser.add_argument("--requested-gpu", default="none")
     args = parser.parse_args()
     signal.signal(signal.SIGTERM, cancel)
-    compare(args.source, args.work, args.output, args.design)
+    compare(args.source, args.work, args.output, args.design, assets=args.assets,
+            require_vnni=args.require_vnni, runtime_pilot=args.runtime_pilot,
+            budget_minutes=args.budget_minutes, requested_gpu=args.requested_gpu)
 
 
 if __name__ == "__main__":
