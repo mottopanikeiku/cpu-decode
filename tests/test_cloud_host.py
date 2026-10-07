@@ -135,3 +135,15 @@ def test_summary_keeps_cell_to_container_provenance():
     assert summary["container_runs"] == raw["container_runs"]
     assert summary["cells"][0]["container_run_id"] == "test-run"
     assert summary["cells"][0]["elapsed_cell_seconds"] == 32.0
+
+
+def test_read_only_archive_fetch_does_not_mix_or_resume_an_older_plan(tmp_path):
+    raw = completed_fixture()
+    raw["design_sha256"] = "e" * 64
+    path = tmp_path / "raw.json"
+    cloud_run.save(path, raw)
+    assert cloud_run.read_completed(path, None, "full-matrix", True) == raw
+    with pytest.raises(ValueError, match="another design"):
+        cloud_run.read_completed(path, "d" * 64, "full-matrix", True)
+    with pytest.raises(ValueError, match="runtime-pilot mode"):
+        cloud_run.read_completed(path, None, "runtime-pilot", True)

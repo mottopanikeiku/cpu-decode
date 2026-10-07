@@ -283,12 +283,12 @@ def prepare(source: Path, work: Path, output: Path, design: dict, *, assets: Pat
         "driver_source_sha256": sha(source / "tools/cloud_bench.cpp")}
 
 
-def read_completed(path: Path, design_sha256: str, run_mode: str, require_vnni: bool):
+def read_completed(path: Path, design_sha256: str | None, run_mode: str, require_vnni: bool):
     if not path.exists():
         return None
     from .cloud_summary import validate
     previous = json.loads(path.read_text())
-    if previous["design_sha256"] != design_sha256 or previous.get("run_mode") != run_mode:
+    if (design_sha256 is not None and previous["design_sha256"] != design_sha256) or previous.get("run_mode") != run_mode:
         raise ValueError("Stored cells belong to another design or runtime-pilot mode")
     validate(previous, allow_partial=True)
     if require_vnni and any(cell["native_settings"]["kernel"] != "vnni16"

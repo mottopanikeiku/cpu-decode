@@ -58,8 +58,10 @@ completed cell is committed to the Volume before it is streamed to my client.
 An explicit `--resume` retains local startup history; a matching server
 checkpoint reuses completed sixteen-pair cells, never partial pairs. A
 CPU-only `--recover-only` fetch also regenerates any missing summary/table.
-Pilot and final checkpoints have separate names and must match both the
-design hash and run mode. Each cell links to its measurement container's
+Pilot and final checkpoints have separate names. Resuming measurement must
+match the current design hash and run mode; read-only recovery can fetch an
+older saved experiment after validating its mode and complete cells, without
+merging it into a new run. Each cell links to its measurement container's
 environment, actual build hashes and resources. If resumed cells span
 containers, I report that and do not infer absolute thread scaling across
 them. I retain the same worker-lifetime `CpuBinding` scope described below,

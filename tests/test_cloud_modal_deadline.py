@@ -2,6 +2,8 @@
 import importlib.util
 import ast
 import json
+import io
+import zipfile
 from pathlib import Path
 import tempfile
 import os
@@ -15,7 +17,7 @@ from unittest.mock import patch
 
 SDK_AVAILABLE = importlib.util.find_spec("modal") is not None
 if SDK_AVAILABLE:
-    from tools.cloud_modal import ROOT, UPLOADS, enforce_deadline, parse_deadline, persist_outputs, remaining
+    from tools.cloud_modal import ROOT, UPLOADS, enforce_deadline, guard_destination, parse_deadline, persist_outputs, remaining, unpack_outputs
 
 
 @unittest.skipUnless(SDK_AVAILABLE, "install the optional Modal CLI to test its launcher")
@@ -99,6 +101,30 @@ class CheckpointTests(unittest.TestCase):
                 for node in ast.walk(ast.parse((ROOT / "tools" / filename).read_text())):
                     if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module:
                         self.assertIn(node.module + ".py", uploaded)
+
+    def test_archive_recovery_preserves_local_experiment_and_resume_guard(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory)
+            (destination / "raw.json").write_text(json.dumps({
+                "design_sha256": "a" * 64, "run_mode": "runtime-pilot"}))
+            self.assertEqual(guard_destination(destination, True, True, True), "a" * 64)
+            with self.assertRaisesRegex(ValueError, "another comparison"):
+                guard_destination(destination, True, True, False)
+            with self.assertRaisesRegex(ValueError, "another comparison"):
+                guard_destination(destination, False, True, True)
+            with self.assertRaisesRegex(ValueError, "explicit --resume"):
+                guard_destination(destination, True, False, True)
+
+    def test_archive_payload_cannot_overwrite_a_different_saved_experiment(self):
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w") as archive:
+            archive.writestr("raw.json", json.dumps({"design_sha256": "b" * 64}))
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory)
+            (destination / "raw.json").write_text("unchanged")
+            with self.assertRaisesRegex(ValueError, "another archived experiment"):
+                unpack_outputs(destination, payload.getvalue(), expected_design_sha="a" * 64)
+            self.assertEqual((destination / "raw.json").read_text(), "unchanged")
 
 
 if __name__ == "__main__":

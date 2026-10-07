@@ -113,20 +113,41 @@ def persist_outputs(output: Path, checkpoint: Path, raw: dict, volume_name: str)
     modal.Volume.from_name(volume_name).commit()
 
 
-def unpack_outputs(destination: Path, payload: bytes):
+def unpack_outputs(destination: Path, payload: bytes, *, expected_design_sha: str | None = None):
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+        if expected_design_sha is not None and json.loads(archive.read("raw.json"))["design_sha256"] != expected_design_sha:
+            raise ValueError("Refusing to overwrite another archived experiment")
         for member in archive.infolist():
             if Path(member.filename).name != member.filename:
                 raise ValueError("Unexpected nested result path")
             (destination / member.filename).write_bytes(archive.read(member))
 
 
-def read_checkpoint(checkpoint: Path, runtime_pilot: bool):
+def guard_destination(destination: Path, runtime_pilot: bool, resume: bool, recover_only: bool):
+    if not destination.exists() or not any(destination.iterdir()):
+        return None
+    if not resume:
+        raise ValueError("Existing comparison needs an explicit --resume")
+    local_raw = destination / "raw.json"
+    if not local_raw.exists():
+        if any(path.name != "startup.json" for path in destination.iterdir()):
+            raise ValueError("Refusing to overwrite unrelated files")
+        return None
+    previous = json.loads(local_raw.read_text())
+    design_sha = hashlib.sha256((ROOT / "tools/cloud_vnni_design.json").read_bytes()).hexdigest()
+    if previous.get("run_mode") != ("runtime-pilot" if runtime_pilot else "full-matrix") or (
+            not recover_only and previous["design_sha256"] != design_sha):
+        raise ValueError("Refusing to overwrite another comparison")
+    return previous["design_sha256"]
+
+
+def read_checkpoint(checkpoint: Path, runtime_pilot: bool, *, archive: bool = False):
     import sys
     sys.path.insert(0, "/assets")
     from tools.cloud_run import read_completed
     design_path = Path("/assets/tools/cloud_vnni_design.json")
-    return read_completed(checkpoint / "raw.json", hashlib.sha256(design_path.read_bytes()).hexdigest(),
+    expected_sha = None if archive else hashlib.sha256(design_path.read_bytes()).hexdigest()
+    return read_completed(checkpoint / "raw.json", expected_sha,
                           "runtime-pilot" if runtime_pilot else "full-matrix", True)
 
 
@@ -141,7 +162,7 @@ def finish_checkpoint(checkpoint: Path, volume_name: str, raw: dict):
               max_containers=1, single_use_containers=True)
 def recover(run_name: str, volume_name: str, runtime_pilot: bool):
     checkpoint = Path("/cache/results") / run_name
-    raw = read_checkpoint(checkpoint, runtime_pilot)
+    raw = read_checkpoint(checkpoint, runtime_pilot, archive=True)
     if raw is None:
         return None
     finish_checkpoint(checkpoint, volume_name, raw)
@@ -282,23 +303,13 @@ def main(output: str = "results/v2/cloud-vnni/final", gpu: str = "none", minutes
     deadline = parse_deadline(deadline_utc)
     if deadline is not None and deadline - time.time() <= 40:
         raise TimeoutError("The experiment deadline has passed")
-    destination = Path(output)
-    if destination.exists() and any(destination.iterdir()):
-        if not resume:
-            raise ValueError("Existing comparison needs an explicit --resume")
-        local_raw = destination / "raw.json"
-        if local_raw.exists():
-            previous = json.loads(local_raw.read_text())
-            design_sha = hashlib.sha256((ROOT / "tools/cloud_vnni_design.json").read_bytes()).hexdigest()
-            if previous["design_sha256"] != design_sha or previous.get("run_mode") != ("runtime-pilot" if runtime_pilot else "full-matrix"):
-                raise ValueError("Refusing to overwrite another comparison")
-        elif any(path.name != "startup.json" for path in destination.iterdir()):
-            raise ValueError("Refusing to overwrite unrelated files")
-    destination.mkdir(parents=True, exist_ok=True)
     volume = modal.Volume.from_name(volume_name)
     if cleanup_assets:
         print(remove_asset_cache.with_options(timeout=minutes * 60, volumes={"/cache": volume}).remote(volume_name))
         return
+    destination = Path(output)
+    previous_sha = guard_destination(destination, runtime_pilot, resume, recover_only)
+    destination.mkdir(parents=True, exist_ok=True)
     run_name = run_name or ("runtime-pilot" if runtime_pilot else "vnni-final")
     if not run_name.replace("-", "").replace("_", "").isalnum():
         raise ValueError("Use an alphanumeric checkpoint name with optional hyphens or underscores")
@@ -306,7 +317,7 @@ def main(output: str = "results/v2/cloud-vnni/final", gpu: str = "none", minutes
         payload = recover.with_options(timeout=minutes * 60, volumes={"/cache": volume}).remote(run_name, volume_name, runtime_pilot)
         if payload is None:
             raise RuntimeError("No completed cells have been committed for this run")
-        unpack_outputs(destination, payload)
+        unpack_outputs(destination, payload, expected_design_sha=previous_sha)
         return
     selected = execute.with_options(gpu=None if gpu == "none" else gpu,
                                     timeout=minutes * 60, volumes={"/cache": volume})
