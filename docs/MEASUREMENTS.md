@@ -4,7 +4,42 @@
 
 The v2 tools write only under `results/v2`; the original results and the archived protocol below are unchanged. This is still single-stream decode on one pinned Qwen2.5-0.5B-Instruct model, not prompt processing, batched serving or a downstream-task benchmark. Native and llama.cpp use F16 K/V and native CPU Release builds. The baseline is the verified Q8_0 GGUF and commit in `results/llama-preparation.json`, converted from the same BF16 snapshot as the native artifact. Formats need not be numerically identical: native group size/scale dtype and quality are recorded separately.
 
-### Separate cloud CPU comparison
+### VNNI-only cloud comparison
+
+I committed the [unchanged six-cell workload](../tools/cloud_vnni_design.json)
+at `21481f3` before collecting new results. I searched twelve fresh CPU
+containers: [five reported every required flag](../results/v2/cloud-vnni/probes-cpu.json).
+All reported CPU model “unknown”; fresh containers do not prove distinct
+physical hosts. I bound the overall search to twenty probes, with GPU-host
+fallback only if the CPU-only search fails.
+
+The [timing launcher](../tools/cloud_modal.py) checks its own CPU at startup,
+before source checkout, model access or compilation. It requires exactly the
+ISA used by `parse_kernel("vnni16")`: `avx512f`, `avx512_vnni`, `avx512bw`,
+`avx2`, `f16c`. It retries at most five fresh rejected starts, not failed
+accepted benchmarks. The driver must then report `vnni16` and int16
+activations. I never relabel an FP32 fallback as this result.
+
+I [prepare pinned assets on CPU](../tools/cloud_assets_modal.py) in the named
+`cpu-decode-day-vnni-assets` Modal Volume. Timing reads those models offline,
+copies only cached upstream source and compiles both engines and the driver
+fresh on its actual host. I never reuse the preparation CPU's native builds.
+If I rent a GPU container for its CPU instructions, I record that request and
+still disable all GPU layers, backends and operation offload.
+
+A separate full first-cell runtime pilot determines the final booking:
+`ceil(pilot function minutes × 6 × 1.3)`. Its pairs never enter the final
+six-cell inference. I keep threads 1/2/4, initial contexts 128/4096, 128 full
+forwards, sixteen pairs and eight ABBA quartets per cell unchanged. Every
+completed cell is streamed immediately; atomic raw writes preserve earlier
+cells. I retain the same worker-lifetime `CpuBinding` scope described below,
+not unchanged per-operator laptop CLI performance.
+
+The launcher accepts an optional UTC deadline and reserves forty seconds for
+process cleanup, including a thirty-five-second termination grace period.
+The earlier AVX2 partial run remains separate under `results/v2/cloud`.
+
+### Earlier AVX2 partial comparison
 
 I completed **2/6 planned cells** before the function timed out. Both favor
 llama.cpp: native/llama paired ratios are 0.4108 [0.4061, 0.4428] at one
@@ -60,12 +95,12 @@ do not remove performance outliers. These are per-cell intervals, not a
 simultaneous test; host load, boost and NUMA placement remain uncontrolled.
 I do not measure a cloud read-bandwidth ceiling.
 
-The [Modal launcher](../tools/cloud_modal.py) runs one ephemeral CPU container:
-eight requested cores, 8 GiB, no GPU and a 40-minute limit. It streams every
-completed cell immediately so a timeout preserves returned samples, alongside
-preparation manifests, CPU flags/topology, settings and hashes.
-Run it with `uvx --from modal==1.5.3 modal run tools/cloud_modal.py --output results/v2/cloud`
-using an authenticated Modal account and a fresh destination. The
+My earlier launcher at commit `cf266bf` requested eight cores, 8 GiB, no GPU
+and a forty-minute limit. Streaming retained the two completed cells, alongside
+preparation manifests, CPU flags/topology, settings and hashes. The current
+launcher instead requires VNNI and the CPU-prepared Volume described above.
+I keep the original design and data unchanged, rather than mixing these
+fallback observations into the VNNI study. The
 [summarizer](../tools/cloud_summary.py) rejects an incomplete six-cell matrix
 unless `--allow-partial` is explicit. Partial publication lists missing cells;
 each published cell still needs all sixteen chronological pairs.

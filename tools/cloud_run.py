@@ -186,8 +186,11 @@ def prepare(source: Path, work: Path, output: Path, design: dict, *, assets: Pat
     hf = assets / "hf" if assets is not None else work / "hf"
     if assets is not None:
         os.environ["HF_HUB_OFFLINE"] = "1"
-    run([str(python), "-m", "tools.download_model", "--hf-home", str(hf),
-         "--output", str(output / "source-model.json")], source)
+    download = [str(python), "-m", "tools.download_model", "--hf-home", str(hf),
+                "--output", str(output / "source-model.json")]
+    if assets is not None:
+        download.append("--offline")
+    run(download, source)
     model = hf / "hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots" / design["model_revision"]
     build = source / "build-cloud"
     native_flags = ["-DCMAKE_BUILD_TYPE=Release", "-DCPU_DECODE_NATIVE=ON", "-DCMAKE_CXX_FLAGS=-march=native"]

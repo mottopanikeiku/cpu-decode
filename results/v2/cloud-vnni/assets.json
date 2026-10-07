@@ -1,0 +1,54 @@
+{
+  "stage": "artifact_preparation_only",
+  "volume": "cpu-decode-day-vnni-assets",
+  "started_utc": "2026-10-07T18:51:01.069211Z",
+  "committed_utc": "2026-10-07T18:56:01.874712Z",
+  "function_wall_seconds_including_setup_and_commit": 300.805553115,
+  "requested_resources": {
+    "gpu": "none",
+    "cpu_cores": 2,
+    "memory_gib": 8,
+    "max_containers": 1,
+    "single_use_containers": true,
+    "timeout_seconds": 600
+  },
+  "pins": {
+    "native_commit": "8371e65af3d4ba5fb34c41d4e4c5702f29d5804a",
+    "llama_commit": "6c73b3e12dc501de35fe5f6979960d06921a2f6c",
+    "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "model_revision": "7ae557604adf67be50417f59c2c2f167def9a775"
+  },
+  "design_sha256": "4222a8b025b3f1b49b0f8a674b8cc512d904d5ab694e7a416db4e428ca815f4e",
+  "manifests": {
+    "source-model.json": "manifests/source-model.json",
+    "native-preparation.json": "manifests/native-preparation.json",
+    "llama-preparation.json": "manifests/llama-preparation.json"
+  },
+  "artifacts": {
+    "source_weights": {
+      "path": "hf/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775/model.safetensors",
+      "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+      "expected_sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+    },
+    "native_weights": {
+      "path": "artifacts/g64f16/model.safetensors",
+      "sha256": "c70c215d96047722ac638b9677e761874e46c7d41b0b01068a94ef33b12fa049",
+      "expected_sha256": "c70c215d96047722ac638b9677e761874e46c7d41b0b01068a94ef33b12fa049"
+    },
+    "native_config": {
+      "path": "artifacts/g64f16/config.json",
+      "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45"
+    },
+    "BF16": {
+      "path": "artifacts/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-bf16.gguf",
+      "sha256": "794f9d6e09be1e0509d0c917e4aff89d837f3e16b852b59453894e61a9816ed2",
+      "expected_sha256": "794f9d6e09be1e0509d0c917e4aff89d837f3e16b852b59453894e61a9816ed2"
+    },
+    "Q8_0": {
+      "path": "artifacts/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+      "sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7",
+      "expected_sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7"
+    }
+  },
+  "timing_binary_policy": "Compile both engines and the driver fresh on the actual timing host; do not copy or run staged builds."
+}
