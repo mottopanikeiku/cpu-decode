@@ -1,0 +1,52 @@
+{
+  "kind": "completed_attempt_requested_resource_estimates",
+  "allocation_usd": 2.36,
+  "recorded_through_pdt": "2026-10-07T13:13:05-07:00",
+  "prior_night_cost_file": "../cloud/run-cost.json",
+  "prior_night_total_upper_usd": 0.8553,
+  "day_attempts": [
+    {
+      "id": "cpu-decode-1791398777848",
+      "purpose": "twelve fresh CPU ISA probes",
+      "start_pdt": "2026-10-07T11:46:17-07:00",
+      "end_pdt": "2026-10-07T11:46:59-07:00",
+      "requested_cpu_cores": 1,
+      "requested_memory_gib": 0.5,
+      "requested_gpu": "none",
+      "booked_minutes": 3,
+      "client_wall_minutes": 0.69,
+      "estimated_upper_usd": 0.0006,
+      "outcome": "five of twelve containers reported every required VNNI flag"
+    },
+    {
+      "id": "cpu-decode-1791399041829",
+      "purpose": "CPU-only preparation of pinned model assets",
+      "start_pdt": "2026-10-07T11:50:41-07:00",
+      "end_pdt": "2026-10-07T11:56:03-07:00",
+      "requested_cpu_cores": 2,
+      "requested_memory_gib": 8,
+      "requested_gpu": "none",
+      "booked_minutes": 10,
+      "client_wall_minutes": 5.36,
+      "estimated_upper_usd": 0.0156,
+      "outcome": "source BF16, native g64f16, BF16 GGUF and Q8_0 hashes matched pinned artifacts"
+    },
+    {
+      "id": "cpu-decode-1791402097664",
+      "purpose": "initial VNNI runtime pilot",
+      "start_pdt": "2026-10-07T12:41:37-07:00",
+      "end_pdt": "2026-10-07T13:13:05-07:00",
+      "requested_cpu_cores": 8,
+      "requested_memory_gib": 8,
+      "requested_gpu": "none",
+      "booked_minutes": 30,
+      "client_wall_minutes": 31.46,
+      "estimated_upper_usd": 0.2545,
+      "completed_cells": 0,
+      "outcome": "supported CPU, verified offline artifacts and fresh builds; a baseline pilot response exceeded twenty minutes; its flash setting and sample index were not retained"
+    }
+  ],
+  "day_total_upper_usd": 0.2707,
+  "total_upper_usd": 1.126,
+  "note": "These rounded elapsed-client-wall-time resource estimates include a ten-percent margin, setup, pilots and failed work. They are not Modal invoices or measured billed usage. Volume storage is not included. No timings from the failed pilot enter a final matrix."
+}
