@@ -139,7 +139,7 @@ def compare_engine(args, oracle: dict, model: Path, label: str) -> dict:
     cases = []
     for case in oracle["prompts"]:
         prefix = args.raw_dir / f"{case['id']}-{label}"
-        common = [str(args.engine.resolve()), "--model", str(model.resolve()), "--threads", str(args.threads), "--kernel", args.kernel]
+        common = [str(args.engine.resolve()), "--model", str(model.resolve()), "--threads", str(args.threads), "--kernel", args.kernel, "--kv", "f32"]
         command = [common[0], "logits", *common[1:], "--tokens", ",".join(map(str, case["tokens"])), "--output", str(prefix)]
         subprocess.run(command, check=True)
         metadata = json.loads(prefix.with_suffix(".json").read_text())
@@ -195,7 +195,7 @@ def main() -> None:
     parser.add_argument("--head-chunk", type=int, default=1024)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--steps", type=int, default=8)
-    parser.add_argument("--kernel", choices=("scalar", "simd256", "simd512", "simd512x4"), default="scalar")
+    parser.add_argument("--kernel", choices=("scalar", "simd256", "simd512", "simd512x4", "vnni"), default="scalar")
     parser.add_argument("--atol", type=float, default=None)
     parser.add_argument("--rtol", type=float, default=None)
     parser.add_argument("--quant-max-kl", type=float, help="Optional caller-chosen maximum per-position KL; otherwise reporting only")

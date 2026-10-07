@@ -1,4 +1,5 @@
 #include "decode.hpp"
+#include "kv_cache.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -14,7 +15,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <omp.h>
 
 namespace decode {
 namespace {
@@ -56,6 +56,7 @@ struct Tensor {
     size_t count() const { size_t n = 1; for (size_t d : shape) n = product(n, d); return n; }
     float at(size_t i) const {
         if (type == DType::bf16) return bf16_float(static_cast<const uint16_t*>(data)[i]);
+        if (type == DType::f16) return half_float(static_cast<const uint16_t*>(data)[i]);
         if (type == DType::f32) { float x; std::memcpy(&x, static_cast<const char*>(data) + 4 * i, 4); return x; }
         return float(static_cast<const int8_t*>(data)[i]);
     }
@@ -93,6 +94,7 @@ struct Store {
                 size_t width;
                 if (dtype == "BF16") { type = DType::bf16; width = 2; }
                 else if (dtype == "F32") { type = DType::f32; width = 4; }
+                else if (dtype == "F16") { type = DType::f16; width = 2; }
                 else if (dtype == "I8") { type = DType::i8; width = 1; }
                 else throw std::runtime_error("unsupported tensor dtype: " + dtype);
                 std::vector<size_t> shape;
@@ -159,7 +161,7 @@ struct Config {
 struct Layer {
     Matrix q, k, v, o, gate, up, down;
     std::vector<float> input_norm, post_norm, qbias, kbias, vbias;
-    std::vector<float> keys, values;
+    std::unique_ptr<KvCache> cache;
 };
 template<class F> void timed(Profile* profile, const char* name, F&& fn) {
     if (!profile) { fn(); return; }
@@ -174,21 +176,33 @@ struct Engine::Impl {
     Store store;
     Kernel kernel;
     int threads;
-    bool cached_rope;
-    size_t capacity, pos = 0;
+    EngineOptions options;
+    ThreadPool pool;
+    Activation activation;
+    std::unique_ptr<AttentionWorkspace> workspace;
+    size_t capacity, pos = 0, cache_bytes = 0;
     Matrix embedding;
     std::vector<Layer> layers;
-    std::vector<float> final_norm, x, norm, q, k, v, attn, projected, gate, up, scores, logits;
+    std::vector<float> final_norm, x, norm, q, k, v, attn, projected, gate, logits;
     std::vector<float> inverse_frequency, rope_cos, rope_sin;
+    // Hidden rows survive across layers; all other intermediates are fixed tiles.
+    // Grow only to the largest requested batch, bounded by context capacity.
+    std::vector<float> batch_x, batch_logits;
+    std::vector<float> batch_norm, batch_q, batch_k, batch_v, batch_attn, batch_projected, batch_gate;
+    std::vector<float> batch_rope_cos, batch_rope_sin;
+    std::vector<Activation> batch_activations;
     uint64_t stored_bytes = 0, stored_scales = 0;
     std::string weight_dtype;
-    Impl(const std::string& directory, Kernel ktype, int nthreads, size_t cap, bool cached)
-        : config(read_json(fs::path(directory) / "config.json")), store(directory), kernel(ktype), threads(nthreads), cached_rope(cached), capacity(cap) {
+    Impl(const std::string& directory, Kernel ktype, int nthreads, size_t cap, EngineOptions opts)
+        : config(read_json(fs::path(directory) / "config.json")), store(directory), kernel(ktype), threads(nthreads),
+          options(std::move(opts)), pool(nthreads, options.cpus, options.persistent_pool, options.strict_affinity),
+          activation(std::max(config.hidden, config.intermediate), ktype), capacity(cap) {
         if (threads < 1 || threads > 1024 || !capacity || capacity > config.max_positions) throw std::runtime_error("invalid thread count or context capacity");
         parse_kernel(kernel_name(kernel));
-        omp_set_dynamic(0);
-        size_t cache = product(product(product(capacity, config.kv_heads * config.dim), config.layers), 2 * sizeof(float));
-        if (cache > 768ull * 1024 * 1024) throw std::runtime_error("KV cache exceeds 768MiB safety limit");
+        cache_bytes = product(KvCache::allocation_bytes(options.cache_type, capacity, config.kv_heads, config.dim), config.layers);
+        if (cache_bytes > 768ull * 1024 * 1024) throw std::runtime_error("KV cache exceeds 768MiB safety limit");
+        cache_bytes = 0;
+        workspace = std::make_unique<AttentionWorkspace>(capacity, config.heads, config.dim);
         embedding = matrix("model.embed_tokens.weight", config.vocab, config.hidden);
         weight_dtype = embedding.dtype == DType::i8 ? "int8" : "bf16";
         if (embedding.dtype == DType::f32) throw std::runtime_error("full FP32 model is not supported");
@@ -204,21 +218,29 @@ struct Engine::Impl {
             layer.up = matrix(base + "mlp.up_proj.weight", config.intermediate, config.hidden);
             layer.down = matrix(base + "mlp.down_proj.weight", config.hidden, config.intermediate);
             for (const Matrix* m : {&layer.q, &layer.k, &layer.v, &layer.o, &layer.gate, &layer.up, &layer.down})
-                if (m->dtype != embedding.dtype) throw std::runtime_error("mixed matrix dtypes are not supported");
+                if (m->dtype != embedding.dtype || m->group_size != embedding.group_size || m->scale_dtype != embedding.scale_dtype)
+                    throw std::runtime_error("mixed matrix formats are not supported");
             layer.input_norm = vector(base + "input_layernorm.weight", config.hidden);
             layer.post_norm = vector(base + "post_attention_layernorm.weight", config.hidden);
             layer.qbias = vector(base + "self_attn.q_proj.bias", config.hidden);
             layer.kbias = vector(base + "self_attn.k_proj.bias", config.kv_heads * config.dim);
             layer.vbias = vector(base + "self_attn.v_proj.bias", config.kv_heads * config.dim);
-            layer.keys.resize(product(capacity, config.kv_heads * config.dim));
-            layer.values.resize(layer.keys.size());
+            layer.cache = std::make_unique<KvCache>(options.cache_type, capacity, config.heads, config.kv_heads, config.dim);
+            cache_bytes += layer.cache->bytes();
             layers.push_back(std::move(layer));
         }
         final_norm = vector("model.norm.weight", config.hidden);
         x.resize(config.hidden); norm.resize(config.hidden); q.resize(config.hidden);
         k.resize(config.kv_heads * config.dim); v.resize(k.size()); attn.resize(config.hidden);
-        projected.resize(config.hidden); gate.resize(config.intermediate); up.resize(config.intermediate);
-        scores.resize(product(config.heads, capacity)); logits.resize(config.vocab);
+        projected.resize(config.hidden); gate.resize(config.intermediate);
+        logits.resize(config.vocab);
+        batch_norm.resize(product(projection_columns, config.hidden));
+        batch_q.resize(batch_norm.size()); batch_attn.resize(batch_norm.size()); batch_projected.resize(batch_norm.size());
+        batch_k.resize(product(projection_columns, config.kv_heads * config.dim)); batch_v.resize(batch_k.size());
+        batch_gate.resize(product(projection_columns, config.intermediate));
+        batch_activations.reserve(projection_columns);
+        for (size_t c = 0; c < projection_columns; ++c)
+            batch_activations.emplace_back(std::max(config.hidden, config.intermediate), kernel);
         inverse_frequency.resize(config.dim / 2); rope_cos.resize(config.dim / 2); rope_sin.resize(config.dim / 2);
         for (size_t j = 0; j < inverse_frequency.size(); ++j)
             inverse_frequency[j] = 1.0f / std::pow(config.theta, float(2 * j) / float(config.dim));
@@ -229,12 +251,19 @@ struct Engine::Impl {
     }
     Matrix matrix(const std::string& name, size_t rows, size_t cols) {
         const auto& t = store.get(name, {rows, cols});
+        if (t.type == DType::f16) throw std::runtime_error("FP16 matrices are not supported");
         Matrix result{t.data, nullptr, rows, cols, t.type};
         if (t.type == DType::i8) {
-            const auto& s = store.get(name + ".scales", {rows});
-            if (s.type != DType::f32) throw std::runtime_error("scales must be FP32");
-            result.scales = static_cast<const float*>(s.data);
-            for (size_t j = 0; j < rows; ++j) if (!std::isfinite(result.scales[j]) || result.scales[j] <= 0) throw std::runtime_error("invalid quantization scale");
+            auto found = store.tensors.find(name + ".scales");
+            if (found == store.tensors.end()) throw std::runtime_error("missing matrix scales");
+            const auto& s = found->second;
+            if (s.shape.size() == 1 && s.shape[0] == rows) result.group_size = 0;
+            else if (s.shape.size() == 2 && s.shape[0] == rows && cols % s.shape[1] == 0) result.group_size = cols / s.shape[1];
+            else throw std::runtime_error("invalid scale shape");
+            if (result.group_size && (result.group_size < 32 || (result.group_size & (result.group_size - 1)))) throw std::runtime_error("group size must be a power of two at least32");
+            if (s.type != DType::f32 && s.type != DType::f16) throw std::runtime_error("scales must be FP32 or FP16");
+            result.scales = s.data; result.scale_dtype = s.type;
+            for (size_t j = 0; j < s.count(); ++j) if (!std::isfinite(s.at(j)) || s.at(j) <= 0) throw std::runtime_error("invalid quantization scale");
         }
         return result;
     }
@@ -248,25 +277,32 @@ struct Engine::Impl {
         }
         return result;
     }
-    void multiply(const Matrix& m, const float* input, float* out, Profile* p) {
-        matvec(m, input, out, kernel, threads);
-        if (p) {
+    void multiply(const Projection* items, size_t count, const float* input, Profile* p, bool swiglu = false) {
+        projections(items, count, input, kernel, pool, activation, swiglu);
+        if (p) for (size_t i = 0; i < count; ++i) {
+            const Matrix& m = *items[i].matrix;
             p->matrix_weight_bytes += m.rows * m.cols * (m.dtype == DType::bf16 ? 2 : m.dtype == DType::i8 ? 1 : 4);
-            if (m.dtype == DType::i8) p->scale_bytes += m.rows * 4;
+            p->scale_bytes += matrix_scale_bytes(m);
         }
+    }
+    void multiply(const Matrix& m, const float* input, float* out, Profile* p) {
+        Projection projection{&m, out};
+        multiply(&projection, 1, input, p);
     }
     const std::vector<float>& step(int token, bool head, Profile* p) {
         if (token < 0 || size_t(token) >= config.vocab) throw std::runtime_error("token ID outside vocabulary");
         if (pos >= capacity) throw std::runtime_error("context capacity exceeded");
+        if (p && (options.cache_type == CacheType::i8 || options.cache_type == CacheType::i8_centered))
+            throw std::runtime_error("int8 KV profiling is unsupported; measure externally");
         timed(p, "embedding", [&] {
             for (size_t j = 0; j < config.hidden; ++j) {
                 size_t offset = size_t(token) * config.hidden + j;
                 if (embedding.dtype == DType::bf16) x[j] = bf16_float(static_cast<const uint16_t*>(embedding.data)[offset]);
-                else x[j] = float(static_cast<const int8_t*>(embedding.data)[offset]) * embedding.scales[token];
+                else x[j] = float(static_cast<const int8_t*>(embedding.data)[offset]) * matrix_scale(embedding, size_t(token), j);
             }
         });
-        if (p) { p->embedding_bytes += config.hidden * (embedding.dtype == DType::bf16 ? 2 : 1) + (embedding.dtype == DType::i8 ? 4 : 0); ++p->steps; }
-        if (cached_rope) timed(p, "rope", [&] {
+        if (p) { p->embedding_bytes += config.hidden * (embedding.dtype == DType::bf16 ? 2 : 1) + (embedding.dtype == DType::i8 ? matrix_scale_bytes(embedding) / embedding.rows : 0); ++p->steps; }
+        if (options.cached_rope) timed(p, "rope", [&] {
             for (size_t j = 0; j < inverse_frequency.size(); ++j) {
                 float angle = float(pos) * inverse_frequency[j];
                 rope_cos[j] = std::cos(angle); rope_sin[j] = std::sin(angle);
@@ -275,12 +311,11 @@ struct Engine::Impl {
         for (Layer& l : layers) {
             timed(p, "rmsnorm", [&] { rmsnorm(x.data(), l.input_norm.data(), norm.data(), config.hidden, config.epsilon); });
             timed(p, "qkv", [&] {
-                multiply(l.q, norm.data(), q.data(), p); multiply(l.k, norm.data(), k.data(), p); multiply(l.v, norm.data(), v.data(), p);
-                for (size_t j = 0; j < q.size(); ++j) q[j] += l.qbias[j];
-                for (size_t j = 0; j < k.size(); ++j) { k[j] += l.kbias[j]; v[j] += l.vbias[j]; }
+                Projection items[]{{&l.q, q.data(), l.qbias.data()}, {&l.k, k.data(), l.kbias.data()}, {&l.v, v.data(), l.vbias.data()}};
+                multiply(items, 3, norm.data(), p);
             });
             timed(p, "rope", [&] {
-                if (!cached_rope) {
+                if (!options.cached_rope) {
                     rope(q.data(), config.heads, config.dim, pos, config.theta);
                     rope(k.data(), config.kv_heads, config.dim, pos, config.theta);
                     return;
@@ -296,23 +331,24 @@ struct Engine::Impl {
                 };
                 rotate(q); rotate(k);
             });
-            timed(p, "kv_write", [&] {
-                std::copy(k.begin(), k.end(), l.keys.begin() + pos * k.size());
-                std::copy(v.begin(), v.end(), l.values.begin() + pos * v.size());
+            timed(p, "kv_write", [&] { l.cache->store(pos, k.data(), v.data()); });
+            timed(p, "attention", [&] {
+                l.cache->attend(q.data(), attn.data(), pos + 1, pool, *workspace, options.scalar_attention);
             });
-            timed(p, "attention", [&] { attention(q.data(), l.keys.data(), l.values.data(), attn.data(), scores.data(), pos + 1, config.heads, config.kv_heads, config.dim, threads); });
             timed(p, "attention_output", [&] { multiply(l.o, attn.data(), projected.data(), p); });
-            timed(p, "residual", [&] { for (size_t j = 0; j < x.size(); ++j) x[j] += projected[j]; });
-            timed(p, "rmsnorm", [&] { rmsnorm(x.data(), l.post_norm.data(), norm.data(), config.hidden, config.epsilon); });
-            timed(p, "mlp_gate_up", [&] { multiply(l.gate, norm.data(), gate.data(), p); multiply(l.up, norm.data(), up.data(), p); });
-            timed(p, "silu", [&] { for (size_t j = 0; j < gate.size(); ++j) gate[j] = (gate[j] / (1.0f + std::exp(-gate[j]))) * up[j]; });
+            timed(p, "rmsnorm", [&] { residual_rmsnorm(x.data(), projected.data(), l.post_norm.data(), norm.data(), config.hidden, config.epsilon); });
+            timed(p, "mlp_gate_up", [&] {
+                Projection items[]{{&l.gate, gate.data()}, {&l.up, nullptr}};
+                multiply(items, 2, norm.data(), p, true);
+            });
             timed(p, "mlp_down", [&] { multiply(l.down, gate.data(), projected.data(), p); });
             timed(p, "residual", [&] { for (size_t j = 0; j < x.size(); ++j) x[j] += projected[j]; });
             if (p) {
                 p->norm_bias_bytes += (2 * config.hidden + q.size() + 2 * k.size()) * 4;
-                p->kv_write_bytes += 2 * k.size() * 4;
-                p->kv_read_min_bytes += 2 * (pos + 1) * k.size() * 4;
-                p->kv_read_logical_bytes += 2 * (pos + 1) * q.size() * 4;
+                size_t width = options.cache_type == CacheType::f16 ? 2 : 4;
+                p->kv_write_bytes += 2 * k.size() * width;
+                p->kv_read_min_bytes += 2 * (pos + 1) * k.size() * width;
+                p->kv_read_logical_bytes += 2 * (pos + 1) * q.size() * width;
             }
         }
         if (head) {
@@ -321,14 +357,106 @@ struct Engine::Impl {
             if (p) {
                 p->norm_bias_bytes += config.hidden * 4; ++p->head_steps;
                 p->lm_head_weight_bytes += embedding.rows * embedding.cols * (embedding.dtype == DType::bf16 ? 2 : 1);
-                if (embedding.dtype == DType::i8) p->lm_head_scale_bytes += embedding.rows * 4;
+                p->lm_head_scale_bytes += matrix_scale_bytes(embedding);
             }
         }
         ++pos;
         return logits;
     }
+    const std::vector<float>& batch(const std::vector<int>& tokens, size_t head_start, Profile* profile) {
+        if (profile) throw std::runtime_error("batch profiling is unsupported; measure externally");
+        if (head_start > tokens.size()) throw std::runtime_error("head_start outside batch");
+        if (tokens.size() > capacity - pos) throw std::runtime_error("context capacity exceeded");
+        for (int token : tokens)
+            if (token < 0 || size_t(token) >= config.vocab) throw std::runtime_error("token ID outside vocabulary");
+        // Check all sizes and allocate before any cache writes or position changes.
+        const size_t hidden = config.hidden, kv_width = config.kv_heads * config.dim;
+        const size_t x_count = product(tokens.size(), hidden);
+        const size_t logits_count = product(tokens.size() - head_start, config.vocab);
+        if (x_count > batch_x.size()) {
+            batch_x.reserve(x_count);
+            batch_x.resize(x_count);
+        }
+        if (logits_count > batch_logits.capacity()) batch_logits.reserve(logits_count);
+        batch_logits.resize(logits_count);
+        if (options.cached_rope) {
+            const size_t angles = product(tokens.size(), config.dim / 2);
+            if (angles > batch_rope_cos.size()) {
+                batch_rope_cos.reserve(angles); batch_rope_sin.reserve(angles);
+                batch_rope_cos.resize(angles); batch_rope_sin.resize(angles);
+            }
+            for (size_t t = 0; t < tokens.size(); ++t) for (size_t j = 0; j < inverse_frequency.size(); ++j) {
+                float angle = float(pos + t) * inverse_frequency[j];
+                batch_rope_cos[t * inverse_frequency.size() + j] = std::cos(angle);
+                batch_rope_sin[t * inverse_frequency.size() + j] = std::sin(angle);
+            }
+        }
+        for (size_t t = 0; t < tokens.size(); ++t) for (size_t j = 0; j < hidden; ++j) {
+            size_t offset = size_t(tokens[t]) * hidden + j;
+            batch_x[t * hidden + j] = embedding.dtype == DType::bf16
+                ? bf16_float(static_cast<const uint16_t*>(embedding.data)[offset])
+                : float(static_cast<const int8_t*>(embedding.data)[offset]) * matrix_scale(embedding, size_t(tokens[t]), j);
+        }
+        auto multiply_batch = [&](const BatchProjection* items, size_t count, const float* input,
+                                  size_t columns, size_t stride, bool swiglu = false) {
+            batch_projections(items, count, input, columns, stride, kernel, pool, batch_activations.data(), swiglu);
+        };
+        auto rotate = [&](float* data, size_t heads, size_t position) {
+            if (!options.cached_rope) { rope(data, heads, config.dim, position, config.theta); return; }
+            for (size_t h = 0; h < heads; ++h) for (size_t j = 0; j < config.dim / 2; ++j) {
+                size_t a = h * config.dim + j, b = a + config.dim / 2;
+                float first = data[a], second = data[b];
+                size_t angle = (position - pos) * inverse_frequency.size() + j;
+                data[a] = first * batch_rope_cos[angle] - second * batch_rope_sin[angle];
+                data[b] = second * batch_rope_cos[angle] + first * batch_rope_sin[angle];
+            }
+        };
+        // Each complete layer processes every token before the next layer starts.
+        // Causal attention is sequential within a tile, including prefix-mean freezing.
+        for (Layer& l : layers) for (size_t begin = 0; begin < tokens.size(); begin += projection_columns) {
+            size_t columns = std::min(projection_columns, tokens.size() - begin);
+            for (size_t c = 0; c < columns; ++c)
+                rmsnorm(batch_x.data() + (begin + c) * hidden, l.input_norm.data(),
+                        batch_norm.data() + c * hidden, hidden, config.epsilon);
+            BatchProjection qkv[]{{&l.q, batch_q.data(), hidden, l.qbias.data()},
+                                  {&l.k, batch_k.data(), kv_width, l.kbias.data()},
+                                  {&l.v, batch_v.data(), kv_width, l.vbias.data()}};
+            multiply_batch(qkv, 3, batch_norm.data(), columns, hidden);
+            for (size_t c = 0; c < columns; ++c) {
+                size_t position = pos + begin + c;
+                rotate(batch_q.data() + c * hidden, config.heads, position);
+                rotate(batch_k.data() + c * kv_width, config.kv_heads, position);
+                l.cache->store(position, batch_k.data() + c * kv_width, batch_v.data() + c * kv_width);
+                l.cache->attend(batch_q.data() + c * hidden, batch_attn.data() + c * hidden,
+                                position + 1, pool, *workspace, options.scalar_attention);
+            }
+            BatchProjection output{&l.o, batch_projected.data(), hidden};
+            multiply_batch(&output, 1, batch_attn.data(), columns, hidden);
+            for (size_t c = 0; c < columns; ++c)
+                residual_rmsnorm(batch_x.data() + (begin + c) * hidden,
+                                 batch_projected.data() + c * hidden, l.post_norm.data(),
+                                 batch_norm.data() + c * hidden, hidden, config.epsilon);
+            BatchProjection mlp[]{{&l.gate, batch_gate.data(), config.intermediate},
+                                  {&l.up, nullptr, 0}};
+            multiply_batch(mlp, 2, batch_norm.data(), columns, hidden, true);
+            BatchProjection down{&l.down, batch_projected.data(), hidden};
+            multiply_batch(&down, 1, batch_gate.data(), columns, config.intermediate);
+            for (size_t c = 0; c < columns; ++c) for (size_t j = 0; j < hidden; ++j)
+                batch_x[(begin + c) * hidden + j] += batch_projected[c * hidden + j];
+        }
+        for (size_t begin = head_start; begin < tokens.size(); begin += projection_columns) {
+            size_t columns = std::min(projection_columns, tokens.size() - begin);
+            for (size_t c = 0; c < columns; ++c)
+                rmsnorm(batch_x.data() + (begin + c) * hidden, final_norm.data(),
+                        batch_norm.data() + c * hidden, hidden, config.epsilon);
+            BatchProjection head{&embedding, batch_logits.data() + (begin - head_start) * config.vocab, config.vocab};
+            multiply_batch(&head, 1, batch_norm.data(), columns, hidden);
+        }
+        pos += tokens.size();
+        return batch_logits;
+    }
 };
-Engine::Engine(const std::string& dir, Kernel kernel, int threads, size_t capacity, bool cached_rope) : impl(std::make_unique<Impl>(dir, kernel, threads, capacity, cached_rope)) {}
+Engine::Engine(const std::string& dir, Kernel kernel, int threads, size_t capacity, EngineOptions options) : impl(std::make_unique<Impl>(dir, kernel, threads, capacity, std::move(options))) {}
 Engine::~Engine() = default;
 Engine::Engine(Engine&&) noexcept = default;
 Engine& Engine::operator=(Engine&&) noexcept = default;
@@ -337,21 +465,47 @@ void Engine::rewind(size_t position) {
     if (position > impl->pos) throw std::runtime_error("cannot rewind forward");
     impl->pos = position;
 }
-const std::vector<float>& Engine::step(int token, bool head, Profile* profile) { return impl->step(token, head, profile); }
+const std::vector<float>& Engine::step(int token, bool head, Profile* profile) {
+    CpuBinding binding(impl->options.strict_affinity ? impl->pool.cpus()[0] : -1);
+    return impl->step(token, head, profile);
+}
+const std::vector<float>& Engine::batch(const std::vector<int>& tokens, size_t head_start, Profile* profile) {
+    CpuBinding binding(impl->options.strict_affinity ? impl->pool.cpus()[0] : -1);
+    return impl->batch(tokens, head_start, profile);
+}
 size_t Engine::vocab_size() const { return impl->config.vocab; }
 size_t Engine::position() const { return impl->pos; }
 Json Engine::metadata() const {
-    return {{"weight_dtype", impl->weight_dtype}, {"quantization", impl->weight_dtype == "int8" ? "symmetric per-row int8, float32 scales, float32 activations" : "none"},
-            {"kernel", kernel_name(impl->kernel)}, {"kernel_scope", "matrix-vector products; FP32 norms, RoPE, attention and elementwise operations shared"},
-            {"threads", impl->threads}, {"stored_weight_bytes", impl->stored_bytes},
-            {"rope", impl->cached_rope ? "cached" : "direct"},
-            {"thread_scheduling", "OpenMP static rows/heads, separate parallel region per operation"},
-            {"stored_scale_bytes", impl->stored_scales}, {"kv_capacity", impl->capacity},
+    return {{"weight_dtype", impl->weight_dtype}, {"group_size", impl->embedding.group_size},
+            {"scale_dtype", impl->embedding.scale_dtype == DType::f16 ? "f16" : "f32"},
+            {"activation_dtype", impl->kernel == Kernel::vnni16 ? "int16" : impl->kernel == Kernel::vnni ? "int8" : "float32"},
+            {"activation_group_size", impl->kernel == Kernel::vnni16 ? 64 : impl->kernel == Kernel::vnni ? 32 : 0},
+            {"quantization", impl->weight_dtype == "int8" ? "symmetric int8 weights with per-row or group scales" : "none"},
+            {"kernel", kernel_name(impl->kernel)}, {"threads", impl->threads}, {"cpu_set", impl->pool.cpus()},
+            {"stored_weight_bytes", impl->stored_bytes}, {"stored_scale_bytes", impl->stored_scales},
+            {"rope", impl->options.cached_rope ? "cached" : "direct"},
+            {"scheduler", impl->options.persistent_pool ? "pool" : "openmp"},
+            {"affinity", impl->options.strict_affinity ? "strict" : "unpinned"},
+            {"attention", impl->options.scalar_attention ? "scalar" : "blocked"},
+            {"attention_block_size", AttentionWorkspace::block_size},
+            {"fused_operations", {"qkv_bias", "gate_up_silu", "attention_residual_rmsnorm"}},
+            {"kv_dtype", impl->options.cache_type == CacheType::f16 ? "f16" :
+                         impl->options.cache_type == CacheType::f32 ? "f32" :
+                         impl->options.cache_type == CacheType::i8 ? "i8" : "i8_centered"},
+            {"kv_key_mean_prefix", impl->options.cache_type == CacheType::i8_centered ? KvCache::key_mean_prefix : 0},
+            {"kv_centered_warmup_keys", impl->options.cache_type == CacheType::i8_centered ? "raw fp32 below 64 tokens" : "none"},
+            {"batch_projection_columns", projection_columns}, {"batch_profile", "unsupported"},
+            {"step_profile", (impl->options.cache_type == CacheType::f16 || impl->options.cache_type == CacheType::f32) ? "supported" : "unsupported"},
+            {"kv_capacity", impl->capacity},
             {"auxiliary_fp32_weight_bytes", (impl->config.layers * (3 * impl->config.hidden + 2 * impl->config.kv_heads * impl->config.dim) + impl->config.hidden) * 4},
-            {"kv_cache_bytes", impl->capacity * impl->config.kv_heads * impl->config.dim * impl->config.layers * 2 * 4},
+            {"kv_cache_bytes", impl->cache_bytes}, {"key_cache_layout", "kv/block64/dim/token"},
             {"tied_head", true}, {"vocab_size", impl->config.vocab}};
 }
-void quantize_model(const std::string& source, const std::string& output) {
+void quantize_model(const std::string& source, const std::string& output, size_t group_size, DType scale_dtype) {
+    if (scale_dtype != DType::f32 && scale_dtype != DType::f16) throw std::runtime_error("scale dtype must be FP32 or FP16");
+    if (group_size && group_size != 32 && group_size != 64 && group_size != 128) throw std::runtime_error("group size must be0,32,64,128");
+    if ((!group_size && scale_dtype != DType::f32) || (group_size && 8 + (scale_dtype == DType::f16 ? 16.0 : 32.0) / group_size > 8.5))
+        throw std::runtime_error("quantization exceeds8.5 matrix bits/weight or changes legacy row scales");
     fs::path src(source), dst(output);
     if (fs::weakly_canonical(src) == fs::weakly_canonical(dst)) throw std::runtime_error("quantization output must differ from input");
     { Engine validate(source, Kernel::scalar, 1, 1); }
@@ -361,6 +515,8 @@ void quantize_model(const std::string& source, const std::string& output) {
         if (item.second.type != DType::bf16) throw std::runtime_error("quantization input must be BF16");
         if (item.second.shape.size() == 2 && item.second.count() % 4)
             throw std::runtime_error("int8 matrices must contain a multiple of four elements");
+        if (group_size && item.second.shape.size() == 2 && item.second.shape[1] % group_size)
+            throw std::runtime_error("matrix columns must be divisible by group size");
     }
     if (store.tensors.count("lm_head.weight")) throw std::runtime_error("duplicate tied head in input");
     Json header;
@@ -368,15 +524,27 @@ void quantize_model(const std::string& source, const std::string& output) {
     auto add = [&](const std::string& name, const std::string& dtype, const std::vector<size_t>& shape, uint64_t bytes) {
         header[name] = {{"dtype", dtype}, {"shape", shape}, {"data_offsets", {offset, offset + bytes}}}; offset += bytes;
     };
-    // Preserve source iteration order in data emission, not JSON key order.
-    for (const auto& item : store.tensors) {
+    auto visit = [&](auto&& emit_tensor) {
+        // FP32 vectors first keeps them aligned even when an FP16-scale tensor has an odd count.
+        if (scale_dtype == DType::f16) for (const auto& item : store.tensors)
+            if (item.second.shape.size() == 1) emit_tensor(item);
+        for (const auto& item : store.tensors)
+            if (scale_dtype != DType::f16 || item.second.shape.size() == 2) emit_tensor(item);
+    };
+    visit([&](const auto& item) {
         const Tensor& t = item.second;
         if (t.shape.size() == 2) {
+            size_t groups = group_size ? t.shape[1] / group_size : 1;
             add(item.first, "I8", t.shape, t.count());
-            add(item.first + ".scales", "F32", {t.shape[0]}, t.shape[0] * 4);
+            std::vector<size_t> shape = group_size ? std::vector<size_t>{t.shape[0], groups} : std::vector<size_t>{t.shape[0]};
+            add(item.first + ".scales", scale_dtype == DType::f16 ? "F16" : "F32", shape, t.shape[0] * groups * (scale_dtype == DType::f16 ? 2 : 4));
         } else add(item.first, "F32", t.shape, t.count() * 4);
+    });
+    header["__metadata__"] = {{"format", "pt"}, {"quantization", group_size ? "symmetric-per-group-int8" : "symmetric-per-row-int8"}};
+    if (group_size) {
+        header["__metadata__"]["group_size"] = std::to_string(group_size);
+        header["__metadata__"]["scale_dtype"] = scale_dtype == DType::f16 ? "f16" : "f32";
     }
-    header["__metadata__"] = {{"format", "pt"}, {"quantization", "symmetric-per-row-int8"}};
     std::string encoded = header.dump();
     while (encoded.size() % 8) encoded.push_back(' ');
     fs::create_directories(dst);
@@ -386,17 +554,31 @@ void quantize_model(const std::string& source, const std::string& output) {
         if (!out) throw std::runtime_error("cannot create quantized model");
         uint64_t header_size = encoded.size();
         out.write(reinterpret_cast<const char*>(&header_size), 8); out.write(encoded.data(), encoded.size());
-        for (const auto& item : store.tensors) {
+        visit([&](const auto& item) {
             const Tensor& t = item.second;
             if (t.shape.size() == 2) {
-                std::vector<float> row(t.shape[1]), scales(t.shape[0]);
+                size_t groups = group_size ? t.shape[1] / group_size : 1, width = group_size ? group_size : t.shape[1];
+                std::vector<float> row(t.shape[1]), scales(t.shape[0] * groups);
+                std::vector<uint16_t> scales16(scale_dtype == DType::f16 ? scales.size() : 0);
                 std::vector<int8_t> quantized(t.shape[1]);
                 for (size_t r = 0; r < t.shape[0]; ++r) {
                     for (size_t j = 0; j < row.size(); ++j) row[j] = t.at(r * row.size() + j);
-                    quantize_row(row.data(), row.size(), quantized.data(), scales[r]);
+                    for (size_t g = 0; g < groups; ++g) {
+                        float& scale = scales[r * groups + g];
+                        quantize_row(row.data() + g * width, width, quantized.data() + g * width, scale);
+                        if (scale_dtype == DType::f16) {
+                            uint16_t encoded_scale = float_half(scale);
+                            scale = half_float(encoded_scale);
+                            if (!std::isfinite(scale) || scale <= 0) throw std::runtime_error("scale not representable in FP16");
+                            scales16[r * groups + g] = encoded_scale;
+                            for (size_t j = g * width; j < (g + 1) * width; ++j)
+                                quantized[j] = static_cast<int8_t>(std::clamp(std::round(row[j] / scale), -127.0f, 127.0f));
+                        }
+                    }
                     out.write(reinterpret_cast<const char*>(quantized.data()), quantized.size());
                 }
-                out.write(reinterpret_cast<const char*>(scales.data()), scales.size() * 4);
+                if (scale_dtype == DType::f16) out.write(reinterpret_cast<const char*>(scales16.data()), scales16.size() * 2);
+                else out.write(reinterpret_cast<const char*>(scales.data()), scales.size() * 4);
             } else {
                 for (size_t j = 0; j < t.count(); ++j) {
                     float value = t.at(j);
@@ -405,7 +587,11 @@ void quantize_model(const std::string& source, const std::string& output) {
                 }
             }
             if (!out) throw std::runtime_error("quantization write failed");
-        }
+            // A larger BF16 input need not remain resident after each streamed tensor.
+            for (const auto& mapping : store.mappings)
+                if (madvise(mapping->base, mapping->length, MADV_DONTNEED))
+                    throw std::runtime_error("cannot release quantization source pages");
+        });
         out.close();
         if (!out) throw std::runtime_error("quantization flush failed");
         fs::copy_file(src / "config.json", dst / "config.json");

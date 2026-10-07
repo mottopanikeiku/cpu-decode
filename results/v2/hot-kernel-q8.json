@@ -1,0 +1,24 @@
+{
+  "schema": "executed-upstream-kernel-v1",
+  "scope": "Debugger-observed Q8_0 execution on the actual 0.5B checkpoint; not a throughput measurement",
+  "llama_commit": "6c73b3e12dc501de35fe5f6979960d06921a2f6c",
+  "model_sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7",
+  "binaries": {
+    "$LLAMA_BENCH": "eba9707f67b3f1a4d90954c39e5aa41267cbb81f3faf4de05d428eb34d3f3b2f",
+    "$LIBGGML_CPU": "f5bd6ba7950fbbab882215b897293147cd7254af278c6d5f282d53f864b77fab"
+  },
+  "command": ["$LLAMA_BENCH", "-m", "$GGUF", "-p", "0", "-n", "1", "-d", "128", "-t", "1", "-r", "1", "-ngl", "0", "-ctk", "f16", "-ctv", "f16", "-fa", "auto", "--cpu-mask", "0x1", "--cpu-strict", "1", "--poll", "50", "--repack", "1", "-o", "json"],
+  "function": "ggml_vec_dot_q8_0_q8_0",
+  "before_single_step": {
+    "function_offset_bytes": 103,
+    "pc": "0x7ffff731c1f7",
+    "instruction": "{vex} vpdpbusd %ymm2,%ymm4,%ymm1"
+  },
+  "after_single_step": {
+    "function_offset_bytes": 108,
+    "pc": "0x7ffff731c1fc",
+    "instruction": "vcvtdq2ps %ymm1,%ymm1"
+  },
+  "result": "The debugger hit the actual shared-library integer-dot instruction and stepped past it. This is execution evidence, not merely disassembly or CPU-feature detection.",
+  "termination": "GDB exited successfully after the single step and intentionally stopped the inferior; no completed benchmark or sample rate is claimed."
+}

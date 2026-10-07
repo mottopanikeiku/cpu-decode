@@ -1,0 +1,94 @@
+{
+  "scope": "Provisional int16 path, NOT quality-approved; development single exclusive interleaved window; order reversed in second round; no upstream baseline or final claim",
+  "engine_sha256": "b4d8209ad34934fb55164b461f0acc840012f4c2f1d9e0e14b9d3e85f4c10aaa",
+  "weights_sha256": "c70c215d96047722ac638b9677e761874e46c7d41b0b01068a94ef33b12fa049",
+  "steps": 16,
+  "repeats": 3,
+  "rounds": 2,
+  "rows": [
+    {
+      "threads": 1,
+      "context": 128,
+      "simd512x4": {
+        "median": 38.43498699296358,
+        "min": 35.73229718485464,
+        "max": 39.41203024733409,
+        "samples": 6,
+        "spread_percent": 9.573915201670578,
+        "median_prefill_seconds": 2.4538838370000002
+      },
+      "vnni16": {
+        "median": 58.124237132181605,
+        "min": 57.04386281587032,
+        "max": 60.049047912212075,
+        "samples": 6,
+        "spread_percent": 5.170278776317697,
+        "median_prefill_seconds": 1.6393203545000001
+      },
+      "int16_over_fp32": 1.5122741460228046
+    },
+    {
+      "threads": 2,
+      "context": 128,
+      "simd512x4": {
+        "median": 57.210937987374834,
+        "min": 54.27130999195974,
+        "max": 58.98997526572459,
+        "samples": 6,
+        "spread_percent": 8.247837633436726,
+        "median_prefill_seconds": 1.8055341335
+      },
+      "vnni16": {
+        "median": 68.09509028332809,
+        "min": 65.41460282231958,
+        "max": 71.35442812536465,
+        "samples": 6,
+        "spread_percent": 8.722839309458017,
+        "median_prefill_seconds": 1.3898787874999998
+      },
+      "int16_over_fp32": 1.1902460032792181
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "simd512x4": {
+        "median": 62.915925717950756,
+        "min": 60.09365092211886,
+        "max": 64.03347977683435,
+        "samples": 6,
+        "spread_percent": 6.262053382759666,
+        "median_prefill_seconds": 1.489209775
+      },
+      "vnni16": {
+        "median": 66.45599643196314,
+        "min": 64.17244856751714,
+        "max": 71.2221882863333,
+        "samples": 6,
+        "spread_percent": 10.608131842599951,
+        "median_prefill_seconds": 1.4534870255
+      },
+      "int16_over_fp32": 1.056266687227688
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "simd512x4": {
+        "median": 59.02079029268498,
+        "min": 55.14336730959743,
+        "max": 60.568199287031284,
+        "samples": 6,
+        "spread_percent": 9.191391627479117,
+        "median_prefill_seconds": 48.624523054
+      },
+      "vnni16": {
+        "median": 59.96334070726521,
+        "min": 56.965932958623526,
+        "max": 67.46278487151773,
+        "samples": 6,
+        "spread_percent": 17.505448811030625,
+        "median_prefill_seconds": 48.97074114
+      },
+      "int16_over_fp32": 1.0159698033507534
+    }
+  ]
+}

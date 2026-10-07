@@ -152,3 +152,168 @@ Reviewed the completed README, generated summary/tables, traffic JSON, all prima
 The relative-output metadata fix is coherent: samples are saved before metadata bookkeeping, bookkeeping now records the actual path, and portable publication can replace an external output directory. `attempt-note.json` identifies the retained completed scalar samples, exact command and environment reference; preserving these valid samples without a new timed run is appropriate. Failed/excluded warmup attempts remain outside the final aggregation search. Numeric preservation and reader/source provenance findings remain resolved.
 
 This was source/file inspection only. **No builds, tests, models, benchmarks, linters or formatters were independently executed or rerun by this reviewer.** `results/checks.json` reports native 3 passed, fast Python 18 passed/2 explicitly optional model skips, and model-specific 11 passed/no skips; these remain parent-reported outcomes, not independent reproduction. The final result is a small, honestly bounded measurement suitable for publication within those stated limits.
+
+## Block attention, grouped weights and worker-pool review
+
+Two independent source inspections covered the new native paths and their measurement/quality consumers. The reviewers ran no models, builds, tests or timings. Their concrete findings were:
+
+- SIMD group loads accepted eight-element groups although a 16-lane load used one scale. Groups now have a minimum size of 32.
+- FP16 matrix weights could reach code expecting FP32 or int8 payloads. FP16 is supported for scales and KV, not matrix weights; unsupported matrices are rejected before access.
+- Permanently binding the calling thread in a pool constructor caused overlapping engines to discover only one allowed CPU. Binding is now scoped to a forward/job, with exact restoration on success and exceptions; nested construction uses the original outer mask.
+- Unpinned baseline workers did not establish equal process eligibility, and upstream OpenMP ignored its worker mask at one thread. Selected-set comparisons now restrict the whole process; unrestricted upstream defaults remain a separate, eligible category.
+- An experimental VNNI run could be selected without its held-out quality comparison. Final selection now requires all four Q8 comparisons, matching execution settings and linked artifact identities.
+- Quality output paths could overwrite archived results, any per-row artifact could be labeled the old control, and hashing the reader alone did not identify its actual llama/ggml shared libraries. The consumers now reject archived output paths, check the archived row-artifact hashes, and hash/recheck the resolved libraries and build settings.
+
+The author ran the updated native tests (three passed) and Python suite (117 passed, two optional model skips) after these source corrections and the separated grouped/row SIMD kernels. Those executions are not independent reproductions by the reviewers. New affinity regressions cover overlapping/replaced engines, exception restoration, nested bindings, OpenMP and the full allowed mask for unpinned workers.
+
+The development protocol was also corrected to load one model at a time: each native process exits before llama loads. Earlier interactive development records are not eligible for the final protocol. The archived first-version results remain unchanged.
+
+Performance targets and the held-out grouped-weight results are not established by this source review. Development regressions and their per-operation measurements are retained under `results/v2/`; a faster code path is not an accuracy result.
+
+## Normalized attention and reproduction-identity follow-up
+
+A further source-only arithmetic review found two finite-input counterexamples in blocked attention: an all-negative-infinity block produced NaNs despite a later finite block, and an unnormalized sum of large finite values overflowed even when their weighted average was finite. Both scalar and SIMD blocks now retain zero mass for the first case, normalize local probabilities before forming each block mean, and merge those means using normalized global block masses in ascending block order. Actual NaNs still propagate. The reviewer source-rechecked both corrections, cache-type specializations, SIMD and scalar fallback tests, and found no remaining concrete defect in those changes. This was not independent executable verification.
+
+The author executed three native tests after the corrections and grouped-scale reuse, and 171 Python tests with two explicitly optional model skips after the measurement fixes. Native coverage includes 160,000 exponential inputs, finite reduction-tree agreement, negative-infinity/NaN/large-average cases, F16/F32 cache paths, SIMD GQA ratios and scalar fallback, and thread-count bitwise checks. The real-model reference suite separately passed all eleven tests after normalized attention was introduced; that run preceded the later cache-type specialization and scale-load reuse.
+
+A separate source-only reproduction review found that executable-parent paths did not prove the resolved llama/ggml library build, freezes could overwrite discovery records, raw quality windows could be overwritten, and a uniform ceiling test misrepresented the different short/long targets. Freeze and execution now bind and recheck actual resolved libraries, their build root and loader-environment identity; destination preflight rejects existing discovery/protocol and raw-window paths before subprocesses run. Summary thresholds are explicit: one best short-context cell at 85%, every long-context cell at 75%, and descriptive twelve-thread scaling without an invented numeric collapse threshold. These safeguards were exercised with synthetic tests, not a completed final performance matrix. Active upstream hot-kernel tracing, final held-out candidate results and final throughput acceptance are not established by this review.
+
+## Transposed attention and unattended runner review
+
+Two independent source-only reviews covered the transposed K allocation,
+write/index contracts, masked SIMD softmax, numerical tests, and the final
+runner's protocol, sample validation and interruption handling. Neither
+reviewer ran models, tests or benchmarks.
+
+No definite transposition/masking defect was found. Suggested coverage gaps
+for poisoned inactive keys, every 16-lane tail width and insufficient
+allocated key blocks were added to the native tests. Actual-model cache
+write/rewind coverage remains separate from those direct attention fixtures.
+Parallel merges preserve ascending block order within each independent head.
+
+The runner review found two P2 defects, both corrected:
+
+1. A numbered attempt directory interrupted before its first checkpoint
+   prevented resume. Recovery now retains it as interrupted, excludes it
+   from sampling and starts a new numbered directory; partial checkpoint
+   bytes remain available.
+2. Non-VNNI quality could be from an earlier binary despite using the same
+   format selection. Final execution now requires exactly one matching
+   chosen-format F16 report, verifies its linked file hash and fields, and
+   compares its engine hash with the timing binary.
+
+Synthetic regressions cover both recovery paths and mutations to the
+binary, linked report, model/settings and duplicate matching evidence.
+Parent execution of the exact CI commands passed three CTest checks and
+229 Python tests, with two explicitly optional model checks skipped.
+Each measured native attention stage also passed its three CTest checks;
+the rejected singleton-claim API was subsequently removed. These are
+parent-executed outcomes, not independent reviewer reproduction. The quiet
+full final matrix and final-binary heldout confirmation remain distinct.
+
+## Signed-int16 arithmetic and streamed-oracle review
+
+Two source-only reviews examined the signed-word VNNI kernel and the
+layer-resident FP32 oracle. Neither reviewer executed tests or models.
+
+The arithmetic review found premature FP32 multiplication of weight and
+activation scales: an underflow could erase a representable result, and an
+overflow could turn an exact zero integer dot into NaN. The corrected path
+retains the fast FP32 vector FMA for ordinary coefficients, but recomputes a
+whole row with wide integer dots and FP64 scales/accumulation for subnormal
+or excessively large coefficients. The conservative constant leaves range
+for any addressable row, including final reduction. Regressions use
+independently widened scale products and check a normal tiny result,
+overflowing coefficient with zero weights, and cancellation of large
+opposite SIMD lanes. They cover row/32/64/128 scales and both F16/F32 storage.
+
+Activation groups have 64 values, clip to ±32767 and round half away from
+zero. A positive scale floor of FLT_MIN intentionally loses relative
+precision for sufficiently tiny inputs; no universal relative-error claim
+is made. Four -128×-32767 products fit both int32 and exact FP32 conversion
+before scaling; integer accumulators reset at each applicable weight group.
+FP32 kernels allocate no integer activation representation.
+
+Parent execution on the final native binary passed three CTest checks.
+The Python integration after S1/original-int16 tooling passed 326 tests
+with two explicitly optional model skips. The actual pinned 0.5B reference
+suite subsequently passed all eleven tests, using g64f16 and the final
+binary's FP32 path. The full 512 calibration and 2048 heldout signed-int16
+reports independently satisfy all three requested actual-Q8 comparisons;
+perplexity is worse and is display-only. F32 KV is a required linked control,
+not an extra format-selection condition.
+
+The streamed-oracle source review found no concrete defect: layer-major
+execution preserves priming/cached causality, tensors are independently
+widened from original BF16, and tied-head chunks and raw mapping lifetimes
+are bounded. Real S1 completion and process memory are separate executions,
+not established by that source inspection.
+
+## Final v2 binding and publication review
+
+Two further source-only reviews checked the corrected int16 arithmetic and
+quality binding, upstream streamed GGUF, real-thread reporting and completed
+matrix publication. They ran no checks and changed no files.
+
+No additional mathematical defect was found in the whole-row wide fallback,
+integer bounds, supported scales/groups/tails or shared activation work.
+One binding defect remained: direct-RoPE measurement could reuse cached-RoPE
+quality. Final signed-int16 validation now explicitly rejects anything but
+cached RoPE; synthetic regressions exercise both direct validation and
+linked-report loading.
+
+The publication review found a copied approval flag could outlive its
+linked quality files. Publication now requires the sibling retained protocol,
+recomputes its digest and matches the summary's source and quality decision,
+then invokes the existing validator to reload the comparison and all five
+linked reports before rendering or changing any output. Regressions mutate
+the protocol, copied approval, comparison and each linked report while
+checking that publication files remain unchanged.
+
+The second finding concerned old prepared caches: changing the private
+manifest filename could reject previously verified GGUFs. A one-time
+migration now validates exact source/commit and all existing artifact hashes
+before retiring the old manifest. Valid and mutated synthetic cache cases
+exercise this behavior.
+
+Parent executions after these changes passed **550 Python tests**, with two
+explicitly optional model checks skipped. Actual pinned-upstream synthetic
+integration ran for both model configurations; an initially missing
+subclass architecture declaration was fixed before those integrations passed.
+The exact CI C++ configure/build and all three CTest checks also passed.
+Both actual final-artifact preflight freezes completed; neither collects
+final timing samples.
+
+Separate parent executions established whole-file equality of the actual
+0.5B streamed and original upstream BF16 GGUF, genuine upstream S1 Q8
+conversion, its 2048-position quality comparison and a native
+4096-context/4160-capacity run at the imposed 2000 MiB cap. A debugger actually
+stepped across upstream Q8 `vpdpbusd`; the twenty real 0.5B thread-check
+processes were bitwise invariant within each kernel/KV pair. These are
+parent-observed records, not independent reviewer reproduction. The full
+final timing matrix remains **not run**.
+
+## CI fixture portability
+
+Hosted CI for commit `c8b3469` found 27 synthetic thread-check setup errors:
+the fixture required twelve actual caller-allowed CPUs, but the runner exposed
+four. Those cases never execute the synthetic ELF, so their command/report
+tests now inject a twelve-CPU topology as well as the native subprocess.
+The full twenty-command matrix and all byte/report checks remain covered.
+A new four-CPU topology rejection case confirms the production preflight still
+rejects an unavailable twelve-CPU order before starting any native process.
+No production affinity requirement was relaxed and no failing case was skipped.
+
+The parent then ran the entire Python suite with actual caller affinity limited
+to four CPUs, retaining the pinned-upstream integration opt-in:
+**551 passed, 2 explicitly optional model checks skipped**.
+
+## Batched prompt lookup and int8 KV review
+
+I asked a separate reviewer to read PR 3 without running its tests or models. The review traced candidate verification, first-mismatch handling, cache rewind across the 64-token mean boundary, shared-weight batch arithmetic, int8 scales and allocated bytes, sparse logit positions, and the chunked oracle's causal mask and KL direction.
+
+It found two problems. The quality summary expected the CLI label `i8-centered`, while the engine reports dtype `i8_centered`; I now compare the actual metadata spelling and preserve the key-mean/warmup fields, with an aggregation regression. The timing script dropped actual execution settings from its output; I now retain the resolved kernel, cache type, CPU set, activation/group settings, configuration hash and condition order, reject changed settings, and test that those fields survive.
+
+The reviewer re-read both fixes and found no remaining concrete source defect. It did not reproduce numerical results, execute timing scripts, or independently verify CI. My real sparse-logit integration also caught a test-only assumption that the fixed prompt had 128 tokens; it actually has 118. I now use its real final position while retaining the 63/64/65 transition checks, rather than padding or changing the prompt.
+
+After the long-context jobs finished, the reviewer also checked the README tables against `kv-quality.json` and `lookup-acceptance.json`. It found no rounding or claim defect: the storage saving is 45.3%, centered KL remains worse than F16, and the text discloses the small sample, raw-key warmup and absence of new speed measurements. That last review was also read-only.

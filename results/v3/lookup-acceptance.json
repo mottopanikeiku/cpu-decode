@@ -1,0 +1,58 @@
+{
+  "config_sha256": "fc80777e98e3de0f20f2ed18af493b3c58080920a25e1f775afff619e3985e2a",
+  "inputs_sha256": "6be76be65ad3cce7d7aa7259c7589c5d0ac4a7cb031cd214e8f9ac34bc70f384",
+  "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+  "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+  "timing": "not measured",
+  "aggregate": {
+    "all": {
+      "drafted_tokens": 944,
+      "accepted_tokens": 263,
+      "verification_batches": 246,
+      "forward_tokens": 1437,
+      "ordinary_steps": 247,
+      "acceptance_rate": 0.2786016949152542,
+      "prompts": 12,
+      "generated_tokens": 768,
+      "exact_match_prompts": 12
+    },
+    "copy-heavy": {
+      "drafted_tokens": 423,
+      "accepted_tokens": 228,
+      "verification_batches": 109,
+      "forward_tokens": 573,
+      "ordinary_steps": 41,
+      "acceptance_rate": 0.5390070921985816,
+      "prompts": 6,
+      "generated_tokens": 384,
+      "exact_match_prompts": 6
+    },
+    "open-ended": {
+      "drafted_tokens": 521,
+      "accepted_tokens": 35,
+      "verification_batches": 137,
+      "forward_tokens": 864,
+      "ordinary_steps": 206,
+      "acceptance_rate": 0.0671785028790787,
+      "prompts": 6,
+      "generated_tokens": 384,
+      "exact_match_prompts": 6
+    }
+  },
+  "cases": [
+    "lookup-cases/copy-austen.json",
+    "lookup-cases/edit-austen.json",
+    "lookup-cases/summarize-quote.json",
+    "lookup-cases/copy-checklist.json",
+    "lookup-cases/edit-checklist.json",
+    "lookup-cases/copy-code.json",
+    "lookup-cases/explain-cache.json",
+    "lookup-cases/story-lighthouse.json",
+    "lookup-cases/plan-garden.json",
+    "lookup-cases/explain-kl.json",
+    "lookup-cases/code-binary-search.json",
+    "lookup-cases/reason-interview.json"
+  ],
+  "binary_sha256": "fed6c2bdc74d929cb8c393cadf2969e081e2f178f5f68a022c966f634dc38c86",
+  "weights_sha256": "c70c215d96047722ac638b9677e761874e46c7d41b0b01068a94ef33b12fa049"
+}

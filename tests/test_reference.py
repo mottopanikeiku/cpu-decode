@@ -142,10 +142,18 @@ def test_pinned_int8_per_position_top1_and_kl(tmp_path) -> None:
     path = Path(os.environ["CPU_DECODE_QUANT_MODEL"]) / "model.safetensors"
     with safe_open(path, framework="numpy") as stored:
         assert "lm_head.weight" not in stored.keys()
-        assert stored.metadata()["quantization"] == "symmetric-per-row-int8"
+        metadata = stored.metadata()
+        assert metadata["quantization"] in {"symmetric-per-row-int8", "symmetric-per-group-int8"}
         assert stored.get_slice("model.embed_tokens.weight").get_shape() == [151936, 896]
         assert stored.get_tensor("model.layers.0.self_attn.k_proj.weight").dtype == np.int8
-        assert stored.get_tensor("model.embed_tokens.weight.scales").dtype == np.float32
+        scales = stored.get_tensor("model.embed_tokens.weight.scales")
+        if metadata["quantization"] == "symmetric-per-row-int8":
+            assert scales.dtype == np.float32 and scales.shape == (151936,)
+        else:
+            group_size = int(metadata["group_size"])
+            assert group_size in {32, 64, 128}
+            assert scales.shape == (151936, 896 // group_size)
+            assert scales.dtype == {"f16": np.float16, "f32": np.float32}[metadata["scale_dtype"]]
 
 
 def test_explicit_integration_rejects_missing_engine(tmp_path, monkeypatch) -> None:

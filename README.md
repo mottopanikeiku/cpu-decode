@@ -1,58 +1,67 @@
 # cpu-decode
 
-A small C++ engine for single-stream CPU decoding of one pinned Qwen checkpoint.
+<!-- FINAL_RESULT_START -->
+**v2 result:** My pinned VNNI/int16 decoder beat llama.cpp Q8_0 in **all six pre-specified cloud cells**, at **1.090–1.531× paired throughput**. This is **one virtual host with worker-lifetime CPU binding**, not unchanged laptop CLI performance. My selected weights improve KL agreement but slightly worsen perplexity.
+<!-- FINAL_RESULT_END -->
 
-**Question:** How close can int8 decoding get to a laptop's read-bandwidth ceiling, and how does it compare with native llama.cpp?
+I wrote the C++ [decoder](src/model.cpp), [kernels](src/kernels.cpp) and [attention](src/attention.cpp) from scratch.
 
-I built the complete forward pass and FP32 KV cache in [model.cpp](src/model.cpp), with scalar and AVX2/AVX-512 matrix-vector kernels in [kernels.cpp](src/kernels.cpp). Weights are memory-mapped; offline quantization uses one FP32 scale per int8 output row. [The reference](tools/reference.py) checks the original BF16 values in FP32 arithmetic against Transformers; a separate reader measures real llama.cpp outputs.
+## v2 quality
 
-**Result:** Short-context decoding approaches the estimated ceiling, but scalar attention leaves a long-context gap. More threads are not automatically faster.
+I selected g64f16 through [four-format calibration](results/v2/format-calibration.json) and [separate int16 checks](results/v2/quality-vnni16-final.json), against original BF16-storage/FP32-arithmetic weights. Matrix storage is 8.25 versus Q8_0's 8.50 bits/weight; artifacts are 509.73 versus 531.07 MB, including container overhead.
 
-## Measured result
+[Heldout](results/v2/corpus.json): 2,048 positions, fresh F16 KV and 512-input windows. Agreement is not task accuracy.
 
-[All thread counts and generated tables](results/tables.md), with [raw samples](results/measurements), use median tokens/s over three repeats; native ranges are minimum–maximum. Context is the initial cache length, not timed prefill.
-
-| Threads | Context | This engine (range) | Read ceiling reached | llama.cpp Q8_0 | BF16 eager |
-|---:|---:|---:|---:|---:|---:|
-| 2 | 128 | 69.03 (68.81–69.52) | 83.1% | 61.76 | 17.71 |
-| 6 | 128 | 65.55 (64.17–66.18) | 78.0% | 68.53 | 19.31 |
-| 6 | 1024 | 51.16 (48.51–52.16) | 63.6% | 61.03 | 17.59 |
-| 6 | 4096 | 31.69 (31.66–31.82) | 45.1% | 44.06 | 11.81 |
-
-This is **not an equal-quality comparison**. On the same fixed prompt positions, [native quality](results/quality-summary.json), [Q8_0 quality](results/llama-quality.json) and [actual storage accounting](results/traffic.json) give:
-
-| Numerical path | Matrix bits/weight, including scales | Weight bytes/token | Top-1 agreement | Mean / worst KL, nats |
+| Path | Mean KL, nats | p99 KL, nats | Top-1 agreement | Perplexity |
 |---|---:|---:|---:|---:|
-| Per-row int8, FP32 KV | 8.03 | 496.07 MB | 57/60 (95.0%) | 0.0288 / 0.7897 |
-| Q8_0, F16 KV, flash auto | 8.50 | 525.12 MB | 56/60 (93.3%) | 0.00970 / 0.1827 |
+| [g64f16/int16](results/v2/heldout-g64f16-vnni16-final-f16.json) | 0.00093877 | 0.00336880 | 97.75% | 16.60984 |
+| [llama.cpp Q8_0](results/v2/heldout-final-q8_0.json) | 0.00240027 | 0.00813769 | 95.90% | 16.60406 |
 
-These are distribution checks, not task accuracy; the lower Q8_0 mean KL matters despite its slightly lower top-1 count. The baseline's default F16 cache and flash-attention auto differ from this engine's FP32 cache and scalar attention, conservatively favoring the baseline.
+## v2 cloud timing
 
-[Unique KV reads](results/traffic.json), averaged across the generation window, are **3.35 / 25.37 / 100.87 MB** at the listed context lengths; F16 halves them. FP32 KV needs **24,576 bytes per cached token**. The weight total includes the tied vocabulary head, not just projections.
+The host is **AMD Zen 4 EPYC (family 25, model 17; the model name wasn't exposed)**, identified from family/model, not an observed SKU. The sandbox exposes 24 virtual CPUs, not proven dedicated physical cores. Both engines use F16 KV, matching strict CPU sets and fresh GCC 12.2.0 `-march=native` builds.
 
-[Unquantized checks](results/quality-summary.json) cover 88 positions: maximum absolute logit error **0.000439**, with **32/32** greedy tokens matching. [Ablations](results/tables.md) show int8 alone giving **1.01×**, SIMD256 **5.21×** over scalar, widening **1.10×**, four accumulators **1.01×**, and cached RoPE **1.03×**. Small gains should not be read as stable causal effects. At the longest context, [attention takes 17.22 ms of 31.56 ms/token](results/summary.json), making it the clearest next optimization target.
+| Threads | Initial context | Native tokens/s | llama tokens/s | Paired ratio | Individual 95% CI |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 128 | 39.887 | 32.110 | 1.2335 | [1.1649, 1.2970] |
+| 2 | 128 | 55.135 | 50.394 | 1.1361 | [1.0631, 1.2054] |
+| 4 | 128 | 93.067 | 87.622 | 1.0898 | [1.0183, 1.1318] |
+| 1 | 4096 | 30.111 | 21.854 | 1.3436 | [1.3235, 1.4431] |
+| 2 | 4096 | 45.312 | 29.774 | 1.5306 | [1.4643, 1.5969] |
+| 4 | 4096 | 68.643 | 49.774 | 1.3627 | [1.2594, 1.4882] |
 
-## Reproduce
+I retained sixteen 128-forward pairs per cell in eight ABBA quartets. The clock includes LM head/argmax and the final consumed token; load, prefill, warmup and rewind are excluded. Paired medians are not ratios of displayed medians. I bootstrap quartets 20,000 times: per-cell, not simultaneous intervals. Runtime and flash-selection pilots are excluded.
 
-Requires Linux x86-64, C++17/OpenMP, CMake and uv; AVX-512 for the recorded kernel. [The recorded hardware/software](results/measurements/environment-engine-t1,2,4,6,12-c128-ksimd512x4-ropecached.json) is a Ryzen AI 5 PRO 340 with GCC 16.2.1. [Model checks](results/checks.json) used a 2000 MB memory cap; this is not a peak-memory measurement. Compute is local CPU with free downloads, no paid compute.
+Native holds public `CpuBinding` for its worker lifetime; inactive native execution is stopped and the actual GGML pool paused outside clocks. llama.cpp selects flash ON/OFF/AUTO by pilot, uses poll50 and enables repacking; no repacked buffer was selected. [Raw samples](results/v2/cloud-vnni/final/raw.json), [spreads](results/v2/cloud-vnni/final/summary.json) and [methods](docs/MEASUREMENTS.md) retain provenance and failed work. [Estimated total cost](results/v2/cloud-vnni/run-cost.json): **$1.6074**, not an invoice.
 
-```sh
-make build
-make prepare
-make measure llama-quality traffic
-```
+My separate [earlier AVX2/FP32 run](results/v2/cloud/summary.json) completed only 2/6 cells and lost both, at 0.4108× and 0.3079×. Different hosts do not establish a causal VNNI speedup.
 
-[llama.cpp is pinned](results/llama-preparation.json) to `6c73b3e12dc501de35fe5f6979960d06921a2f6c`, built Release with `GGML_NATIVE=ON`, CUDA/Vulkan off; [the preparation script](tools/prepare_llama.py) records the full flags. Models and raw logits stay outside git. [Methods](docs/MEASUREMENTS.md), [baseline differences](docs/BASELINE.md) and [cold review](docs/COLD_REVIEW.md) explain the comparison.
+## v3: exact lookup and smaller KV
 
-## Limitations
+I added layer-major batching and four-column projection tiles that share weight loads. [Prompt lookup](src/generate.cpp) drafts earlier context tokens, verifies greedy predictions and rewinds rejected entries. [All 768/768 tokens](results/v3/lookup-acceptance.json) matched plain greedy across twelve prompts: acceptance was **53.9% copy-heavy**, **6.7% open-ended**, **27.9% overall (263/944 proposals)**. Acceptance is not acceleration; **I claim no v3 speedup**.
 
-- One model and laptop; clocks/temperatures were not fixed. The ceiling is a storage/read-bandwidth estimate, not measured DRAM utilization.
-- Shapes match, but llama-bench uses synthetic tokens and omits sampling; native/eager use greedy trajectories.
-- Quality uses four short prompts. Long-context numerical agreement and free-running Q8_0 generation were not measured.
-- No batched serving, speculative decoding or activation quantization; attention remains scalar within each head.
+I center post-RoPE keys using a fixed per-head mean from the first 64 keys; the shared score offset cancels in softmax. [64 heldout positions near 2K/4K](results/v3/kv-quality.json), allocated KV at capacity 4096:
 
-## Prior work
+| Cache | MB | Mean KL | p99 KL | Oracle top-1 |
+|---|---:|---:|---:|---:|
+| F16 | 50.33 | 0.000855 | 0.003254 | 64/64 |
+| Plain int8 | 26.74 | 0.030889 | 0.370448 | 57/64 |
+| Centered int8 | 27.54 | 0.005105 | 0.038579 | 64/64 |
 
-[Qwen](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) supplies the Apache-2.0 weights; [Transformers](https://github.com/huggingface/transformers) supplies the oracle. [llama.cpp](https://github.com/ggml-org/llama.cpp) is the native baseline. [Prior-work notes](docs/PRIOR_WORK.md) also cover llama2.c, gemma.cpp, llamafile, T-MAC and BitNet. The decoder core is written from scratch; the optional baseline-quality reader links llama.cpp. New code is MIT licensed.
+Centered KV saves **45.3%** versus F16 but remains numerically worse. Storage includes padding, scales, mean and retained prefix, not workspaces or peak process memory. The small probe includes a disclosed first-64-position F32-key warmup confound. **F16 remains default**.
+
+## Laptop development and limits
+
+<!-- FINAL_TABLE_START -->
+I did **not** run the full 15-cell, nine-configuration laptop matrix. Cloud v2 results do not measure v3 batching, lookup or int8-KV speed.
+<!-- FINAL_TABLE_END -->
+
+Host load, clocks and NUMA are uncontrolled; I have no cloud read-bandwidth ceiling. This is one model, not downstream-task accuracy or batched serving. Lookup exactness is relative to its chosen numerical path. [Earlier short-window measurements](results/v2/int16-shipped-short/summary.json) remain development evidence.
+
+## Reproduce and attribution
+
+Linux x86-64, C++17/OpenMP, CMake and uv. [Methods](docs/MEASUREMENTS.md) cover pinned downloads, numerical checks, cloud execution, v3 reproduction and the [AMD identification source](https://docs.amd.com/api/khub/documents/LZ~6p62H~zRDhkNiPAE9NQ/content).
+
+[Qwen](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) weights: Apache-2.0; my decoder: MIT. [Transformers](https://github.com/huggingface/transformers): oracle. [llama.cpp](https://github.com/ggml-org/llama.cpp): baseline. [Prompt-lookup attribution](https://github.com/apoorvumang/prompt-lookup-decoding) and [prior work](docs/PRIOR_WORK.md).
 
 Written with AI coding assistance.

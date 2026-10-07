@@ -1,0 +1,46 @@
+{
+  "affinity": "strict",
+  "callback": "increment one independent counter per fixed task",
+  "checksum": 10100,
+  "cpu_set": [
+    0,
+    1,
+    4,
+    2,
+    3,
+    5
+  ],
+  "dispatch_timer_includes_per_run_clock": false,
+  "iterations_per_batch": 2000,
+  "requested_serial_gap_ns": 0,
+  "samples": [
+    {
+      "nanoseconds_per_run": 467.9615,
+      "seconds": 0.000935923,
+      "serial_gap_seconds": 0.0
+    },
+    {
+      "nanoseconds_per_run": 457.216,
+      "seconds": 0.000914432,
+      "serial_gap_seconds": 0.0
+    },
+    {
+      "nanoseconds_per_run": 466.0075,
+      "seconds": 0.000932015,
+      "serial_gap_seconds": 0.0
+    },
+    {
+      "nanoseconds_per_run": 452.602,
+      "seconds": 0.000905204,
+      "serial_gap_seconds": 0.0
+    },
+    {
+      "nanoseconds_per_run": 442.8535,
+      "seconds": 0.000885707,
+      "serial_gap_seconds": 0.0
+    }
+  ],
+  "tasks": 1,
+  "threads": 6,
+  "warmup_runs": 100
+}

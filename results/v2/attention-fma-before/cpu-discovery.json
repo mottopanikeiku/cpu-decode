@@ -1,0 +1,58 @@
+{
+  "command": [
+    "build/cpu-decode",
+    "cpus"
+  ],
+  "started_utc": "2026-10-06T20:16:55.377654+00:00",
+  "returncode": 0,
+  "success": true,
+  "error": null,
+  "stdout_file": "results/v2/attention-fma-before/cpu-discovery.stdout.txt",
+  "stderr_file": "results/v2/attention-fma-before/cpu-discovery.stderr.txt",
+  "data": {
+    "allowed_cpu_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "max_frequency_khz": {
+      "0": 4900000,
+      "1": 4900000,
+      "10": 4900000,
+      "11": 3425000,
+      "2": 3425000,
+      "3": 3425000,
+      "4": 4900000,
+      "5": 3425000,
+      "6": 4900000,
+      "7": 4900000,
+      "8": 3425000,
+      "9": 3425000
+    },
+    "ordering": "physical cores by maximum frequency, then SMT siblings by maximum frequency",
+    "preferred_cpu_ids": [
+      0,
+      1,
+      4,
+      2,
+      3,
+      5,
+      6,
+      7,
+      10,
+      8,
+      9,
+      11
+    ]
+  },
+  "environment_overrides": null
+}

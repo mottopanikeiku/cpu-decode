@@ -1,33 +1,94 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include <sched.h>
 
 namespace decode {
 using Json = nlohmann::json;
-enum class DType { bf16, f32, i8 };
-enum class Kernel { scalar, simd256, simd512, simd512x4 };
+enum class DType { bf16, f32, f16, i8 };
+enum class Kernel { scalar, simd256, simd512, simd512x4, vnni, vnni16 };
+enum class CacheType { f16, f32, i8, i8_centered };
 Kernel parse_kernel(const std::string& name);
 std::string kernel_name(Kernel kernel);
 float bf16_float(uint16_t value);
+float half_float(uint16_t value);
+uint16_t float_half(float value);
+Json cpu_topology();
+class CpuBinding {
+public:
+    explicit CpuBinding(int cpu);
+    ~CpuBinding();
+    CpuBinding(const CpuBinding&) = delete;
+    CpuBinding& operator=(const CpuBinding&) = delete;
+private:
+    cpu_set_t original;
+    int previous;
+    bool changed = false;
+};
+class ThreadPool {
+public:
+    using Function = void (*)(void*, size_t) noexcept;
+    ThreadPool(int threads, const std::vector<int>& cpus = {}, bool persistent = true, bool strict_affinity = true);
+    ~ThreadPool();
+    ThreadPool(const ThreadPool&) = delete;
+    ThreadPool& operator=(const ThreadPool&) = delete;
+    void run(size_t tasks, Function function, void* context);
+    const std::vector<int>& cpus() const;
+    int size() const;
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl;
+};
 struct Matrix {
     const void* data = nullptr;
-    const float* scales = nullptr;
+    const void* scales = nullptr;
     size_t rows = 0, cols = 0;
     DType dtype = DType::bf16;
+    size_t group_size = 0;
+    DType scale_dtype = DType::f32;
 };
-void matvec(const Matrix& matrix, const float* x, float* y, Kernel kernel, int threads);
+float matrix_scale(const Matrix& matrix, size_t row, size_t column);
+uint64_t matrix_scale_bytes(const Matrix& matrix);
+struct Activation {
+    Kernel kernel;
+    std::vector<uint8_t> bytes;
+    std::vector<int16_t> words;
+    std::vector<float> scales;
+    Activation(size_t capacity, Kernel kernel);
+};
+struct Projection { const Matrix* matrix; float* output; const float* bias = nullptr; };
+void matvec(const Matrix& matrix, const float* x, float* y, Kernel kernel, ThreadPool& pool);
+void projections(const Projection* items, size_t count, const float* x, Kernel kernel,
+                 ThreadPool& pool, Activation& activation, bool swiglu = false);
+// A bounded column tile; each row traverses its weights once for all columns.
+inline constexpr size_t projection_columns = 4;
+struct BatchProjection {
+    const Matrix* matrix;
+    float* output;
+    size_t output_stride;
+    const float* bias = nullptr;
+};
+void batch_projections(const BatchProjection* items, size_t count, const float* x,
+                       size_t columns, size_t input_stride, Kernel kernel,
+                       ThreadPool& pool, Activation* activations, bool swiglu = false);
 void quantize_row(const float* source, size_t n, int8_t* out, float& scale);
 void rmsnorm(const float* x, const float* weight, float* out, size_t n, float epsilon);
+void residual_rmsnorm(float* x, const float* residual, const float* weight, float* out, size_t n, float epsilon);
 void rope(float* x, size_t heads, size_t head_dim, size_t position, float theta);
-void attention(const float* q, const float* keys, const float* values, float* out,
-               float* scores, size_t length, size_t heads, size_t kv_heads,
-               size_t head_dim, int threads);
+struct AttentionWorkspace {
+    static constexpr size_t block_size = 64;
+    size_t capacity, heads, dim, blocks;
+    std::vector<float> scores, maxima, sums, weighted;
+    AttentionWorkspace(size_t capacity, size_t heads, size_t dim);
+};
+void attention(const float* q, const void* keys, const void* values, CacheType type,
+               float* out, size_t length, size_t heads, size_t kv_heads,
+               size_t head_dim, size_t key_blocks, ThreadPool& pool, AttentionWorkspace& workspace, bool scalar = false);
 struct Profile {
     Profile();
     std::map<std::string, double, std::less<>> seconds;
@@ -38,9 +99,15 @@ struct Profile {
     size_t steps = 0, head_steps = 0;
     Json json() const;
 };
+struct EngineOptions {
+    bool cached_rope = true, scalar_attention = false, persistent_pool = true;
+    bool strict_affinity = true;
+    CacheType cache_type = CacheType::f16;
+    std::vector<int> cpus;
+};
 class Engine {
 public:
-    Engine(const std::string& directory, Kernel kernel, int threads, size_t capacity, bool cached_rope = true);
+    Engine(const std::string& directory, Kernel kernel, int threads, size_t capacity, EngineOptions options = {});
     ~Engine();
     Engine(Engine&&) noexcept;
     Engine& operator=(Engine&&) noexcept;
@@ -48,6 +115,10 @@ public:
     Engine& operator=(const Engine&) = delete;
     void reset();
     const std::vector<float>& step(int token, bool head, Profile* profile = nullptr);
+    // Flat token-major logits for tokens[head_start:], reused until the next batch.
+    // Non-null profiling is rejected: batch traffic differs from step traffic.
+    const std::vector<float>& batch(const std::vector<int>& tokens, size_t head_start = 0,
+                                    Profile* profile = nullptr);
     size_t vocab_size() const;
     void rewind(size_t position);
     size_t position() const;
@@ -56,5 +127,5 @@ private:
     struct Impl;
     std::unique_ptr<Impl> impl;
 };
-void quantize_model(const std::string& source, const std::string& output);
+void quantize_model(const std::string& source, const std::string& output, size_t group_size = 0, DType scale_dtype = DType::f32);
 } // namespace decode
