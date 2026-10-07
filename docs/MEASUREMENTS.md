@@ -31,8 +31,15 @@ A separate full first-cell runtime pilot determines the final booking:
 `ceil(pilot function minutes × 6 × 1.3)`. Its pairs never enter the final
 six-cell inference. I keep threads 1/2/4, initial contexts 128/4096, 128 full
 forwards, sixteen pairs and eight ABBA quartets per cell unchanged. Every
-completed cell is streamed immediately; atomic raw writes preserve earlier
-cells. I retain the same worker-lifetime `CpuBinding` scope described below,
+completed cell is committed to the Volume before it is streamed to my client.
+An explicit `--resume` retains local startup history; a matching server
+checkpoint reuses completed sixteen-pair cells, never partial pairs. A
+CPU-only `--recover-only` fetch also regenerates any missing summary/table.
+Pilot and final checkpoints have separate names and must match both the
+design hash and run mode. Each cell links to its measurement container's
+environment, actual build hashes and resources. If resumed cells span
+containers, I report that and do not infer absolute thread scaling across
+them. I retain the same worker-lifetime `CpuBinding` scope described below,
 not unchanged per-operator laptop CLI performance.
 
 The launcher accepts an optional UTC deadline and reserves forty seconds for

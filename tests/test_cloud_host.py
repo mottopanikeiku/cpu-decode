@@ -86,3 +86,52 @@ def test_invalid_next_result_does_not_destroy_completed_cells(tmp_path):
     with pytest.raises(ValueError):
         cloud_run.save(result, {"cells": [float("nan")]})
     assert json.loads(result.read_text()) == {"cells": [1]}
+
+
+def completed_fixture():
+    from test_cloud_summary import synthetic_raw
+    raw = synthetic_raw()
+    raw["cells"] = raw["cells"][:1]
+    raw["run_mode"] = "full-matrix"
+    raw["container_runs"] = [{"id": "test-run", "environment": {"cpu": "synthetic"}}]
+    raw["cells"][0]["container_run_id"] = "test-run"
+    raw["cells"][0]["native_settings"]["activation_dtype"] = "int16"
+    return raw
+
+
+def test_read_completed_retains_only_whole_validated_cells(tmp_path):
+    path = tmp_path / "raw.json"
+    raw = completed_fixture()
+    cloud_run.save(path, raw)
+    assert cloud_run.read_completed(path, "d" * 64, "full-matrix", True) == raw
+
+
+@pytest.mark.parametrize("change", ["design", "mode", "partial_pairs", "kernel", "dtype", "container_id"])
+def test_read_completed_rejects_mixing_or_incomplete_cells(tmp_path, change):
+    raw = completed_fixture()
+    if change == "design":
+        raw["design_sha256"] = "e" * 64
+    elif change == "mode":
+        raw["run_mode"] = "runtime-pilot"
+    elif change == "partial_pairs":
+        raw["cells"][0]["pairs"].pop()
+    elif change == "kernel":
+        raw["cells"][0]["native_settings"]["kernel"] = "simd256"
+    elif change == "dtype":
+        raw["cells"][0]["native_settings"]["activation_dtype"] = "fp32"
+    else:
+        raw["cells"][0]["container_run_id"] = "unregistered"
+    path = tmp_path / "raw.json"
+    cloud_run.save(path, raw)
+    with pytest.raises(ValueError):
+        cloud_run.read_completed(path, "d" * 64, "full-matrix", True)
+
+
+def test_summary_keeps_cell_to_container_provenance():
+    from tools.cloud_summary import summarize
+    raw = completed_fixture()
+    raw["cells"][0]["elapsed_cell_seconds"] = 32.0
+    summary = summarize(raw, allow_partial=True)
+    assert summary["container_runs"] == raw["container_runs"]
+    assert summary["cells"][0]["container_run_id"] == "test-run"
+    assert summary["cells"][0]["elapsed_cell_seconds"] == 32.0

@@ -193,6 +193,9 @@ def summarize(raw: dict, *, allow_partial: bool = False) -> dict:
             "native_over_llama": {"median": median, "ci95": ci},
             "decision": "native-win" if ci[0] > 1 else "llama-win" if ci[1] < 1 else "inconclusive",
         })
+        for key in ("container_run_id", "elapsed_cell_seconds"):
+            if key in cell:
+                summary["cells"][-1][key] = deepcopy(cell[key])
     return summary
 
 

@@ -251,12 +251,35 @@ def prepare(source: Path, work: Path, output: Path, design: dict, *, assets: Pat
         "driver_source_sha256": sha(source / "tools/cloud_bench.cpp")}
 
 
+def read_completed(path: Path, design_sha256: str, run_mode: str, require_vnni: bool):
+    if not path.exists():
+        return None
+    from .cloud_summary import validate
+    previous = json.loads(path.read_text())
+    if previous["design_sha256"] != design_sha256 or previous.get("run_mode") != run_mode:
+        raise ValueError("Stored cells belong to another design or runtime-pilot mode")
+    validate(previous, allow_partial=True)
+    if require_vnni and any(cell["native_settings"]["kernel"] != "vnni16"
+                            or cell["native_settings"].get("activation_dtype") != "int16"
+                            for cell in previous["cells"]):
+        raise ValueError("Stored cells are not the actual vnni16/int16 path")
+    if require_vnni:
+        registry = {run["id"]: run for run in previous.get("container_runs", [])}
+        if any(not cell.get("container_run_id") or cell["container_run_id"] not in registry
+               for cell in previous["cells"]):
+            raise ValueError("Stored cells are missing their measured container provenance")
+    return previous
+
+
 def compare(source: Path, work: Path, output: Path, design_path: Path, *,
             assets: Path | None = None, require_vnni: bool = False,
             runtime_pilot: bool = False, budget_minutes: int | None = None,
-            requested_gpu: str = "none"):
+            requested_gpu: str = "none", resume: bool = False,
+            container_run_id: str = ""):
     start = time.monotonic()
     design = json.loads(design_path.read_text())
+    run_mode = "runtime-pilot" if runtime_pilot else "full-matrix"
+    previous = read_completed(output / "raw.json", sha(design_path), run_mode, require_vnni) if resume else None
     output.mkdir(parents=True, exist_ok=True)
     os.environ.update({"OMP_NUM_THREADS": "4", "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "4"})
     env = environment()
@@ -265,6 +288,8 @@ def compare(source: Path, work: Path, output: Path, design_path: Path, *,
         env["startup_cpu"] = snapshot()
         if not env["startup_cpu"]["supports_vnni16"]:
             raise ValueError("Timing container does not expose every required vnni16 CPU flag")
+    if require_vnni and not container_run_id:
+        raise ValueError("VNNI measurements require a unique container run identifier")
     binary, native_model, gguf, artifacts = prepare(source, work, output, design, assets=assets)
     topology = json.loads(capture([str(source / "build-cloud/cpu-decode"), "cpus"]))
     env["native_cpu_discovery"] = topology
@@ -282,12 +307,19 @@ def compare(source: Path, work: Path, output: Path, design_path: Path, *,
     if not resources["timeout_minutes"]:
         raise ValueError("The comparison needs an explicit positive booked duration")
     result = {"design_sha256": sha(design_path), "design": design, "environment": env,
-              "artifacts": artifacts, "resources": resources, "pilot": [], "cells": [],
-              "run_mode": "runtime-pilot" if runtime_pilot else "full-matrix",
-              "offline_model_assets": assets is not None}
+              "artifacts": artifacts, "resources": resources,
+              "pilot": previous["pilot"] if previous else [],
+              "cells": previous["cells"] if previous else [],
+              "run_mode": run_mode, "offline_model_assets": assets is not None,
+              "container_runs": previous.get("container_runs", []) if previous else []}
+    result["container_runs"].append({"id": container_run_id, "environment": env,
+                                     "artifacts": artifacts, "resources": resources})
     expected_tokens = {}
     cell_order = design["cell_order"][:1] if runtime_pilot else design["cell_order"]
+    completed = {(cell["threads"], cell["context"]) for cell in result["cells"]}
     for threads, context in cell_order:
+        if (threads, context) in completed:
+            continue
         workers = []
         cell_start = time.monotonic()
         try:
@@ -349,6 +381,7 @@ def compare(source: Path, work: Path, output: Path, design_path: Path, *,
                         expected_tokens[key] = trajectory
                     cell["pairs"].append({"id": block * 2 + offset, "block": block, "order": order, "native": a, "llama": b})
             cell["elapsed_cell_seconds"] = time.monotonic() - cell_start
+            cell["container_run_id"] = container_run_id
             result["cells"].append(cell)
             save(output / "raw.json", result)
             print("CLOUD_CELL_COMPLETE", flush=True)
@@ -375,11 +408,14 @@ def main():
     parser.add_argument("--runtime-pilot", action="store_true", help="Measure only the first complete cell; never pool it into final inference")
     parser.add_argument("--budget-minutes", type=int)
     parser.add_argument("--requested-gpu", default="none")
+    parser.add_argument("--resume", action="store_true", help="Skip validated completed cells from this same design and mode")
+    parser.add_argument("--container-run-id", default="")
     args = parser.parse_args()
     signal.signal(signal.SIGTERM, cancel)
     compare(args.source, args.work, args.output, args.design, assets=args.assets,
             require_vnni=args.require_vnni, runtime_pilot=args.runtime_pilot,
-            budget_minutes=args.budget_minutes, requested_gpu=args.requested_gpu)
+            budget_minutes=args.budget_minutes, requested_gpu=args.requested_gpu,
+            resume=args.resume, container_run_id=args.container_run_id)
 
 
 if __name__ == "__main__":
