@@ -190,7 +190,8 @@ def calibration_choices():
             "settings": settings,
             "aggregate": dict(summarize([dict(row, kl_reference_candidate_nats=0.01 * (index + 1))]),
                 top1_agreement=0.9),
-            "oracle_identity": {"fixture": "same oracle/source"},
+            "oracle_identity": {"fixture": "same oracle/source", "model_id": quality_v2.MODEL_ID,
+                "revision": quality_v2.REVISION},
             "binary_identity": {"engine_binary_sha256": "same native binary"},
             "model_identity": {"sha256": f"weights-{group}-{dtype}", "files": {
                 "config.json": {"bytes": 1, "sha256": "same config"},
@@ -746,3 +747,163 @@ def test_reader_compiler_setting_is_bound_and_portable(tmp_path):
     public = portable(identity, quality_v2.reader_identity_locations(identity))
     assert public["build"]["settings"]["CMAKE_CXX_COMPILER"] == "$LLAMA_CXX_COMPILER"
     assert str(tmp_path) not in json.dumps(public)
+
+
+def fixed_transfer_decision():
+    """Use the immutable real 0.5 decision; synthetic target artifact only."""
+    origin = json.loads((ROOT / "results/v2/format-selection.json").read_text())
+    source = copy.deepcopy(origin["oracle_identity"]["verified_source"])
+    source.update(model_id=quality_v2.S1_MODEL_ID,
+        revision=quality_v2.pinned_revision(quality_v2.S1_MODEL_ID))
+    for name, (size, algorithm, digest) in quality_v2.download_model.PINNED_MODELS[quality_v2.S1_MODEL_ID]["files"].items():
+        source["files"][name].update(bytes=size, upstream_algorithm=algorithm, upstream_digest=digest)
+        if algorithm == "sha256":
+            source["files"][name]["sha256"] = digest
+    oracle_identity = dict(origin["oracle_identity"], model_id=source["model_id"],
+        revision=source["revision"], verified_source=source,
+        implementation="layer-resident unmodified Transformers Qwen2DecoderLayer",
+        tokenizer_transfer=quality_v2.tokenizer_transfer(source))
+    files = {"config.json": {key: source["files"]["config.json"][key] for key in ("sha256", "bytes")},
+        "model.safetensors": {"bytes": 123, "sha256": "a" * 64}}
+    return {"schema": "fixed-format-transfer-v1", "split": "fixed_format_transfer",
+        "policy": quality_v2.FIXED_FORMAT_POLICY, "corpus_sha256": CORPUS_SHA256,
+        "oracle_identity": oracle_identity, "verified_source": source,
+        "origin_selection": origin,
+        "origin_selection_sha256": file_hash(ROOT / "results/v2/format-selection.json"),
+        "chosen": {"label": "g64f16", "group_size": 64, "scale_dtype": "f16",
+            "matrix_bits_per_weight": 8.25, "weights_artifact_bytes": 123,
+            "model_identity": {"files": files, "sha256": digest_json(files)}}}
+
+
+def test_fixed_transfer_reads_native_per_directory_provenance(tmp_path, monkeypatch):
+    """Synthetic target bytes; the native manifest filename is the real API."""
+    decision = fixed_transfer_decision()
+    origin = tmp_path / "origin.json"
+    write_json(origin, decision["origin_selection"])
+    model = tmp_path / "synthetic-model"
+    model.mkdir()
+    identity = decision["chosen"]["model_identity"]
+    provenance = model / "quantization.json"
+    write_json(provenance, {"source": decision["verified_source"],
+        "weights": identity["files"]["model.safetensors"],
+        "config_sha256": identity["files"]["config.json"]["sha256"],
+        "group_size": 64, "scale_dtype": "f16"})
+    monkeypatch.setattr(quality_v2, "read_oracle", lambda *_: {"identity": decision["oracle_identity"]})
+    monkeypatch.setattr(quality_v2, "model_identity", lambda *_: identity)
+    monkeypatch.setattr(quality_v2, "preflight_native_model", lambda *_: None)
+    output = tmp_path / "transfer.json"
+    args = Namespace(output=output, model=model, corpus=CORPUS, origin_selection=origin,
+        model_id=quality_v2.S1_MODEL_ID, raw_dir=tmp_path / "unused")
+    quality_v2.fixed_format(args)
+    actual = json.loads(output.read_text())
+    assert actual["quantization_manifest_sha256"] == file_hash(provenance)
+    assert actual["chosen"]["model_identity"] == identity
+
+
+def test_fixed_transfer_binds_origin_target_artifacts_without_calibration(tmp_path):
+    decision = fixed_transfer_decision()
+    path = tmp_path / "fixed.json"
+    write_json(path, decision)
+    assert read_selection(path, CORPUS_SHA256) == decision
+    assert "aggregate" not in decision["chosen"]
+    settings = {"group_size": 64, "scale_dtype": "f16", "weight_dtype": "int8"}
+    validate_heldout_settings(settings, decision["chosen"]["model_identity"], decision)
+    with pytest.raises(ValueError, match="unchanged transferred"):
+        validate_heldout_settings(dict(settings, group_size=0, scale_dtype="f32"),
+            archived_v1_identity(), decision)
+
+
+@pytest.mark.parametrize("change", ["format", "origin", "source", "config", "weight", "tokenizer", "fake-calibration", "fake-aggregate"])
+def test_fixed_transfer_rejects_changed_identity_or_fabricated_calibration(change):
+    decision = fixed_transfer_decision()
+    if change == "format":
+        decision["chosen"]["group_size"] = 32
+    elif change == "origin":
+        decision["origin_selection"]["chosen"]["group_size"] = 32
+    elif change == "source":
+        decision["verified_source"]["revision"] = "changed"
+    elif change == "config":
+        decision["chosen"]["model_identity"]["files"]["config.json"]["sha256"] = "changed"
+    elif change == "weight":
+        decision["chosen"]["weights_artifact_bytes"] += 1
+    elif change == "tokenizer":
+        decision["verified_source"]["files"]["tokenizer.json"]["upstream_digest"] = "changed"
+    elif change == "fake-calibration":
+        decision["format_table"] = []
+    else:
+        decision["chosen"]["aggregate"] = {}
+    with pytest.raises(ValueError):
+        quality_v2.validate_selection(decision, CORPUS_SHA256)
+
+
+def test_fixed_transfer_comparison_needs_q8_and_kv_pair_but_not_05_v1():
+    decision = fixed_transfer_decision()
+    row = position_metric([0, 1], [0, 1], 1)
+    chosen = calibration_choices()[2]
+    f16 = dict(chosen, split="heldout", model_identity=decision["chosen"]["model_identity"],
+        positions=[row], aggregate=summarize([row]), label="f16")
+    f32 = dict(f16, label="f32", settings=dict(f16["settings"], kv_dtype="f32"))
+    q8 = dict(f16, label="q8", backend="llama", settings={"weight_dtype": "Q8_0"})
+    result = heldout_comparison([f16, f32, q8], decision)
+    assert result["tuning"] == quality_v2.FIXED_FORMAT_POLICY
+    assert len(result["kv_comparisons"]) == 1
+    with pytest.raises(ValueError, match="Q8_0"):
+        heldout_comparison([f16, f32], decision)
+    with pytest.raises(ValueError, match="KV pair"):
+        heldout_comparison([f16, q8], decision)
+
+
+def test_evaluate_closes_raw_mappings_before_next_candidate_process(tmp_path, monkeypatch):
+    corpus = load_manifest(CORPUS)
+    windows = [window for window in corpus["windows"] if window["split"] == "calibration"]
+    args = Namespace(output=tmp_path / "quality.json", raw_dir=tmp_path / "raw",
+        corpus=CORPUS, split="calibration", selection=tmp_path / "absent-selection.json",
+        label="mapping-test", backend="native", model=tmp_path / "candidate",
+        engine=tmp_path / "engine", reader=tmp_path / "reader", threads=1,
+        kernel="scalar", kv="f16", attention="blocked", scheduler="pool",
+        affinity="unpinned", cpu_set=None)
+    args.raw_dir.mkdir()
+    args.engine.write_bytes(b"synthetic engine identity")
+    cases = []
+    for window in windows:
+        inputs, positions, targets = window_alignment(window)
+        path = args.raw_dir / f"{window['id']}-reference.bin"
+        np.zeros((256, 2), dtype="<f4").tofile(path)
+        cases.append({"id": window["id"], "shape": [256, 2], "sha256": file_hash(path),
+            "logits": path.name, "input_tokens": inputs, "logit_positions": positions, "targets": targets})
+    monkeypatch.setattr(quality_v2, "read_oracle", lambda *_: {
+        "identity": {"verified_source": {"synthetic": True}}, "windows": cases})
+    monkeypatch.setattr(quality_v2, "model_identity", lambda *_: {"synthetic": True})
+    monkeypatch.setattr(quality_v2, "preflight_native_model", lambda *_: {})
+    # Small raw vocabulary isolates mapping lifetime from real corpus scoring.
+    monkeypatch.setattr(quality_v2, "position_metric",
+        lambda reference, candidate, target: dict(position_metric([0, 0], [0, 0], 0), target=target))
+    mappings = []
+    real_checked = quality_v2.checked_logits
+
+    def tracked_checked(*a, **kw):
+        result = real_checked(*a, **kw)
+        mappings.append(result)
+        return result
+
+    monkeypatch.setattr(quality_v2, "checked_logits", tracked_checked)
+    processes = []
+
+    def synthetic_process(command, **kwargs):
+        assert all(array._mmap.closed for array in mappings)
+        processes.append(command)
+        prefix = Path(command[command.index("--output") + 1])
+        case = cases[len(processes) - 1]
+        np.zeros((256, 2), dtype="<f4").tofile(prefix.with_suffix(".bin"))
+        prefix.with_suffix(".json").write_text(json.dumps({
+            "shape": case["shape"], "tokens": case["input_tokens"],
+            "logit_positions": case["logit_positions"], "argmax": [0] * 256,
+            "group_size": 64, "scale_dtype": "f16", "weight_dtype": "int8",
+            "kv_dtype": "f16", "kernel": "scalar", "attention": "blocked",
+            "scheduler": "pool", "affinity": "unpinned", "cpu_set": [], "threads": 1}))
+
+    monkeypatch.setattr(quality_v2.subprocess, "run", synthetic_process)
+    evaluate(args)
+    assert len(processes) == 2
+    assert len(mappings) == 4
+    assert all(array._mmap.closed for array in mappings)

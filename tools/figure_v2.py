@@ -24,7 +24,11 @@ def figure(summary: dict) -> str:
     def text(x, y, value, extra=""):
         lines.append(f'<text x="{x:.1f}" y="{y:.1f}" {extra}>{html.escape(str(value))}</text>')
     text(20, 24, "CPU decode: median tokens/s by initial context", 'class="heading"')
-    text(20, 45, "Full final matrix" if summary["complete_final_matrix"] else "Partial/development data — not a full-matrix result")
+    caption = ("Complete requested subset — not fifteen-cell target acceptance"
+               if summary.get("matrix_scope") == "explicit-subset" and summary["complete_requested_matrix"]
+               else "Full final matrix" if summary["complete_final_matrix"]
+               else "Partial/development data — not a full-matrix result")
+    text(20, 45, caption)
     series = [("native_tps", "#1766ac", "native", False),
               ("best_baseline_tps", "#c54e00", "best llama.cpp", False),
               ("read_ceiling_tps", "#555", "read ceiling (EXT)", True)]

@@ -21,11 +21,13 @@ FINAL_LABEL = $(shell $(RUN) uv run python -c 'import json; print(json.load(open
 FINAL_MODEL ?= $(CACHE)/$(FINAL_LABEL)
 FINAL_MANIFEST ?= $(RESULTS)/quantized-$(FINAL_LABEL).json
 FINAL_QUALITY ?= $(RESULTS)/quality.json
+FINAL_ENGINE ?= build/cpu-decode
+FINAL_BANDWIDTH ?= build/read-bandwidth
 FINAL_OUTPUT ?= $(RESULTS)/final
 FINAL_LLAMA_BIN ?= $(LLAMA_BIN)
 FINAL_GGUF ?= $(GGUF)
 FINAL_PREPARATION ?= $(RESULTS)/llama-preparation.json
-FINAL_KERNEL ?= $(KERNEL)
+FINAL_KERNEL ?= $(shell $(RUN) uv run python -c 'import json; q=json.load(open("$(FINAL_QUALITY)")); print("vnni16" if q.get("comparison", {}).get("vnni16_gate", {}).get("approved") else "$(KERNEL)")')
 FINAL_AFFINITY ?= strict
 FINAL_CPU_ORDER ?=
 FINAL_WRAPPER ?=
@@ -62,16 +64,20 @@ calibration: oracle
 	$(RUN) uv run python -m tools.quality_v2 compare --split calibration --corpus $(RESULTS)/corpus.json --selection $(RESULTS)/format-selection.json --reports $(RESULTS)/cal-g32f16.json $(RESULTS)/cal-g64f32.json $(RESULTS)/cal-g64f16.json $(RESULTS)/cal-g128f16.json $(RESULTS)/cal-q8_0.json --output $(RESULTS)/format-calibration.json
 
 quality: calibration
+	$(RUN) uv run python -m tools.quality_v2 evaluate --split calibration --model $(SELECTED_MODEL) --label grouped-vnni16-calibration --kernel vnni16 --kv f16 $(QUALITY_OPTIONS) --output $(RESULTS)/cal-vnni16.json
+	$(RUN) uv run python -m tools.quality_v2 compare --split calibration --corpus $(RESULTS)/corpus.json --selection $(RESULTS)/format-selection.json --reports $(RESULTS)/cal-vnni16.json $(RESULTS)/cal-q8_0.json --output $(RESULTS)/calibration-vnni16.json
 	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(ROW_QUANT) --label per-row --kernel simd512x4 --kv f16 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-row.json
 	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(SELECTED_MODEL) --label grouped-f16 --kernel simd512x4 --kv f16 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-f16.json
 	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(SELECTED_MODEL) --label grouped-f32 --kernel simd512x4 --kv f32 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-f32.json
 	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(SELECTED_MODEL) --label grouped-vnni --kernel vnni --kv f16 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-vnni.json
+	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(SELECTED_MODEL) --label grouped-vnni16-f16 --kernel vnni16 --kv f16 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-vnni16-f16.json
+	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --model $(SELECTED_MODEL) --label grouped-vnni16-f32 --kernel vnni16 --kv f32 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-vnni16-f32.json
 	$(RUN) uv run python -m tools.quality_v2 evaluate --split heldout --backend llama --model $(GGUF) --artifact-manifest $(RESULTS)/llama-preparation.json --label q8_0 $(QUALITY_OPTIONS) --output $(RESULTS)/heldout-q8.json
-	$(RUN) uv run python -m tools.quality_v2 compare --split heldout --corpus $(RESULTS)/corpus.json --selection $(RESULTS)/format-selection.json --reports $(RESULTS)/heldout-row.json $(RESULTS)/heldout-f16.json $(RESULTS)/heldout-f32.json $(RESULTS)/heldout-vnni.json $(RESULTS)/heldout-q8.json --output $(RESULTS)/quality.json
+	$(RUN) uv run python -m tools.quality_v2 compare --split heldout --corpus $(RESULTS)/corpus.json --selection $(RESULTS)/format-selection.json --vnni16-calibration-report $(RESULTS)/cal-vnni16.json --q8-calibration-report $(RESULTS)/cal-q8_0.json --reports $(RESULTS)/heldout-row.json $(RESULTS)/heldout-f16.json $(RESULTS)/heldout-f32.json $(RESULTS)/heldout-vnni.json $(RESULTS)/heldout-vnni16-f16.json $(RESULTS)/heldout-vnni16-f32.json $(RESULTS)/heldout-q8.json --output $(RESULTS)/quality.json
 
 
 final:
-	$(RUN) uv run python -m tools.run_final_v2 --model "$(FINAL_MODEL)" --model-manifest "$(FINAL_MANIFEST)" --format-selection "$(FINAL_FORMAT_SELECTION)" --engine build/cpu-decode --bandwidth build/read-bandwidth --llama "$(FINAL_LLAMA_BIN)" --gguf "$(FINAL_GGUF)" --preparation "$(FINAL_PREPARATION)" --quality "$(FINAL_QUALITY)" --kernel "$(FINAL_KERNEL)" --affinity "$(FINAL_AFFINITY)" $(if $(FINAL_CPU_ORDER),--cpu-order "$(FINAL_CPU_ORDER)") --wrapper "$$FINAL_WRAPPER" --output "$(FINAL_OUTPUT)" $(FINAL_OPTIONS)
+	$(RUN) uv run python -m tools.run_final_v2 --model "$(FINAL_MODEL)" --model-manifest "$(FINAL_MANIFEST)" --format-selection "$(FINAL_FORMAT_SELECTION)" --engine "$(FINAL_ENGINE)" --bandwidth "$(FINAL_BANDWIDTH)" --llama "$(FINAL_LLAMA_BIN)" --gguf "$(FINAL_GGUF)" --preparation "$(FINAL_PREPARATION)" --quality "$(FINAL_QUALITY)" --kernel "$(FINAL_KERNEL)" --affinity "$(FINAL_AFFINITY)" $(if $(FINAL_CPU_ORDER),--cpu-order "$(FINAL_CPU_ORDER)") --wrapper "$$FINAL_WRAPPER" --output "$(FINAL_OUTPUT)" $(FINAL_OPTIONS)
 
 model-test:
 	CPU_DECODE_MODEL=$(MODEL) CPU_DECODE_QUANT_MODEL=$(ROW_QUANT) CPU_DECODE_KERNEL=simd512x4 $(RUN) uv run pytest -q tests/test_reference.py

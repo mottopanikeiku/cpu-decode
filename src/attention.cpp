@@ -196,6 +196,7 @@ void block(void* context, size_t task) noexcept {
             case 1: block_simd<1>(w, task); return;
             case 2: block_simd<2>(w, task); return;
             case 4: block_simd<4>(w, task); return;
+            case 6: block_simd<6>(w, task); return;
             case 7: block_simd<7>(w, task); return;
             case 8: block_simd<8>(w, task); return;
         }

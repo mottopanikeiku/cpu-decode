@@ -17,7 +17,8 @@ def args(tmp_path):
     output = tmp_path / "final"
     output.mkdir()
     result = SimpleNamespace(output=output, kernel="simd512x4", affinity="strict", cpu_order=None,
-                             tokens="1,2,3", wrapper="/private/scheduler bench", plan=False)
+                             tokens="1,2,3", wrapper="/private/scheduler bench", plan=False,
+                             thread_counts=[1, 2, 4, 6, 12], context_lengths=[128, 1024, 4096])
     for key in ["model", "model_manifest", "format_selection", "llama", "gguf", "preparation",
                 "quality", "engine", "bandwidth"]:
         setattr(result, key, tmp_path / key)
@@ -118,7 +119,8 @@ def test_resume_rejects_changed_input_hash(args, field):
 
 @pytest.mark.parametrize("field,value", [("kernel", "simd256"), ("affinity", "unpinned"),
                                         ("wrapper", "/other/scheduler bench"), ("tokens", "4,5"),
-                                        ("cpu_order", "1,0,2,3,4,5,6,7,8,9,10,11")])
+                                        ("cpu_order", "1,0,2,3,4,5,6,7,8,9,10,11"),
+                                        ("thread_counts", [2, 6]), ("context_lengths", [128, 4096])])
 def test_resume_rejects_changed_settings(args, field, value):
     original = runner.specification(args)
     setattr(args, field, value)
@@ -411,3 +413,230 @@ def test_zero_exit_is_not_acceptance_of_invalid_samples(args, protocol, monkeypa
     assert record["raw_directory"] == str(attempt.relative_to(args.output))
     assert (attempt / (unit["name"] + ".json")).exists()
     assert not (args.output / (unit["name"] + ".json")).exists()
+
+
+def test_subset_plan_keeps_all_candidates_and_bounded_chunks(args):
+    args.thread_counts, args.context_lengths = [2, 6], [128, 4096]
+    result = runner.plan(args)
+    assert result["matrix_scope"] == "explicit-subset"
+    assert result["timing_commands"] == 38
+    assert result["candidate_windows"] == 36
+    assert result["bandwidth_windows"] == 2
+    assert result["model_processes"] == 144
+    assert result["bandwidth_processes"] == 4
+    assert result["measured_tokens_per_engine"] == 23040
+    assert {(u["threads"], u["context"]) for u in result["units"] if u["stage"] == "window"} == {
+        (2, 128), (2, 4096), (6, 128), (6, 4096)}
+    freeze = result["freeze"]
+    assert freeze[freeze.index("--thread-counts") + 1] == "2,6"
+    assert freeze[freeze.index("--context-lengths") + 1] == "128,4096"
+    assert len({u["name"] for u in result["units"]}) == 38
+    assert result["hard_command_limit_seconds"] < 1800
+
+
+def test_subset_protocol_validation_rejects_dimension_drift(args, protocol):
+    args.thread_counts, args.context_lengths = [2, 6], [128, 4096]
+    protocol.update(threads=args.thread_counts, contexts=args.context_lengths,
+                    model_manifest=runner.load(args.model_manifest))
+    protocol["id"] = runner.digest({k: v for k, v in protocol.items() if k != "id"})
+    runner.verify_protocol(protocol, args)
+    protocol["contexts"] = [128]
+    protocol["id"] = runner.digest({k: v for k, v in protocol.items() if k != "id"})
+    with pytest.raises(ValueError, match="contexts"):
+        runner.verify_protocol(protocol, args)
+
+
+@pytest.mark.parametrize("fault", ["missing_bandwidth", "missing_cell", "missing_candidate", "duplicate"])
+def test_subset_complete_requires_all_38_units(args, protocol, fault):
+    protocol.update(threads=[2, 6], contexts=[128, 4096],
+                    source_model={"model_id": "Qwen/Qwen2.5-1.5B-Instruct"})
+    protocol["id"] = runner.digest({k: v for k, v in protocol.items() if k != "id"})
+    runner.atomic_json(args.output / "protocol.json", protocol)
+    for unit in runner.units(protocol["threads"], protocol["contexts"]):
+        runner.atomic_json(args.output / (unit["name"] + ".json"), unit_raw(unit, protocol))
+    complete = summarize(args.output)
+    assert not complete["complete_final_matrix"] and complete["complete_requested_matrix"]
+    assert len(complete["results"]) == 4 and len(complete["bandwidth"]) == 2
+    assert all(len(row["candidates"]) == 9 for row in complete["results"])
+    assert complete["matrix_scope"] == "explicit-subset"
+    assert not complete["full_fifteen_cell_target_matrix"] and not complete["target_eligible"]
+    assert not complete["numeric_targets_met"] and not any(complete["target_predicates"].values())
+    assert all(row["targets"] is None for row in complete["results"])
+    if fault == "missing_bandwidth":
+        (args.output / "bandwidth-t6.json").unlink()
+    elif fault == "missing_cell":
+        for path in args.output.glob("window-t6-c4096-*.json"):
+            path.unlink()
+    elif fault == "missing_candidate":
+        unit = runner.units([6], [4096])[0]
+        (args.output / (unit["name"] + ".json")).unlink()
+    else:
+        unit = runner.units([6], [4096])[0]
+        runner.atomic_json(args.output / "duplicate.json", unit_raw(unit, protocol))
+    incomplete = summarize(args.output)
+    assert not incomplete["complete_requested_matrix"] and not incomplete["numeric_targets_met"]
+
+
+def test_fixed_format_selection_binds_target_and_origin(args):
+    manifest = runner.load(args.model_manifest)
+    source = {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "revision": "pinned"}
+    manifest.update(group_size=64, source=source)
+    original = runner.load(args.format_selection)
+    selection = {"schema": "fixed-format-transfer-v1", "split": "fixed_format_transfer",
+                 "chosen": {**original["chosen"], "label": "g64f16", "group_size": 64},
+                 "origin_selection": original, "verified_source": source,
+                 "oracle_identity": {"verified_source": source}}
+    runner.validate_selection(selection, manifest)
+    with pytest.raises(ValueError, match="target-model calibration"):
+        runner.validate_selection(original, manifest)
+    changed = deepcopy(selection)
+    changed["verified_source"] = {"model_id": "wrong"}
+    with pytest.raises(ValueError, match="target source"):
+        runner.validate_selection(changed, manifest)
+    changed = deepcopy(selection)
+    changed["origin_selection"]["split"] = "heldout"
+    with pytest.raises(ValueError, match="original calibration"):
+        runner.validate_selection(changed, manifest)
+    changed = deepcopy(selection)
+    changed["chosen"]["model_identity"]["files"]["config.json"]["sha256"] = "wrong"
+    with pytest.raises(ValueError, match="artifact identity"):
+        runner.validate_selection(changed, manifest)
+
+
+def config_fixture(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    models = []
+    for name in ["0.5", "s1"]:
+        directory = tmp_path / name
+        directory.mkdir()
+        model = directory / "model"
+        model.mkdir()
+        (model / "model.safetensors").write_bytes(b"synthetic")
+        (model / "config.json").write_text("{}")
+        argv = ["--model", str(model), "--kernel", "simd512x4", "--affinity", "strict"]
+        for key in ["model-manifest", "format-selection", "llama", "gguf", "preparation", "quality", "engine", "bandwidth"]:
+            path = directory / key
+            path.write_text("{}")
+            argv += ["--" + key, str(path)]
+        (directory / "model-manifest").write_text(json.dumps(
+            {"source": {"model_id": f"Qwen/Qwen2.5-{'0.5' if name == '0.5' else '1.5'}B-Instruct"}}))
+        output = tmp_path / ("results/v2/final" if name == "0.5" else "results/v2/s1/final")
+        argv += ["--output", str(output)]
+        if name == "s1":
+            argv += ["--thread-counts", "2,6", "--context-lengths", "128,4096"]
+        models.append({"name": name, "optional": name == "s1", "argv": argv})
+    path = tmp_path / "matrix.json"
+    path.write_text(json.dumps({"models": models}))
+    return path
+
+
+def test_combined_plan_never_reads_identity_or_starts_processes(tmp_path, monkeypatch, capsys):
+    path = config_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(runner, "missing_inputs", lambda *a: pytest.fail("plan checked readiness"))
+    monkeypatch.setattr(runner, "run_model", lambda *a: pytest.fail("plan ran model"))
+    runner.run_config(path, dry_run=True)
+    output = json.loads(capsys.readouterr().out)
+    assert output["timing_commands_if_all_ready"] == 178
+    assert [model["timing_commands"] for model in output["models"]] == [140, 38]
+
+
+def test_combined_runs_prepared_models_sequentially_and_resumes(tmp_path, monkeypatch, capsys):
+    path = config_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(runner.os, "setpriority", lambda *a: None)
+    calls = []
+    monkeypatch.setattr(runner, "run_model", lambda args: calls.append(args.output))
+    runner.run_config(path)
+    assert calls == [tmp_path / "results/v2/final", tmp_path / "results/v2/s1/final"]
+    statuses = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert [status["model"] for status in statuses] == ["0.5", "s1"]
+    runner.run_config(path)
+    assert calls[2:] == calls[:2]  # Same single-model resume path, not a separate sampling implementation.
+
+
+def test_combined_optional_not_ready_is_visible_but_existing_resume_is_not_skipped(tmp_path, monkeypatch, capsys):
+    path = config_fixture(tmp_path, monkeypatch)
+    (tmp_path / "s1/quality").unlink()
+    monkeypatch.setattr(runner.os, "setpriority", lambda *a: None)
+    calls = []
+    monkeypatch.setattr(runner, "run_model", lambda args: calls.append(args.output))
+    runner.run_config(path)
+    assert len(calls) == 1
+    statuses = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert statuses[1] == {"model": "s1", "status": "skipped-not-ready", "missing_inputs": ["quality"]}
+    output = tmp_path / "results/v2/s1/final"
+    output.mkdir(parents=True)
+    (output / "runner.json").write_text("{}")
+    with pytest.raises(ValueError, match="missing prepared inputs"):
+        runner.run_config(path)
+
+
+def test_combined_does_not_skip_present_invalid_s1_or_continue_failed_primary(tmp_path, monkeypatch):
+    path = config_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(runner.os, "setpriority", lambda *a: None)
+    calls = []
+    def fail_s1(args):
+        calls.append(args.output)
+        if len(calls) == 2:
+            raise ValueError("invalid quality binding")
+    monkeypatch.setattr(runner, "run_model", fail_s1)
+    with pytest.raises(ValueError, match="invalid quality binding"):
+        runner.run_config(path)
+    assert len(calls) == 2
+    calls.clear()
+    def fail_primary(args):
+        calls.append(args.output)
+        raise SystemExit("incomplete primary")
+    monkeypatch.setattr(runner, "run_model", fail_primary)
+    with pytest.raises(SystemExit, match="incomplete primary"):
+        runner.run_config(path)
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("fault", ["wrong_order", "duplicate_output", "narrow_primary", "broad_s1", "unknown_field"])
+def test_combined_config_rejects_wrong_scope_or_overlapping_outputs(tmp_path, monkeypatch, fault):
+    path = config_fixture(tmp_path, monkeypatch)
+    config = runner.load(path)
+    if fault == "wrong_order":
+        config["models"].reverse()
+    elif fault == "duplicate_output":
+        argv = config["models"][1]["argv"]
+        argv[argv.index("--output") + 1] = str(tmp_path / "results/v2/final")
+    elif fault == "narrow_primary":
+        config["models"][0]["argv"] += ["--thread-counts", "2,6"]
+    elif fault == "broad_s1":
+        argv = config["models"][1]["argv"]
+        argv[argv.index("--context-lengths") + 1] = "128,1024,4096"
+    else:
+        config["models"][1]["prepare"] = True
+    path.write_text(json.dumps(config))
+    with pytest.raises(ValueError):
+        runner.configured_models(path)
+
+
+def test_fixed_transfer_uses_shared_validator_and_preserves_binary_report_binding(args, monkeypatch):
+    original = runner.load(args.format_selection)
+    source = {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "revision": "pinned"}
+    decision = {"schema": "fixed-format-transfer-v1", "split": "fixed_format_transfer",
+                "chosen": {**original["chosen"], "label": "g64f16", "group_size": 64},
+                "origin_selection": original, "origin_selection_sha256": "synthetic-origin-hash",
+                "corpus_sha256": "synthetic-corpus", "verified_source": source,
+                "oracle_identity": {"verified_source": source}}
+    runner.atomic_json(args.format_selection, decision)
+    quality = runner.load(args.quality)
+    report_path = args.quality.parent / quality["evidence"][0]["report"]
+    report = runner.load(report_path)
+    report["settings"]["group_size"] = 64
+    report["selection_sha256"] = runner.file_hash(args.format_selection)
+    runner.atomic_json(report_path, report)
+    entry = quality["evidence"][0]
+    entry.update(settings=report["settings"], sha256=runner.file_hash(report_path))
+    quality.update(selection=decision, selection_sha256=report["selection_sha256"])
+    runner.atomic_json(args.quality, quality)
+    validated = []
+    monkeypatch.setattr("tools.quality_v2.read_selection",
+                        lambda path, corpus_hash: validated.append((path, corpus_hash)) or decision)
+    runner.check_quality_selection(args)
+    assert validated == [(args.format_selection, "synthetic-corpus")]
+    args.engine.write_bytes(b"changed final engine")
+    with pytest.raises(ValueError, match="engine binary differs"):
+        runner.check_quality_selection(args)

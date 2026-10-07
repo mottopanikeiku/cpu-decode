@@ -59,6 +59,51 @@ over all float inputs or rounding modes. Attention checks cover every
 rejection of insufficient blocks, scalar-reference tolerance 3e-6, and
 bitwise results at 1/2/4/6/12 threads.
 
+### Signed-int16 activation path
+
+The original weight-format decision remains
+[g64f16](../results/v2/format-selection.json): the fewest artifact bytes among
+calibration formats strictly better than actual Q8_0 on mean KL, p99 KL and
+top-1 agreement, evaluated with FP32 activations. A separate
+[signed-int16 comparison](../results/v2/quality-vnni16-final.json) keeps those
+weights fixed and checks the same three strict inequalities on 512 calibration
+and 2048 heldout positions. Perplexity is worse than Q8_0 and is not a selection
+criterion. F32 KV is a separately reported required control, not another
+format-selection opportunity.
+
+`vnni16` represents inputs in 64-value groups with a finite positive scale,
+signed clipping at ±32767 and half-away-from-zero rounding. Quantization happens
+once per projection call, shared by fused QKV or gate/up. Weight groups of
+32/64/128 and row scales are supported; the final chosen format is g64f16.
+Thirty-two weights sign-extend to words; two signed-word VNNI instructions
+cover an ordinary 64-value group. Four products per lane, including -128
+weights, remain below 2^24, so int32 accumulation and its FP32 conversion are
+exact before scaling. Integer sums reset before applying each scale, with one
+FP32 vector FMA per ordinary group and one final horizontal reduction per row.
+Subnormal or excessively large combined scales use the independent wide
+whole-row arithmetic path rather than lose finite results through early
+underflow/overflow. The activation-scale FLT_MIN floor is an intentional
+precision loss for extremely tiny values, not a universal relative-error bound.
+
+FP32 kernels allocate no integer activation buffers. Int8 activation VNNI
+remains governed by its earlier four-metric rule and was rejected. `make final`
+chooses signed-int16 only when its recorded comparison passes, otherwise the
+configured FP32 kernel; native CLI `auto` remains FP32. Freeze, windows and
+summary rehash all five linked signed-int16 quality reports and recompute their
+metrics/commands, binding corpus, selection, source, binary, model/config and
+actual Q8 artifact. A changed or rejected comparison cannot enter final timings.
+
+The [same-binary provisional FP32/int16 windows](../results/v2/int16-development/summary.json)
+show the largest difference at one/two threads; the long-context six-thread
+window is noisy and does not establish a speed improvement. Those pre-final
+binary records remain development data. The later
+[selected-path ABAB window](../results/v2/int16-shipped-short/summary.json)
+uses the quality-checked final binary at two threads/context 128: native
+69.580 tokens/s (66.044–70.104, spread 5.834%) versus Q8_0 65.131
+(63.843–66.078, spread 3.432%). Both have six samples, 16 measured tokens and
+three repetitions. This is one candidate, not the full strongest-of-nine
+64-token/five-repetition comparison; its native spread exceeds 5%.
+
 
 ### Fixed settings and sampling
 
@@ -68,6 +113,11 @@ The baseline uses the same resolved-library/build identity reader as the quality
 
 Final `--kernel vnni` additionally requires `--quality results/v2/quality.json` (the default): a held-out **retained** decision bound to the calibrated chosen weight hash, configuration hash, engine binary and execution settings. The runner checks linked report hashes and independently requires mean KL ≤ Q8_0, p99 KL ≤ Q8_0, top-1 agreement ≥ Q8_0 and perplexity ≤ Q8_0. It archives the quality-file hash and eligibility proof in the frozen protocol; windows and the summarizer reject missing, rejected or changed eligibility. Development/ablation can time rejected VNNI paths with an explicit `experimental_vnni` marker, not a final claim. An unapproved auto-selected VNNI path is also rejected. Freeze and timing commands require nice 19; put `nice` inside an external wrapper if that wrapper changes priority.
 
+
+Final `--kernel vnni16` instead requires its separate strictly better
+calibration and shipped-F16-heldout mean/p99 KL and top-1 rule described above;
+perplexity remains display-only. Both native KV variants and actual Q8 reports
+must be present and linked. The int8 activation rule is intentionally unchanged.
 Each cell tries flash attention **on, off, auto** × **pinned, unpinned, defaults**, with repacking enabled and upstream poll=50. The first two categories are process-restricted to the physical-first selected N CPUs: pinned also uses the matching mask/strict1, while unpinned uses mask0/strict0 inside that selected set. `defaults` uses mask0/strict0 on the full frozen allowed set. All nine enter the conservative best-baseline maximum. Actual process CPU sets and winner matching status are reported against the frozen native affinity, rather than assumed equal. `freeze --polls 0,50` can expand the list; every candidate must be sampled.
 
 Process affinity is necessary even for pinned one-thread tests: at this upstream revision the OpenMP single-thread graph branch does not apply the stored worker mask. Echoed mask/strict flags alone do not establish effective placement. Both selected-set categories therefore receive process-level affinity at every thread count; the separately labeled full-set defaults category preserves an unrestricted baseline comparison.
@@ -209,7 +259,7 @@ the entire unattended command in an exclusive benchmark slot: each candidate
 and each bandwidth window acquires its own slot.
 
 ```sh
-nice -n 19 uv run python -m tools.run_final_v2 --model "$INT8_V2" --model-manifest results/v2/quantized-g64f16.json --format-selection results/v2/format-selection.json --engine build/cpu-decode --bandwidth build/read-bandwidth --llama "$LLAMA_BENCH" --gguf "$Q8_GGUF" --preparation results/llama-preparation.json --quality results/v2/quality-final.json --kernel simd512x4 --affinity strict --wrapper "$BENCH_WRAPPER" --output results/v2/final
+nice -n 19 uv run python -m tools.run_final_v2 --model "$INT8_V2" --model-manifest results/v2/quantized-g64f16.json --format-selection results/v2/format-selection.json --engine "$FINAL_ENGINE" --bandwidth "$FINAL_BANDWIDTH" --llama "$LLAMA_BENCH" --gguf "$Q8_GGUF" --preparation results/llama-preparation.json --quality results/v2/quality-vnni16-final.json --kernel vnni16 --affinity strict --wrapper "$BENCH_WRAPPER" --output results/v2/final
 ```
 
 `--wrapper` is split with shell-style quoting, but never evaluated by a shell.
@@ -229,11 +279,13 @@ The equivalent Make target has no build or calibration prerequisites:
 nice -n 19 make final FINAL_MODEL="$INT8_V2" FINAL_LLAMA_BIN="$LLAMA_BENCH" FINAL_GGUF="$Q8_GGUF" FINAL_WRAPPER="$BENCH_WRAPPER"
 ```
 
-Its `FINAL_FORMAT_SELECTION` defaults to `results/v2/format-selection.json`;
-`FINAL_LABEL` reads that file, and `FINAL_MANIFEST` follows the chosen label.
+With the public Make reproduction, `FINAL_FORMAT_SELECTION` defaults to
+`$(RESULTS)/format-selection.json` (`RESULTS=results/v2/reproduction`);
+`FINAL_LABEL` reads that file and `FINAL_MANIFEST` follows it.
 Override `FINAL_MODEL` when artifacts live outside `$CACHE`.
-Other overrides are `FINAL_KERNEL`, `FINAL_AFFINITY`, `FINAL_CPU_ORDER`,
-`FINAL_PREPARATION`, `FINAL_QUALITY`, and `FINAL_OUTPUT`.
+Other overrides are `FINAL_ENGINE`, `FINAL_BANDWIDTH`, `FINAL_KERNEL`,
+`FINAL_AFFINITY`, `FINAL_CPU_ORDER`, `FINAL_PREPARATION`, `FINAL_QUALITY`,
+and `FINAL_OUTPUT`.
 `FINAL_OPTIONS=--plan` or adding `--plan`/`--dry-run` to the Python command
 prints the full command list without reading/loading models or starting
 subprocesses. The synthetic tests are in
@@ -283,6 +335,118 @@ acceptance disabled. `decode.svg` is published only after all **15 × 9
 candidate units plus five bandwidth units** are complete. Derived summary/SVG
 versions are retained in their own attempt directories; the original v1,
 calibration and earlier heldout results are never overwritten.
+
+### Publishing the completed matrix
+
+After the full 0.5B run has completed, publish its README result/table, SVG
+and machine-readable outcomes with one command:
+
+```sh
+nice -n 19 uv run python -m tools.finalize_v2
+```
+
+[`tools/finalize_v2.py`](../tools/finalize_v2.py) reads
+`results/v2/final/summary.json` and its sibling retained `protocol.json`.
+It verifies the protocol digest, source and copied quality decision, then
+reloads the current comparison and all five linked reports through the
+existing quality validator. The actual 15 cells must contain all nine
+baseline candidates, two ABAB rounds, ten samples per arm and command flags
+for 64 measured tokens/five repeats. Partial, development, inconsistent or
+S1-subset inputs cannot update publication files.
+
+The outputs are `decode.svg`, `cell-outcomes.csv` and `cell-outcomes.json`
+beside the summary, plus the two marked sections of the README. Every native
+and Q8 median win/loss/tie appears, independently of requested target margins;
+noise, sample counts, ranges, winning flags, CPU sets and estimated ceilings
+remain disclosed. Rendering and validation finish before staged replacements;
+each file is replaced atomically and the README is replaced last. This is
+not a cross-file transaction. Repeating identical input produces identical
+output without replacing unchanged files. The README retains **Not yet run**
+until a complete final matrix exists.
+
+### Fixed-format 1.5B transfer, not another calibration
+
+The optional S1 checkpoint is pinned Qwen2.5-1.5B-Instruct at revision
+`989aa7980e4cf806f80c7fef2b1adb7bc71aa306`. Its
+[`fixed-format.json`](../results/v2/s1/fixed-format.json) transfers g64f16 from
+the original 0.5B decision unchanged. No S1 calibration, format reselection
+or signed-int16 approval is performed; its timing kernel is FP32 `simd512x4`.
+
+[`streamed_oracle.py`](../tools/streamed_oracle.py) runs the unmodified
+Transformers decoder layer with one resident FP32 layer, widened from the
+original BF16 snapshot, then projects the tied head in chunks. The real
+eight-window/2048-position run completed at the imposed 2000 MiB cap:
+[`oracle-summary.json`](../results/v2/s1/oracle-summary.json).
+This completion does not measure peak RSS.
+
+The ordinary upstream S1 BF16 converter was terminated with exit 143 at
+that cap; the exit alone does not establish an OOM cause. Its failed partial
+was retained. [`streamed_gguf.py`](../tools/streamed_gguf.py) instead supplies
+bounded row chunks to the **actual pinned upstream** metadata/vocabulary,
+name mapping, BF16 codec and GGUF writer. Before accepting that adapter, the
+full original 0.5B BF16 GGUF was compared with a fresh streamed conversion:
+[`gguf-equivalence-0.5b.json`](../results/v2/s1/gguf-equivalence-0.5b.json)
+records exact whole-file equality, 994,157,056 bytes and SHA256
+`794f9d6e09be1e0509d0c917e4aff89d837f3e16b852b59453894e61a9816ed2`.
+The same comparison also checks every tensor's type/shape/bytes and all
+metadata. It reads bounded byte regions, not materialized tensor arrays.
+The completed S1 BF16 and **unmodified upstream `llama-quantize` Q8_0**
+artifacts are in its
+[`preparation record`](../results/v2/s1/llama-preparation.json); no local Q8
+encoder or repacker substitutes for upstream. Previously prepared caches
+with the old manifest name are migrated only after exact source/commit and
+all existing artifact hashes pass; the old manifest is then retired.
+
+The [2048-position heldout comparison](../results/v2/s1/quality-heldout.json)
+uses that real Q8 artifact and the streamed FP32 oracle:
+
+| S1 path | Mean KL, nats | p99 KL, nats | Top-1 agreement | Perplexity |
+|---|---:|---:|---:|---:|
+| Native g64f16, F16 KV | 0.00079655 | 0.00451672 | 98.3887% | 9.47324 |
+| Native g64f16, F32 KV | 0.00079326 | 0.00435566 | 98.3398% | 9.47242 |
+| Upstream Q8_0, F16 KV | 0.00246597 | 0.01160820 | 96.7773% | 9.50208 |
+
+A [separate native cache check](../results/v2/s1/cache-4096-check.json)
+completed context 4096, capacity 4160 and 64 measured steps with two threads
+at the same 2000 MiB cap. Its 119,275,520 cache bytes are an allocation count,
+not total RSS; one diagnostic repetition is not a final speed comparison.
+A separate upstream Q8 diagnostic also completed depth 4096, F16 KV,
+two threads and one generated token under that cap:
+[`q8-cache-4096-check.json`](../results/v2/s1/q8-cache-4096-check.json).
+It is a single memory-fit diagnostic, not the final 64-token comparison.
+The optional timing subset is threads `{2,6}` × contexts `{128,4096}`, still
+all nine baseline candidates. It does not satisfy the primary 15-cell
+matrix or add another target-approval condition.
+
+### Executed baseline and real thread checks
+
+[`hot-kernel-q8.json`](../results/v2/hot-kernel-q8.json) records an actual
+debugger hit in the pinned upstream CPU library on the real 0.5B Q8 model.
+The debugger stepped over `ggml_vec_dot_q8_0_q8_0+103`:
+VEX `vpdpbusd` on YMM registers, followed by `vcvtdq2ps`. Binary/library hashes
+and invocation flags are recorded. This proves an optimized integer-dot path
+executed; it does not prove a particular repacked layout or report throughput.
+The debugger intentionally stopped the inferior immediately afterward.
+
+[`thread-invariance-final.json`](../results/v2/thread-invariance-final.json)
+records 20 real processes on the shipped immutable 0.5B ELF: FP32/int16
+kernels × F16/F32 KV × threads 1/2/4/6/12. Each scored all vocabulary logits
+for 129 protected inputs. Within each kernel/KV pair, the complete binary
+logit files were bitwise equal across thread counts. This is neither a
+cross-kernel equality claim nor a quality/performance measurement.
+
+### Historical report storage
+
+Current calibration, signed-int16 approval and S1 inputs remain plain JSON.
+Superseded pre-wide int16 reports are preserved byte-for-byte in
+[`int16-pre-wide.zip`](../results/v2/int16-pre-wide.zip), and eight older
+g32/per-row/FP32-control reports in
+[`historical-heldout.zip`](../results/v2/historical-heldout.zip).
+The [archive index](../results/v2/archive-index.json) records archive and
+original member hashes, verified after compression. Original v1 measurements
+and historical summary numbers are unchanged. To inspect historical sibling
+links at their original filenames, extract the corresponding ZIP into
+`results/v2`; these reports cannot authorize the current binary.
 
 ## Archived v1 protocol
 

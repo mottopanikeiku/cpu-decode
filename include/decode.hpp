@@ -11,7 +11,7 @@
 namespace decode {
 using Json = nlohmann::json;
 enum class DType { bf16, f32, f16, i8 };
-enum class Kernel { scalar, simd256, simd512, simd512x4, vnni };
+enum class Kernel { scalar, simd256, simd512, simd512x4, vnni, vnni16 };
 enum class CacheType { f16, f32 };
 Kernel parse_kernel(const std::string& name);
 std::string kernel_name(Kernel kernel);
@@ -55,9 +55,11 @@ struct Matrix {
 float matrix_scale(const Matrix& matrix, size_t row, size_t column);
 uint64_t matrix_scale_bytes(const Matrix& matrix);
 struct Activation {
+    Kernel kernel;
     std::vector<uint8_t> bytes;
+    std::vector<int16_t> words;
     std::vector<float> scales;
-    explicit Activation(size_t capacity);
+    Activation(size_t capacity, Kernel kernel);
 };
 struct Projection { const Matrix* matrix; float* output; const float* bias = nullptr; };
 void matvec(const Matrix& matrix, const float* x, float* y, Kernel kernel, ThreadPool& pool);

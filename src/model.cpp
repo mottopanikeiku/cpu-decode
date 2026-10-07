@@ -190,7 +190,7 @@ struct Engine::Impl {
     Impl(const std::string& directory, Kernel ktype, int nthreads, size_t cap, EngineOptions opts)
         : config(read_json(fs::path(directory) / "config.json")), store(directory), kernel(ktype), threads(nthreads),
           options(std::move(opts)), pool(nthreads, options.cpus, options.persistent_pool, options.strict_affinity),
-          activation(ktype == Kernel::vnni ? std::max(config.hidden, config.intermediate) : 0), capacity(cap) {
+          activation(std::max(config.hidden, config.intermediate), ktype), capacity(cap) {
         if (threads < 1 || threads > 1024 || !capacity || capacity > config.max_positions) throw std::runtime_error("invalid thread count or context capacity");
         parse_kernel(kernel_name(kernel));
         key_blocks = capacity / AttentionWorkspace::block_size + (capacity % AttentionWorkspace::block_size != 0);
@@ -386,7 +386,8 @@ size_t Engine::position() const { return impl->pos; }
 Json Engine::metadata() const {
     return {{"weight_dtype", impl->weight_dtype}, {"group_size", impl->embedding.group_size},
             {"scale_dtype", impl->embedding.scale_dtype == DType::f16 ? "f16" : "f32"},
-            {"activation_dtype", impl->kernel == Kernel::vnni ? "int8" : "float32"}, {"activation_group_size", impl->kernel == Kernel::vnni ? 32 : 0},
+            {"activation_dtype", impl->kernel == Kernel::vnni16 ? "int16" : impl->kernel == Kernel::vnni ? "int8" : "float32"},
+            {"activation_group_size", impl->kernel == Kernel::vnni16 ? 64 : impl->kernel == Kernel::vnni ? 32 : 0},
             {"quantization", impl->weight_dtype == "int8" ? "symmetric int8 weights with per-row or group scales" : "none"},
             {"kernel", kernel_name(impl->kernel)}, {"threads", impl->threads}, {"cpu_set", impl->pool.cpus()},
             {"stored_weight_bytes", impl->stored_bytes}, {"stored_scale_bytes", impl->stored_scales},
@@ -488,6 +489,10 @@ void quantize_model(const std::string& source, const std::string& output, size_t
                 }
             }
             if (!out) throw std::runtime_error("quantization write failed");
+            // A larger BF16 input need not remain resident after each streamed tensor.
+            for (const auto& mapping : store.mappings)
+                if (madvise(mapping->base, mapping->length, MADV_DONTNEED))
+                    throw std::runtime_error("cannot release quantization source pages");
         });
         out.close();
         if (!out) throw std::runtime_error("quantization flush failed");

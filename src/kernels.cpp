@@ -189,6 +189,58 @@ static float dot_vnni(const Matrix& m, size_t row, const Activation& x) {
     }
     return total;
 }
+static float dot_vnni16_wide(const Matrix& m, size_t row, const Activation& x) {
+    const auto* weights = static_cast<const int8_t*>(m.data) + row * m.cols;
+    double sum = 0;
+    for (size_t begin = 0; begin < m.cols;) {
+        size_t width = std::min(m.group_size == 32 ? size_t(32) : size_t(64), m.cols - begin);
+        int64_t dot = 0;
+        for (size_t j = begin; j < begin + width; ++j)
+            dot += int64_t(weights[j]) * int64_t(x.words[j]);
+        double scale = double(matrix_scale(m, row, begin)) * double(x.scales[begin / 64]);
+        sum = std::fma(double(dot), scale, sum);
+        begin += width;
+    }
+    return float(sum);
+}
+__attribute__((target("avx512f,avx512vnni,avx512bw,avx2,f16c"), noinline))
+static float dot_vnni16(const Matrix& m, size_t row, const Activation& x) {
+    const auto* weights = static_cast<const int8_t*>(m.data) + row * m.cols;
+    unsigned shift = m.group_size ? unsigned(__builtin_ctzll(m.group_size)) : 0;
+    __m512 sum = _mm512_setzero_ps();
+    for (size_t begin = 0; begin < m.cols;) {
+        // A 32-weight artifact has two different scales within an activation
+        // group; row/64/128 artifacts use one integer reset per 64 inputs.
+        size_t width = std::min(size_t(64), m.cols - begin);
+        if (m.group_size == 32) width = std::min(width, size_t(32));
+        __m512i dot = _mm512_setzero_si512();
+        size_t j = 0;
+        for (; j + 32 <= width; j += 32) {
+            auto w = _mm512_cvtepi8_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights + begin + j)));
+            auto a = _mm512_loadu_si512(static_cast<const void*>(x.words.data() + begin + j));
+            dot = _mm512_dpwssd_epi32(dot, w, a);
+        }
+        if (j < width) {
+            alignas(64) int32_t lanes[16];
+            _mm512_store_si512(static_cast<void*>(lanes), dot);
+            for (; j < width; ++j) lanes[(j % 32) / 2] += int32_t(weights[begin + j]) * int32_t(x.words[begin + j]);
+            dot = _mm512_load_si512(static_cast<const void*>(lanes));
+        }
+        // At most four signed products per lane: even -128 weights cannot
+        // overflow int32. Convert once, FMA in input order, reduce once/row.
+        float weight_scale = scale_fast(m, row, begin, shift), activation_scale = x.scales[begin / 64];
+        float scale = weight_scale * activation_scale;
+        // This conservative constant also leaves accumulation range for any
+        // addressable row. Subnormal/large coefficients use a wide whole-row
+        // integer reference, avoiding both premature scale loss and inf-inf.
+        constexpr float maximum = float(double(std::numeric_limits<float>::max()) /
+            (double(std::numeric_limits<size_t>::max()) * 128.0 * 32767.0 * 2.0));
+        if (!std::isnormal(scale) || scale > maximum) return dot_vnni16_wide(m, row, x);
+        sum = _mm512_fmadd_ps(_mm512_cvtepi32_ps(dot), _mm512_set1_ps(scale), sum);
+        begin += width;
+    }
+    return _mm512_reduce_add_ps(sum);
+}
 #endif
 Kernel parse_kernel(const std::string& name) {
     if (name == "scalar") return Kernel::scalar;
@@ -203,6 +255,7 @@ Kernel parse_kernel(const std::string& name) {
     if (name == "simd512" && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw") && __builtin_cpu_supports("f16c")) return Kernel::simd512;
     if (name == "simd512x4" && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw") && __builtin_cpu_supports("f16c")) return Kernel::simd512x4;
     if (name == "vnni" && __builtin_cpu_supports("avx512vnni") && __builtin_cpu_supports("avx512vl") && __builtin_cpu_supports("f16c")) return Kernel::vnni;
+    if (name == "vnni16" && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512vnni") && __builtin_cpu_supports("avx512bw") && __builtin_cpu_supports("avx2") && __builtin_cpu_supports("f16c")) return Kernel::vnni16;
 #else
     if (name == "auto") return Kernel::scalar;
 #endif
@@ -213,9 +266,15 @@ std::string kernel_name(Kernel k) {
     if (k == Kernel::simd256) return "simd256";
     if (k == Kernel::simd512) return "simd512";
     if (k == Kernel::simd512x4) return "simd512x4";
-    return "vnni";
+    if (k == Kernel::vnni) return "vnni";
+    if (k == Kernel::vnni16) return "vnni16";
+    throw std::runtime_error("invalid kernel enum");
 }
-Activation::Activation(size_t capacity) : bytes(capacity), scales((capacity + 31) / 32) {}
+Activation::Activation(size_t capacity, Kernel selected)
+    : kernel(selected), bytes(selected == Kernel::vnni ? capacity : 0),
+      words(selected == Kernel::vnni16 ? capacity : 0),
+      scales(selected == Kernel::vnni ? capacity / 32 + (capacity % 32 != 0) :
+             selected == Kernel::vnni16 ? capacity / 64 + (capacity % 64 != 0) : 0) {}
 void projections(const Projection* items, size_t count, const float* x, Kernel kernel, ThreadPool& pool, Activation& activation, bool swiglu) {
     if (!count || !x) throw std::runtime_error("empty projection");
     if (swiglu && (count != 2 || items[0].matrix->rows != items[1].matrix->rows || items[0].bias || items[1].bias)) throw std::runtime_error("SwiGLU requires an equal-row gate/up pair without bias");
@@ -225,9 +284,18 @@ void projections(const Projection* items, size_t count, const float* x, Kernel k
         if (!m.data || !m.rows || !m.cols || m.dtype == DType::f16 || (!items[i].output && !(swiglu && i == 1)) || (m.dtype == DType::i8 && !m.scales) || m.cols != items[0].matrix->cols ||
             (m.group_size && (m.group_size < 32 || (m.group_size & (m.group_size - 1)) || m.cols % m.group_size))) throw std::runtime_error("invalid projection dimensions");
         if (kernel == Kernel::vnni && (m.dtype != DType::i8 || m.cols % 32 || (m.group_size && m.group_size < 32))) throw std::runtime_error("VNNI requires int8 matrices and groups divisible by32");
+        if (kernel == Kernel::vnni16 && (m.dtype != DType::i8 ||
+            (m.group_size && m.group_size != 32 && m.group_size != 64 && m.group_size != 128) ||
+            (m.scale_dtype != DType::f16 && m.scale_dtype != DType::f32)))
+            throw std::runtime_error("VNNI16 requires int8 matrices with row or 32/64/128-group F16/F32 scales");
         tasks += (m.rows + 63) / 64;
     }
     if (swiglu) tasks = (items[0].matrix->rows + 63) / 64;
+#ifndef DECODE_X86
+    if (kernel == Kernel::vnni || kernel == Kernel::vnni16) throw std::runtime_error("VNNI kernels require x86 SIMD support");
+#endif
+    if ((kernel == Kernel::vnni || kernel == Kernel::vnni16) && activation.kernel != kernel)
+        throw std::runtime_error("activation representation does not match kernel");
     if (kernel == Kernel::vnni) {
         size_t n = items[0].matrix->cols;
         if (activation.bytes.size() < n) throw std::runtime_error("activation capacity exceeded");
@@ -236,6 +304,25 @@ void projections(const Projection* items, size_t count, const float* x, Kernel k
             float scale = maximum == 0 ? 1 : maximum / 127;
             activation.scales[begin / 32] = scale;
             for (size_t j = begin; j < begin + 32; ++j) activation.bytes[j] = uint8_t(int(std::clamp(std::round(x[j] / scale), -127.0f, 127.0f)) + 128);
+        }
+    }
+    if (kernel == Kernel::vnni16) {
+        size_t n = items[0].matrix->cols;
+        if (activation.words.size() < n || activation.scales.size() < n / 64 + (n % 64 != 0))
+            throw std::runtime_error("activation capacity exceeded");
+        for (size_t begin = 0; begin < n; begin += 64) {
+            size_t end = std::min(n, begin + 64);
+            float maximum = 0;
+            for (size_t j = begin; j < end; ++j) {
+                if (!std::isfinite(x[j])) throw std::runtime_error("nonfinite VNNI16 activation");
+                maximum = std::max(maximum, std::abs(x[j]));
+            }
+            // A normal-scale floor avoids underflow and reciprocal overflow
+            // for tiny groups, including hosts that flush subnormals to zero.
+            float scale = maximum == 0 ? 1 : std::max(maximum / 32767.0f, std::numeric_limits<float>::min());
+            activation.scales[begin / 64] = scale;
+            for (size_t j = begin; j < end; ++j)
+                activation.words[j] = static_cast<int16_t>(std::clamp(std::round(x[j] / scale), -32767.0f, 32767.0f));
         }
     }
     float (*dot)(const Matrix&, size_t, const float*) = dot_scalar;
@@ -250,6 +337,7 @@ void projections(const Projection* items, size_t count, const float* x, Kernel k
         auto dot_row = [&](const Matrix& matrix, size_t row) noexcept {
     #ifdef DECODE_X86
             if (w.kernel == Kernel::vnni) return dot_vnni(matrix, row, *w.activation);
+            if (w.kernel == Kernel::vnni16) return dot_vnni16(matrix, row, *w.activation);
     #endif
             return w.function(matrix, row, w.x);
         };
@@ -276,7 +364,7 @@ void projections(const Projection* items, size_t count, const float* x, Kernel k
 }
 void matvec(const Matrix& m, const float* x, float* y, Kernel kernel, ThreadPool& pool) {
     // Standalone kernel tests; the engine owns and reuses its activation buffers.
-    Activation activation(kernel == Kernel::vnni ? m.cols : 0);
+    Activation activation(m.cols, kernel);
     Projection projection{&m, y}; projections(&projection, 1, x, kernel, pool, activation);
 }
 void quantize_row(const float* source, size_t n, int8_t* out, float& scale) {

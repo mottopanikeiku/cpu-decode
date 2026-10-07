@@ -441,9 +441,198 @@ void group_kernel_tests(const fs::path& root) {
     decode::Engine engine((root / "odd-scales-int8").string(), decode::Kernel::scalar, 1, 8);
     for (float value : engine.step(5, true)) require(std::isfinite(value), "FP16 odd-scale count preserves FP32 tensor alignment");
 }
+void vnni16_tests() {
+    for (auto kernel : kernels()) {
+        decode::Activation activation(147, kernel);
+        require(activation.bytes.empty() && activation.words.empty() && activation.scales.empty(), "FP32 kernels allocate no activation representation");
+    }
+    decode::Activation eight(147, decode::Kernel::vnni);
+    require(eight.bytes.size() == 147 && eight.words.empty() && eight.scales.size() == 5, "int8 activation allocation is exclusive");
+    decode::Activation sixteen(147, decode::Kernel::vnni16);
+    require(sixteen.bytes.empty() && sixteen.words.size() == 147 && sixteen.scales.size() == 3, "int16 activation allocation is exclusive");
+    decode::Kernel kernel;
+    try { kernel = decode::parse_kernel("vnni16"); }
+    catch (const std::exception&) { std::cout << "skip unavailable vnni16\n"; return; }
+    require(decode::kernel_name(kernel) == "vnni16", "int16 parser/name roundtrip");
+    // Independent reference: scalar, wide integer dot, no SIMD lane layout.
+    auto reference = [](const decode::Matrix& matrix, const std::vector<float>& input,
+                        std::vector<int16_t>& quantized, std::vector<float>& scales) {
+        for (size_t begin = 0; begin < input.size(); begin += 64) {
+            size_t end = std::min(input.size(), begin + 64);
+            double maximum = 0;
+            for (size_t j = begin; j < end; ++j) maximum = std::max(maximum, std::abs(double(input[j])));
+            float scale = maximum == 0 ? 1 : std::max(float(maximum / 32767.0), std::numeric_limits<float>::min());
+            scales[begin / 64] = scale;
+            for (size_t j = begin; j < end; ++j) {
+                double magnitude = std::min(32767.0, std::floor(std::abs(double(input[j]) / scale) + 0.5));
+                quantized[j] = int16_t(input[j] < 0 ? -magnitude : magnitude);
+            }
+        }
+        std::vector<double> output(matrix.rows);
+        const auto* weights = static_cast<const int8_t*>(matrix.data);
+        for (size_t row = 0; row < matrix.rows; ++row) {
+            for (size_t begin = 0; begin < matrix.cols;) {
+                size_t width = std::min(matrix.group_size == 32 ? size_t(32) : size_t(64), matrix.cols - begin);
+                int64_t dot = 0;
+                for (size_t j = begin; j < begin + width; ++j) dot += int64_t(weights[row * matrix.cols + j]) * quantized[j];
+                double scale = double(decode::matrix_scale(matrix, row, begin)) * double(scales[begin / 64]);
+                output[row] += double(dot) * scale;
+                begin += width;
+            }
+        }
+        return output;
+    };
+    constexpr size_t rows = 129;
+    for (size_t cols : {size_t(1), size_t(17), size_t(31), size_t(32), size_t(33), size_t(63), size_t(64),
+                        size_t(65), size_t(95), size_t(127), size_t(128), size_t(147), size_t(512)})
+    for (size_t group : {size_t(0), size_t(32), size_t(64), size_t(128)})
+    for (auto dtype : {decode::DType::f16, decode::DType::f32}) {
+        if (group && cols % group) continue;
+        size_t groups = group ? cols / group : 1;
+        std::vector<int8_t> weights(rows * cols);
+        std::vector<float> weight_scales(rows * groups), input(cols), activation_scales((cols + 63) / 64);
+        std::vector<uint16_t> half_scales(weight_scales.size());
+        std::vector<int16_t> quantized(cols);
+        for (size_t i = 0; i < weights.size(); ++i) {
+            // Include the full signed int8 range; row zero forces maximum
+            // same-sign accumulation over enough groups to catch lost resets.
+            weights[i] = i < cols ? int8_t(127) : int8_t(int(i % 256) - 128);
+        }
+        for (size_t i = 0; i < weight_scales.size(); ++i) {
+            float scale = float(i % 7 + 1) / 1024;
+            half_scales[i] = decode::float_half(scale);
+            weight_scales[i] = dtype == decode::DType::f16 ? decode::half_float(half_scales[i]) : scale * 1.001f;
+        }
+        decode::Matrix matrix{weights.data(), dtype == decode::DType::f16 ? static_cast<const void*>(half_scales.data()) : weight_scales.data(),
+                              rows, cols, decode::DType::i8, group, dtype};
+        decode::Activation activation(cols, kernel);
+        const auto* words_storage = activation.words.data();
+        const auto* scales_storage = activation.scales.data();
+        for (int scenario = 0; scenario < 6; ++scenario) {
+            for (size_t j = 0; j < cols; ++j) {
+                if (scenario == 0) input[j] = (j % 2 ? -32767.0f : 32767.0f) * float(j / 64 + 1) / 8;
+                if (scenario == 1) input[j] = 32767.0f;
+                if (scenario == 2) input[j] = j % 2 ? -0.0f : 0.0f;
+                if (scenario == 3) input[j] = (j % 2 ? -1 : 1) * 1e-35f;
+                if (scenario == 4) input[j] = (j % 2 ? -1 : 1) * std::numeric_limits<float>::denorm_min();
+                if (scenario == 5) {
+                    constexpr float boundary[]{32767, -32767, 0.5f, -0.5f, 1.5f, -1.5f, 0};
+                    input[j] = boundary[j % 7];
+                }
+            }
+            auto expected = reference(matrix, input, quantized, activation_scales);
+            std::vector<float> baseline, actual(rows);
+            for (int threads : {1, 2, 4, 6, 12}) {
+                decode::ThreadPool pool(threads);
+                decode::Projection item{&matrix, actual.data()};
+                decode::projections(&item, 1, input.data(), kernel, pool, activation);
+                require(activation.words == quantized && activation.scales == activation_scales, "bounded signed int16 rounding matches independent reference");
+                require(activation.words.data() == words_storage && activation.scales.data() == scales_storage, "projection reuses activation storage");
+                for (size_t row = 0; row < rows; ++row) {
+                    double absolute = 0;
+                    for (size_t j = 0; j < cols; ++j)
+                        absolute += std::abs(double(weights[row * cols + j]) * quantized[j] *
+                                             double(decode::matrix_scale(matrix, row, j)) * double(activation_scales[j / 64]));
+                    near(actual[row], expected[row], 2e-6 * absolute + 1e-37, "int16 SIMD vs independent scalar integer dot across scale/tail/extreme cases");
+                }
+                if (threads == 1) baseline = actual;
+                else require(std::memcmp(baseline.data(), actual.data(), rows * sizeof(float)) == 0, "int16 integer/FMA order is thread invariant");
+            }
+        }
+    }
+    for (auto dtype : {decode::DType::f16, decode::DType::f32})
+    for (size_t group : {size_t(0), size_t(32), size_t(64), size_t(128)}) {
+        constexpr size_t width = 128;
+        size_t groups = group ? width / group : 1;
+        std::vector<int8_t> extreme_weights(width, 127);
+        std::vector<float> extreme_input(width, 32767.0f * std::numeric_limits<float>::min());
+        std::vector<float> float_scales(groups, std::ldexp(1.0f, -24)), activation_scales(2);
+        std::vector<uint16_t> half_scales(groups, decode::float_half(float_scales[0]));
+        std::vector<int16_t> quantized(width);
+        decode::Matrix extreme{extreme_weights.data(),
+            dtype == decode::DType::f16 ? static_cast<const void*>(half_scales.data()) : float_scales.data(),
+            1, width, decode::DType::i8, group, dtype};
+        auto expected = reference(extreme, extreme_input, quantized, activation_scales)[0];
+        require(expected >= std::numeric_limits<float>::min(), "underflow regression has a normal final result");
+        float actual;
+        decode::ThreadPool pool(1);
+        decode::matvec(extreme, extreme_input.data(), &actual, kernel, pool);
+        near(actual, expected, std::abs(expected) * 2e-6 + 32 * double(std::numeric_limits<float>::denorm_min()),
+             "int16 scale product does not erase a representable tiny dot");
+        std::fill(extreme_weights.begin(), extreme_weights.end(), 0);
+        std::fill(extreme_input.begin(), extreme_input.end(), std::numeric_limits<float>::max());
+        std::fill(float_scales.begin(), float_scales.end(), 65504);
+        std::fill(half_scales.begin(), half_scales.end(), decode::float_half(65504));
+        decode::matvec(extreme, extreme_input.data(), &actual, kernel, pool);
+        require(std::isfinite(actual) && actual == 0, "int16 scale product overflow does not turn an exact zero dot into NaN");
+        std::fill(float_scales.begin(), float_scales.end(), 1);
+        std::fill(half_scales.begin(), half_scales.end(), decode::float_half(1));
+        for (size_t j = 0; j < width; ++j) extreme_weights[j] = j % 32 < 16 ? 127 : -127;
+        expected = reference(extreme, extreme_input, quantized, activation_scales)[0];
+        require(expected == 0 && std::isnormal(activation_scales[0]), "large normal coefficient regression cancels within each integer group");
+        decode::matvec(extreme, extreme_input.data(), &actual, kernel, pool);
+        require(std::isfinite(actual) && actual == 0, "int16 lane overflow does not destroy finite integer-group cancellation");
+    }
+    constexpr size_t cols = 147;
+    std::vector<int8_t> weights(rows * cols);
+    std::vector<float> scales(rows, 1.0f / 1024), input(cols), first(rows), second(rows), third(rows), bias(rows);
+    for (size_t i = 0; i < weights.size(); ++i) weights[i] = int8_t(int(i % 255) - 127);
+    for (size_t j = 0; j < cols; ++j) input[j] = std::sin(float(j) * .19f);
+    for (size_t row = 0; row < rows; ++row) bias[row] = float(row) / 8192;
+    decode::Matrix matrix{weights.data(), scales.data(), rows, cols, decode::DType::i8};
+    decode::Activation activation(cols, kernel);
+    decode::ThreadPool pool(6);
+    decode::matvec(matrix, input.data(), first.data(), kernel, pool);
+    decode::Projection qkv[]{{&matrix, second.data(), bias.data()}, {&matrix, third.data()}, {&matrix, first.data()}};
+    decode::projections(qkv, 3, input.data(), kernel, pool, activation);
+    for (size_t row = 0; row < rows; ++row) {
+        near(second[row], first[row] + bias[row], 0, "int16 shared QKV activation with bias");
+        near(third[row], first[row], 0, "int16 shared QKV activation without bias");
+    }
+    decode::Projection gate_up[]{{&matrix, second.data()}, {&matrix, nullptr}};
+    decode::projections(gate_up, 2, input.data(), kernel, pool, activation, true);
+    for (size_t row = 0; row < rows; ++row)
+        near(second[row], (first[row] / (1 + std::exp(-first[row]))) * first[row], 0, "int16 shared gate/up activation and SwiGLU");
+    decode::Projection item{&matrix, second.data()};
+    for (float nonfinite : {std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()}) {
+        input.back() = nonfinite; std::fill(second.begin(), second.end(), 123);
+        fails([&] { decode::projections(&item, 1, input.data(), kernel, pool, activation); }, "int16 nonfinite activation rejected", "nonfinite");
+        require(std::all_of(second.begin(), second.end(), [](float value) { return value == 123; }), "nonfinite rejected before pool dispatch");
+    }
+    input.back() = 0;
+    decode::Activation undersized(cols - 1, kernel);
+    fails([&] { decode::projections(&item, 1, input.data(), kernel, pool, undersized); }, "int16 activation capacity rejected", "capacity");
+    fails([&] { decode::projections(&item, 1, input.data(), kernel, pool, eight); }, "int16 mismatched activation representation rejected", "representation");
+    decode::Matrix noninteger{input.data(), nullptr, 1, cols, decode::DType::f32};
+    fails([&] { decode::matvec(noninteger, input.data(), second.data(), kernel, pool); }, "int16 does not silently fall back to FP32", "VNNI16");
+    decode::Matrix bad_scale = matrix; bad_scale.scale_dtype = decode::DType::bf16;
+    fails([&] { decode::matvec(bad_scale, input.data(), second.data(), kernel, pool); }, "int16 unsupported scale rejected", "VNNI16");
+    std::vector<int8_t> wide_weights(256); std::vector<float> wide_input(256);
+    decode::Matrix bad_group{wide_weights.data(), scales.data(), 1, 256, decode::DType::i8, 256};
+    fails([&] { decode::matvec(bad_group, wide_input.data(), second.data(), kernel, pool); }, "int16 unsupported group rejected", "VNNI16");
+    // Maximum finite input must stay bounded without reciprocal overflow.
+    std::fill(weights.begin(), weights.end(), 0);
+    std::fill(input.begin(), input.end(), std::numeric_limits<float>::max());
+    decode::projections(&item, 1, input.data(), kernel, pool, activation);
+    require(std::all_of(activation.words.begin(), activation.words.end(), [](int16_t value) { return value == 32767; }), "maximum finite activation clips safely");
+    require(std::all_of(second.begin(), second.end(), [](float value) { return value == 0; }), "maximum finite zero-weight dot remains finite");
+    constexpr size_t long_cols = 16384;
+    std::vector<int8_t> long_weights(long_cols, 127);
+    std::vector<float> long_input(long_cols, 32767);
+    float unit_scale = 1, output = 0, baseline = 0;
+    decode::Matrix long_matrix{long_weights.data(), &unit_scale, 1, long_cols, decode::DType::i8};
+    int64_t long_dot = int64_t(long_cols) * 127 * 32767;
+    for (int threads : {1, 2, 4, 6, 12}) {
+        decode::ThreadPool long_pool(threads);
+        decode::matvec(long_matrix, long_input.data(), &output, kernel, long_pool);
+        near(output, double(long_dot), double(long_dot) * 2e-5, "int16 long-row resets prevent int32 lane overflow");
+        if (threads == 1) baseline = output;
+        else require(std::memcmp(&baseline, &output, sizeof(float)) == 0, "int16 long-row thread invariant");
+    }
+}
 void attention_edge_tests() {
-    for (size_t groups : {size_t(1), size_t(2), size_t(4), size_t(7), size_t(8), size_t(16)})
-    for (size_t dim : {size_t(17), size_t(32)}) {
+    for (size_t groups : {size_t(1), size_t(2), size_t(4), size_t(6), size_t(7), size_t(8), size_t(16)})
+    for (size_t dim : {size_t(17), size_t(32), size_t(128)}) {
         constexpr size_t length = 65, kvheads = 2;
         size_t heads = groups * kvheads;
         std::vector<float> q(heads * dim), k(length * kvheads * dim), v(k.size()), expected(q.size()), actual(q.size()), first;
@@ -462,7 +651,7 @@ void attention_edge_tests() {
                 decode::ThreadPool pool(1); decode::AttentionWorkspace workspace(129, heads, dim);
                 decode::attention(q.data(), keys, values, type, expected.data(), length, heads, kvheads, dim, 2, pool, workspace, true);
             }
-            for (int threads : {1, 2, 6, 12}) {
+            for (int threads : {1, 2, 4, 6, 12}) {
                 decode::ThreadPool pool(threads); decode::AttentionWorkspace workspace(129, heads, dim);
                 decode::attention(q.data(), keys, values, type, actual.data(), length, heads, kvheads, dim, 2, pool, workspace);
                 for (size_t j = 0; j < actual.size(); ++j) near(actual[j], expected[j], 3e-6, "all SIMD/fallback GQA groups and oversized workspace");
@@ -547,7 +736,10 @@ void optimized_tests(const fs::path& root) {
     for (const auto& path : {root / "wide", root / "grouped"}) for (auto type : {decode::CacheType::f32, decode::CacheType::f16}) {
         auto available = kernels();
         if (path.filename() == "grouped") {
-            try { available.push_back(decode::parse_kernel("vnni")); } catch (const std::exception&) { std::cout << "skip unavailable vnni\\n"; }
+            for (const char* name : {"vnni", "vnni16"}) {
+                try { available.push_back(decode::parse_kernel(name)); }
+                catch (const std::exception&) { std::cout << "skip unavailable " << name << '\n'; }
+            }
         }
         for (auto kernel : available) {
             std::vector<float> baseline;
@@ -556,6 +748,9 @@ void optimized_tests(const fs::path& root) {
                 {
                     decode::EngineOptions options; options.cache_type = type;
                     decode::Engine engine(path.string(), kernel, threads, 129, options);
+                    if (kernel == decode::Kernel::vnni16)
+                        require(engine.metadata()["activation_dtype"] == "int16" && engine.metadata()["activation_group_size"] == 64 &&
+                                engine.metadata()["weight_dtype"] == "int8", "whole-engine int16 activation metadata on I8 artifacts");
                     for (size_t position = 0; position < 129; ++position) {
                         const auto& row = engine.step(int((position * 7 + 3) % 11), true);
                         actual.insert(actual.end(), row.begin(), row.end());
@@ -577,7 +772,7 @@ int main() {
 #if defined(__x86_64__) || defined(__i386__)
         if (__builtin_cpu_supports("avx512f")) exponential_tests();
 #endif
-        numeric_tests(); engine_tests(root); affinity_tests(root); group_kernel_tests(root); attention_edge_tests(); optimized_tests(root); fs::remove_all(root);
+        numeric_tests(); engine_tests(root); affinity_tests(root); group_kernel_tests(root); vnni16_tests(); attention_edge_tests(); optimized_tests(root); fs::remove_all(root);
         std::cout << "synthetic numerical and malformed-input tests passed\n"; return 0;
     } catch (const std::exception& error) {
         fs::remove_all(root); std::cerr << error.what() << '\n'; return 1;

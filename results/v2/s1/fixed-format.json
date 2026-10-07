@@ -1,0 +1,1646 @@
+{
+  "schema": "fixed-format-transfer-v1",
+  "split": "fixed_format_transfer",
+  "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+  "oracle_identity": {
+    "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "verified_source": {
+      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "stored_dtype": "bfloat16",
+      "files": {
+        "LICENSE": {
+          "bytes": 11343,
+          "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+        },
+        "README.md": {
+          "bytes": 4917,
+          "sha256": "2e1bcd8bd964728a820be709fa0f7b9dd54817a94fd2254c535df70c5e67fada",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "b3327a17e2ffa52e0fd941a2810b18a9fd0e7d94"
+        },
+        "config.json": {
+          "bytes": 660,
+          "sha256": "98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "f81ead14ab072d65a07817f83a3ee0e5a1890d10"
+        },
+        "generation_config.json": {
+          "bytes": 242,
+          "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+        },
+        "merges.txt": {
+          "bytes": 1671839,
+          "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+        },
+        "model.safetensors": {
+          "bytes": 3087467144,
+          "sha256": "dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee",
+          "upstream_algorithm": "sha256",
+          "upstream_digest": "dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee"
+        },
+        "tokenizer.json": {
+          "bytes": 7031645,
+          "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+        },
+        "tokenizer_config.json": {
+          "bytes": 7305,
+          "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+        },
+        "vocab.json": {
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+        }
+      }
+    },
+    "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+    "corpus_policy": {
+      "version": 1,
+      "priming_tokens": 256,
+      "scored_tokens_per_window": 256,
+      "calibration_windows": 2,
+      "heldout_windows": 8,
+      "selection": "First consecutive nonoverlapping 513-token blocks from each pinned body anchor; no shuffle, filtering or candidate-dependent selection",
+      "tokenization": "Pinned Qwen tokenizer; add_special_tokens=False; no chat template or normalization",
+      "partition": "Different books and authors; calibration only chooses format, heldout never tunes it",
+      "format_selection": "Among 32F16,64F32,64F16,128F16 (<=8.5 matrix bits/weight), minimize calibration mean KL, then maximize top1, then minimize cross entropy, then label"
+    },
+    "weight_storage": "bfloat16",
+    "arithmetic": "fp32",
+    "kv_dtype": "float32",
+    "attention": "Transformers eager",
+    "head_chunk_rows": 1024,
+    "threads": 1,
+    "versions": {
+      "torch": "2.8.0+cpu",
+      "transformers": "4.56.2",
+      "safetensors": "0.6.2",
+      "tokenizers": "0.22.1",
+      "huggingface-hub": "0.35.3",
+      "numpy": "2.3.3"
+    },
+    "implementation": "layer-resident unmodified Transformers Qwen2DecoderLayer",
+    "execution": "Layer-major; 256-token priming batch then single-token cached calls; one layer KV resident",
+    "embedding_chunk_rows": 1024,
+    "tokenizer_transfer": {
+      "origin_model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "origin_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "files": {
+        "tokenizer.json": {
+          "bytes": 7031645,
+          "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+        },
+        "tokenizer_config.json": {
+          "bytes": 7305,
+          "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+        },
+        "vocab.json": {
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+        },
+        "merges.txt": {
+          "bytes": 1671839,
+          "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+          "upstream_algorithm": "git-sha1",
+          "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+        }
+      },
+      "policy": "Identical verified tokenizer blobs; reuse original corpus IDs and scored positions without retokenization"
+    }
+  },
+  "verified_source": {
+    "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "stored_dtype": "bfloat16",
+    "files": {
+      "LICENSE": {
+        "bytes": 11343,
+        "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+      },
+      "README.md": {
+        "bytes": 4917,
+        "sha256": "2e1bcd8bd964728a820be709fa0f7b9dd54817a94fd2254c535df70c5e67fada",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "b3327a17e2ffa52e0fd941a2810b18a9fd0e7d94"
+      },
+      "config.json": {
+        "bytes": 660,
+        "sha256": "98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "f81ead14ab072d65a07817f83a3ee0e5a1890d10"
+      },
+      "generation_config.json": {
+        "bytes": 242,
+        "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+      },
+      "merges.txt": {
+        "bytes": 1671839,
+        "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+      },
+      "model.safetensors": {
+        "bytes": 3087467144,
+        "sha256": "dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee",
+        "upstream_algorithm": "sha256",
+        "upstream_digest": "dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee"
+      },
+      "tokenizer.json": {
+        "bytes": 7031645,
+        "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+      },
+      "tokenizer_config.json": {
+        "bytes": 7305,
+        "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+      },
+      "vocab.json": {
+        "bytes": 2776833,
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+        "upstream_algorithm": "git-sha1",
+        "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+      }
+    }
+  },
+  "policy": "Transfer the 0.5B calibration-selected g64f16 format unchanged; no 1.5B calibration or heldout format reselection",
+  "origin_selection_sha256": "b4b1992bf1ce9d2d59ee791ee6416d4fe699accee592629810361b64d0f41ccb",
+  "origin_selection": {
+    "split": "calibration",
+    "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+    "oracle_identity": {
+      "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "verified_source": {
+        "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+        "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+        "stored_dtype": "bfloat16",
+        "files": {
+          "LICENSE": {
+            "bytes": 11343,
+            "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+            "upstream_algorithm": "git-sha1",
+            "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+          },
+          "README.md": {
+            "bytes": 4917,
+            "sha256": "b19c806a904db6dc878a0462e70b551f6b7ac78dfbb88c2eb966ca2b9109ae15",
+            "upstream_algorithm": "git-sha1",
+            "upstream_digest": "4b8373851d093eb9f3017443f27781c6971eff24"
+          },
+          "config.json": {
+            "bytes": 659,
+            "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+            "upstream_algorithm": "git-sha1",
+            "upstream_digest": "0dbb161213629a23f0fc00ef286e6b1e366d180f"
+          },
+          "generation_config.json": {
+            "bytes": 242,
+            "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+            "upstream_algorithm": "git-sha1",
+            "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+          },
+          "merges.txt": {
+            "bytes": 1671839,
+            "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+            "upstream_algorithm": "git-sha1",
+            "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+          },
+          "model.safetensors": {
+            "bytes": 988097824,
+            "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+            "upstream_algorithm": "sha256",
+            "upstream_digest": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+          },
+          "tokenizer.json": {
+            "bytes": 7031645,
+            "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+            "upstream_algorithm": "git-sha1",
+            "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+          },
+          "tokenizer_config.json": {
+            "bytes": 7305,
+            "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+            "upstream_algorithm": "git-sha1",
+            "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+          },
+          "vocab.json": {
+            "bytes": 2776833,
+            "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+            "upstream_algorithm": "git-sha1",
+            "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+          }
+        }
+      },
+      "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+      "corpus_policy": {
+        "version": 1,
+        "priming_tokens": 256,
+        "scored_tokens_per_window": 256,
+        "calibration_windows": 2,
+        "heldout_windows": 8,
+        "selection": "First consecutive nonoverlapping 513-token blocks from each pinned body anchor; no shuffle, filtering or candidate-dependent selection",
+        "tokenization": "Pinned Qwen tokenizer; add_special_tokens=False; no chat template or normalization",
+        "partition": "Different books and authors; calibration only chooses format, heldout never tunes it",
+        "format_selection": "Among 32F16,64F32,64F16,128F16 (<=8.5 matrix bits/weight), minimize calibration mean KL, then maximize top1, then minimize cross entropy, then label"
+      },
+      "weight_storage": "bfloat16",
+      "arithmetic": "fp32",
+      "kv_dtype": "float32",
+      "attention": "Transformers eager",
+      "head_chunk_rows": 1024,
+      "threads": 1,
+      "versions": {
+        "torch": "2.8.0+cpu",
+        "transformers": "4.56.2",
+        "safetensors": "0.6.2",
+        "tokenizers": "0.22.1",
+        "huggingface-hub": "0.35.3",
+        "numpy": "2.3.3"
+      }
+    },
+    "policy": "Among 32F16,64F32,64F16,128F16, require calibration mean KL and p99 KL strictly below actual Q8_0 and top1 strictly above; minimize weights artifact bytes, then mean KL, p99 KL, negative top1, label; perplexity is report-only; no fallback or heldout reselection",
+    "chosen": {
+      "label": "g64f16",
+      "group_size": 64,
+      "scale_dtype": "f16",
+      "matrix_bits_per_weight": 8.25,
+      "weights_artifact_bytes": 509734624,
+      "model_identity": {
+        "files": {
+          "config.json": {
+            "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+            "bytes": 659
+          },
+          "model.safetensors": {
+            "sha256": "c70c215d96047722ac638b9677e761874e46c7d41b0b01068a94ef33b12fa049",
+            "bytes": 509734624
+          }
+        },
+        "sha256": "9ea73dd269574aaca095332cfe47dd06a152aa4e84c22fc70706d3fdfdf04fba"
+      },
+      "settings": {
+        "group_size": 64,
+        "scale_dtype": "f16",
+        "kv_dtype": "f16",
+        "kernel": "simd512x4",
+        "attention": "blocked",
+        "scheduler": "pool",
+        "affinity": "strict",
+        "cpu_set": [
+          0,
+          1
+        ],
+        "threads": 2,
+        "weight_dtype": "int8"
+      },
+      "aggregate": {
+        "positions": 512,
+        "mean_kl_reference_candidate_nats": 0.0008012423225218815,
+        "p99_kl_reference_candidate_nats": 0.002620213861786619,
+        "p99_method": "numpy.quantile linear over all scored positions",
+        "max_kl_reference_candidate_nats": 0.005562736218797577,
+        "top1_agreement": 0.98046875,
+        "reference_next_token_cross_entropy_nats": 3.2284852243397184,
+        "reference_perplexity": 25.241392949903435,
+        "next_token_cross_entropy_nats": 3.229132568532726,
+        "perplexity": 25.257738108954086
+      }
+    },
+    "scope": "512 calibration positions only; PPL reported, not a selection criterion; no heldout reselection",
+    "format_table": [
+      {
+        "label": "g128f16",
+        "split": "calibration",
+        "matrix_bits_per_weight": 8.125,
+        "weights_artifact_bytes": 502016336,
+        "mean_kl_reference_candidate_nats": 0.0012161085830287765,
+        "p99_kl_reference_candidate_nats": 0.004394612083133647,
+        "top1_agreement": 0.96875,
+        "perplexity": 25.270525583970223,
+        "beats_q8_0": false
+      },
+      {
+        "label": "g32f16",
+        "split": "calibration",
+        "matrix_bits_per_weight": 8.5,
+        "weights_artifact_bytes": 525170936,
+        "mean_kl_reference_candidate_nats": 0.0007153467252112733,
+        "p99_kl_reference_candidate_nats": 0.002411287421405917,
+        "top1_agreement": 0.98046875,
+        "perplexity": 25.223540751613562,
+        "beats_q8_0": true
+      },
+      {
+        "label": "g64f16",
+        "split": "calibration",
+        "matrix_bits_per_weight": 8.25,
+        "weights_artifact_bytes": 509734624,
+        "mean_kl_reference_candidate_nats": 0.0008012423225218815,
+        "p99_kl_reference_candidate_nats": 0.002620213861786619,
+        "top1_agreement": 0.98046875,
+        "perplexity": 25.257738108954086,
+        "beats_q8_0": true
+      },
+      {
+        "label": "g64f32",
+        "split": "calibration",
+        "matrix_bits_per_weight": 8.5,
+        "weights_artifact_bytes": 525171728,
+        "mean_kl_reference_candidate_nats": 0.0008015458152780032,
+        "p99_kl_reference_candidate_nats": 0.0025273701281874426,
+        "top1_agreement": 0.982421875,
+        "perplexity": 25.220360196812315,
+        "beats_q8_0": true
+      },
+      {
+        "label": "q8_0-calibration",
+        "split": "calibration",
+        "matrix_bits_per_weight": 8.5,
+        "weights_artifact_bytes": 531068416,
+        "mean_kl_reference_candidate_nats": 0.0023639697296422707,
+        "p99_kl_reference_candidate_nats": 0.006974944310375773,
+        "top1_agreement": 0.97265625,
+        "perplexity": 25.231974469597333,
+        "beats_q8_0": false
+      }
+    ],
+    "baseline": {
+      "label": "q8_0-calibration",
+      "report": "cal-q8_0.json",
+      "sha256": "c8ae3d0b909a705ea009930242b25f8b3839625cde157be44573adf34e72823d",
+      "split": "calibration",
+      "backend": "llama",
+      "settings": {
+        "weight_dtype": "Q8_0",
+        "kv_dtype": "f16",
+        "flash_attention": "auto",
+        "threads": 2
+      },
+      "aggregate": {
+        "positions": 512,
+        "mean_kl_reference_candidate_nats": 0.0023639697296422707,
+        "p99_kl_reference_candidate_nats": 0.006974944310375773,
+        "p99_method": "numpy.quantile linear over all scored positions",
+        "max_kl_reference_candidate_nats": 0.009089288272380374,
+        "top1_agreement": 0.97265625,
+        "reference_next_token_cross_entropy_nats": 3.2284852243397184,
+        "reference_perplexity": 25.241392949903435,
+        "next_token_cross_entropy_nats": 3.2281120183938126,
+        "perplexity": 25.231974469597333
+      },
+      "model_identity": {
+        "files": {
+          "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf": {
+            "sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7",
+            "bytes": 531068416
+          }
+        },
+        "sha256": "1ec359cd08376a2be65a72d0e11e54ecdddb451e59ce301a93012f63e2665fdb"
+      },
+      "binary_identity": {
+        "llama_commit": "6c73b3e12dc501de35fe5f6979960d06921a2f6c",
+        "artifact_manifest_sha256": "279e4cf73d66a6f226c15f95bd4b1bfe6aa538ce49c3bc5b6f6ab13c05592e0a",
+        "reader_binary_sha256": "34bfe4eb1fb132178a323692e56aa1af071fa03346890a4a37128f64562e955b",
+        "shared_libraries": {
+          "libggml-base.so.0": {
+            "resolved_path": "$LLAMA_BUILD/bin/libggml-base.so.0.26.0",
+            "sha256": "1319b58b3dd8598240c60ced8833bbffd0154ab5a6f989bea0ec336a8b27f718",
+            "bytes": 956024
+          },
+          "libggml-cpu.so.0": {
+            "resolved_path": "$LLAMA_BUILD/bin/libggml-cpu.so.0.26.0",
+            "sha256": "f5bd6ba7950fbbab882215b897293147cd7254af278c6d5f282d53f864b77fab",
+            "bytes": 1662008
+          },
+          "libggml.so.0": {
+            "resolved_path": "$LLAMA_BUILD/bin/libggml.so.0.26.0",
+            "sha256": "bd28769b9e3dcb3e1a19a255bfdb4c74e71d92713bd17e641e976822028a790c",
+            "bytes": 55976
+          },
+          "libllama.so.0": {
+            "resolved_path": "$LLAMA_BUILD/bin/libllama.so.0.6.0",
+            "sha256": "3e46c1a305d410504b5a6881e9d1760f3938ec237edf435220ee404d2112bd39",
+            "bytes": 4781632
+          }
+        },
+        "build": {
+          "root": "$LLAMA_BUILD",
+          "root_sha256": "bcfcca58f2f19e1424be39c1a14c54249f48cba2f6943fc40ee01f3536191877",
+          "cache_sha256": "75b2a1772ac9cb9e6ed7e524f10f29f93ece0489413ac82c877cd8fbb9c05a66",
+          "settings": {
+            "CMAKE_BUILD_TYPE": "Release",
+            "CMAKE_CXX_COMPILER": "$LLAMA_CXX_COMPILER",
+            "GGML_ACCELERATE": "ON",
+            "GGML_ALL_WARNINGS_3RD_PARTY": "OFF",
+            "GGML_AMX_BF16": "OFF",
+            "GGML_AMX_INT8": "OFF",
+            "GGML_AMX_TILE": "OFF",
+            "GGML_AVX": "OFF",
+            "GGML_AVX2": "OFF",
+            "GGML_AVX512": "OFF",
+            "GGML_AVX512_BF16": "OFF",
+            "GGML_AVX512_VBMI": "OFF",
+            "GGML_AVX512_VNNI": "OFF",
+            "GGML_AVX_VNNI": "OFF",
+            "GGML_BACKEND_DL": "OFF",
+            "GGML_BLAS": "OFF",
+            "GGML_BMI2": "OFF",
+            "GGML_BUILD_EXAMPLES": "OFF",
+            "GGML_BUILD_TESTS": "OFF",
+            "GGML_CCACHE": "ON",
+            "GGML_CPU": "ON",
+            "GGML_CPU_ALL_VARIANTS": "OFF",
+            "GGML_CPU_HBM": "OFF",
+            "GGML_CPU_KLEIDIAI": "OFF",
+            "GGML_CPU_REPACK": "ON",
+            "GGML_CUDA": "OFF",
+            "GGML_CUDA_FA": "ON",
+            "GGML_CUDA_FA_ALL_QUANTS": "OFF",
+            "GGML_CUDA_FORCE_CUBLAS": "OFF",
+            "GGML_CUDA_FORCE_MMQ": "OFF",
+            "GGML_CUDA_GRAPHS": "ON",
+            "GGML_CUDA_NCCL": "ON",
+            "GGML_CUDA_NO_PEER_COPY": "OFF",
+            "GGML_CUDA_NO_VMM": "OFF",
+            "GGML_ET": "OFF",
+            "GGML_ET_SYSEMU": "OFF",
+            "GGML_F16C": "OFF",
+            "GGML_FMA": "OFF",
+            "GGML_GPROF": "OFF",
+            "GGML_HEXAGON": "OFF",
+            "GGML_HIP": "OFF",
+            "GGML_HIP_EXPORT_METRICS": "OFF",
+            "GGML_HIP_GRAPHS": "ON",
+            "GGML_HIP_MMQ_MFMA": "ON",
+            "GGML_HIP_NO_VMM": "ON",
+            "GGML_HIP_RCCL": "OFF",
+            "GGML_LASX": "ON",
+            "GGML_LLAMAFILE": "ON",
+            "GGML_LSX": "ON",
+            "GGML_LTO": "OFF",
+            "GGML_METAL": "OFF",
+            "GGML_METAL_EMBED_LIBRARY": "OFF",
+            "GGML_METAL_NDEBUG": "OFF",
+            "GGML_METAL_SHADER_DEBUG": "OFF",
+            "GGML_MUSA": "OFF",
+            "GGML_MUSA_GRAPHS": "OFF",
+            "GGML_MUSA_MUDNN_COPY": "OFF",
+            "GGML_NATIVE": "ON",
+            "GGML_OPENCL": "OFF",
+            "GGML_OPENCL_EMBED_KERNELS": "ON",
+            "GGML_OPENCL_PROFILING": "OFF",
+            "GGML_OPENCL_USE_ADRENO_KERNELS": "ON",
+            "GGML_OPENMP": "ON",
+            "GGML_OPENMP_FETCH": "OFF",
+            "GGML_OPENVINO": "OFF",
+            "GGML_RPC": "OFF",
+            "GGML_RVV": "ON",
+            "GGML_RV_ZFH": "ON",
+            "GGML_RV_ZICBOP": "ON",
+            "GGML_RV_ZIHINTPAUSE": "ON",
+            "GGML_RV_ZVFBFWMA": "OFF",
+            "GGML_RV_ZVFH": "ON",
+            "GGML_SANITIZE_ADDRESS": "OFF",
+            "GGML_SANITIZE_THREAD": "OFF",
+            "GGML_SANITIZE_UNDEFINED": "OFF",
+            "GGML_SCHED_NO_REALLOC": "OFF",
+            "GGML_SSE42": "OFF",
+            "GGML_STATIC": "OFF",
+            "GGML_SYCL": "OFF",
+            "GGML_SYCL_DNN": "ON",
+            "GGML_SYCL_F16": "OFF",
+            "GGML_SYCL_GRAPH": "ON",
+            "GGML_SYCL_HOST_MEM_FALLBACK": "ON",
+            "GGML_SYCL_SUPPORT_LEVEL_ZERO_API": "ON",
+            "GGML_VIRTGPU": "OFF",
+            "GGML_VIRTGPU_BACKEND": "OFF",
+            "GGML_VULKAN": "OFF",
+            "GGML_VULKAN_CHECK_RESULTS": "OFF",
+            "GGML_VULKAN_DEBUG": "OFF",
+            "GGML_VULKAN_MEMORY_DEBUG": "OFF",
+            "GGML_VULKAN_RUN_TESTS": "OFF",
+            "GGML_VULKAN_SHADER_DEBUG_INFO": "OFF",
+            "GGML_VULKAN_VALIDATE": "OFF",
+            "GGML_VXE": "ON",
+            "GGML_WEBGPU": "OFF",
+            "GGML_WEBGPU_CPU_PROFILE": "OFF",
+            "GGML_WEBGPU_DEBUG": "OFF",
+            "GGML_WEBGPU_GPU_PROFILE": "OFF",
+            "GGML_WEBGPU_JSPI": "ON",
+            "GGML_XTHEADVECTOR": "OFF",
+            "GGML_ZDNN": "OFF",
+            "GGML_ZENDNN": "OFF"
+          },
+          "compile_flags_sha256": {
+            "app/CMakeFiles/llama-app.dir/flags.make": "7d30dc941069fa37ec3e1c853373ac02074be2a06ef7b1a3ef95734f8ad28798",
+            "common/CMakeFiles/llama-common-base.dir/flags.make": "2e329a0fc76438ddd307f6cfcfb79b720a4a014b3934436b7027c204414fe2e4",
+            "common/CMakeFiles/llama-common.dir/flags.make": "6313a79ec0b031e34629b9b349c69ec00fd3e247dff3bc9659a535c97983039f",
+            "examples/batched/CMakeFiles/llama-batched.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/convert-llama2c-to-ggml/CMakeFiles/llama-convert-llama2c-to-ggml.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/debug/CMakeFiles/llama-debug.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/diffusion/CMakeFiles/llama-diffusion-cli.dir/flags.make": "561e387fba59d3964108db30f8cfa1a62b63dad7a750d2b1c094b4182b90f208",
+            "examples/diffusion/CMakeFiles/llama-diffusion.dir/flags.make": "561e387fba59d3964108db30f8cfa1a62b63dad7a750d2b1c094b4182b90f208",
+            "examples/embedding/CMakeFiles/llama-embedding.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/eval-callback/CMakeFiles/llama-eval-callback.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/gen-docs/CMakeFiles/llama-gen-docs.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/gguf/CMakeFiles/llama-gguf.dir/flags.make": "113d2883ddd1ae0db16d53d5399237de601b34a8e772bd84d8be478f2f192ea3",
+            "examples/gguf-hash/CMakeFiles/llama-gguf-hash.dir/flags.make": "55a324d731ff737a1d17b759edc36d2a15baae4f7edfc52fc06c97900598fd23",
+            "examples/idle/CMakeFiles/llama-idle.dir/flags.make": "561e387fba59d3964108db30f8cfa1a62b63dad7a750d2b1c094b4182b90f208",
+            "examples/lookahead/CMakeFiles/llama-lookahead.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/lookup/CMakeFiles/llama-lookup-create.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/lookup/CMakeFiles/llama-lookup-merge.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/lookup/CMakeFiles/llama-lookup-stats.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/lookup/CMakeFiles/llama-lookup.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/parallel/CMakeFiles/llama-parallel.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/passkey/CMakeFiles/llama-passkey.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/retrieval/CMakeFiles/llama-retrieval.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/simple/CMakeFiles/llama-simple.dir/flags.make": "e12810872d4854321d708203cf22d6b0c9206b9ec173debfefd5f60590d3875c",
+            "examples/simple-chat/CMakeFiles/llama-simple-chat.dir/flags.make": "e12810872d4854321d708203cf22d6b0c9206b9ec173debfefd5f60590d3875c",
+            "examples/speculative/CMakeFiles/llama-speculative.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/speculative-simple/CMakeFiles/llama-speculative-simple.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "examples/training/CMakeFiles/llama-finetune.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "ggml/src/CMakeFiles/ggml-base.dir/flags.make": "1420d23ba1a3fdef8035c2acd92aa336bb60a47d8580ef551b55059f1c21f06c",
+            "ggml/src/CMakeFiles/ggml-cpu.dir/flags.make": "80293e3d716fceea3a92927dc51f42d15ada1b3cdab688ff86cf1c481f6c9395",
+            "ggml/src/CMakeFiles/ggml.dir/flags.make": "39672df713fe69b62829387ac4fe780cef583b687c3dd2b99e17dfe92375bbe4",
+            "pocs/vdot/CMakeFiles/llama-q8dot.dir/flags.make": "b8e51edf648a42ec9af39531d42e1278ba9a4418a1d873cfb3910743a8b8aea9",
+            "pocs/vdot/CMakeFiles/llama-vdot.dir/flags.make": "b8e51edf648a42ec9af39531d42e1278ba9a4418a1d873cfb3910743a8b8aea9",
+            "src/CMakeFiles/llama.dir/flags.make": "103be61c70c6ece275ca8ed29aed1722c2b50d9466756544ac4fb281279ba96f",
+            "tools/batched-bench/CMakeFiles/llama-batched-bench-impl.dir/flags.make": "f3a463b2f51cff17782acfc9b37502409d99a39cb0f0df66cdb1ba8144e62912",
+            "tools/batched-bench/CMakeFiles/llama-batched-bench.dir/flags.make": "7392b094d7da528c8ff74bbcb9de150e4c6e96575344cd686ba59ef525197672",
+            "tools/completion/CMakeFiles/llama-completion-impl.dir/flags.make": "2564b0cd3464b220e3fbdea2fb7ce009743b4193e9ee4e24968177d19cb562f2",
+            "tools/completion/CMakeFiles/llama-completion.dir/flags.make": "39d903af751a9710ff325828606273c8f5a3dc8572d3aa3fe08e508196e28fb4",
+            "tools/cvector-generator/CMakeFiles/llama-cvector-generator.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "tools/export-lora/CMakeFiles/llama-export-lora.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "tools/fit-params/CMakeFiles/llama-fit-params-impl.dir/flags.make": "a102c1386f1c88d6316e72a0991b5e2807cac6e330390fa5516cfac44566d542",
+            "tools/fit-params/CMakeFiles/llama-fit-params.dir/flags.make": "11c16ed3976a261529d416f61de83a62a2254309d64db59efa8f3da56bda6dd1",
+            "tools/gguf-split/CMakeFiles/llama-gguf-split.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "tools/imatrix/CMakeFiles/llama-imatrix.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "tools/llama-bench/CMakeFiles/llama-bench-impl.dir/flags.make": "c9e5b62686eff44a36931772e01f15ba61ce1d063e9c4007dadf58476d55f34d",
+            "tools/llama-bench/CMakeFiles/llama-bench.dir/flags.make": "10671dce2ff9bb1efafdaf037cbdfd77fc6c12c1d9307ea73248c360966b097e",
+            "tools/mtmd/CMakeFiles/llama-gemma3-cli.dir/flags.make": "06baf55a7d8d1e51add138aae17e3d355d40c8d41768ff3d461c8492b6587fb7",
+            "tools/mtmd/CMakeFiles/llama-llava-cli.dir/flags.make": "06baf55a7d8d1e51add138aae17e3d355d40c8d41768ff3d461c8492b6587fb7",
+            "tools/mtmd/CMakeFiles/llama-minicpmv-cli.dir/flags.make": "06baf55a7d8d1e51add138aae17e3d355d40c8d41768ff3d461c8492b6587fb7",
+            "tools/mtmd/CMakeFiles/llama-mtmd-cli.dir/flags.make": "63111b8675e07993b7deab570927b9576c1698b1e1312f380d28a74cc9cc77ff",
+            "tools/mtmd/CMakeFiles/llama-mtmd-debug.dir/flags.make": "63111b8675e07993b7deab570927b9576c1698b1e1312f380d28a74cc9cc77ff",
+            "tools/mtmd/CMakeFiles/llama-qwen2vl-cli.dir/flags.make": "06baf55a7d8d1e51add138aae17e3d355d40c8d41768ff3d461c8492b6587fb7",
+            "tools/mtmd/CMakeFiles/mtmd.dir/flags.make": "6b15be052478c8733cbf93504ad4254fea4212ccdff1cdcb1ed380eee7bda7a1",
+            "tools/perplexity/CMakeFiles/llama-perplexity-impl.dir/flags.make": "3e2b74419fbc85bf82c196d0da54e2afc8bd5cb6fb493a9d67caa95a81c052f4",
+            "tools/perplexity/CMakeFiles/llama-perplexity.dir/flags.make": "2bc60103e44c5cb26a67f8f9cf23b144575310cc1a227bda7a65f4a3ee87bb27",
+            "tools/quantize/CMakeFiles/llama-quantize-impl.dir/flags.make": "4adf0429a39da42de5e591d0290f13a5f2b07f44b5553929ee00de35e23165ca",
+            "tools/quantize/CMakeFiles/llama-quantize.dir/flags.make": "f00590b89fa98215ab2039ffd7138540130a64ced166e49245b7a38b408b52d4",
+            "tools/results/CMakeFiles/llama-results.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "tools/tokenize/CMakeFiles/llama-tokenize.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+            "tools/tts/CMakeFiles/llama-tts.dir/flags.make": "c243c628a4a39f25f559e81c6b68b4f389e5d93417f8caf019d70a9cfdc36fed",
+            "vendor/cpp-httplib/CMakeFiles/cpp-httplib.dir/flags.make": "e73daa8679b253901df3be0084ce7872b41ceb09af54270d307bafac822b9bf8",
+            "vendor/hash/CMakeFiles/vendor-hash.dir/flags.make": "16457c84e573afa098e5b5977b709b899b8030ba6241febd58f642ab5e348442",
+            "compile_commands.json": "3329b1d3a431d9d44a82603adc26927b55221dd9d8e88596f4250cdaba09f0b8"
+          }
+        },
+        "resolution": "ldd under the same inherited loader environment; resolved upstream files rehashed before and after every window",
+        "loader_environment_sha256": {
+          "LD_LIBRARY_PATH": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "LD_PRELOAD": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "LD_AUDIT": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        "pin_provenance": "Preparation manifest; executable, resolved upstream libraries and build records independently hashed"
+      },
+      "oracle_identity": {
+        "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+        "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+        "verified_source": {
+          "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+          "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+          "stored_dtype": "bfloat16",
+          "files": {
+            "LICENSE": {
+              "bytes": 11343,
+              "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+              "upstream_algorithm": "git-sha1",
+              "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+            },
+            "README.md": {
+              "bytes": 4917,
+              "sha256": "b19c806a904db6dc878a0462e70b551f6b7ac78dfbb88c2eb966ca2b9109ae15",
+              "upstream_algorithm": "git-sha1",
+              "upstream_digest": "4b8373851d093eb9f3017443f27781c6971eff24"
+            },
+            "config.json": {
+              "bytes": 659,
+              "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+              "upstream_algorithm": "git-sha1",
+              "upstream_digest": "0dbb161213629a23f0fc00ef286e6b1e366d180f"
+            },
+            "generation_config.json": {
+              "bytes": 242,
+              "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+              "upstream_algorithm": "git-sha1",
+              "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+            },
+            "merges.txt": {
+              "bytes": 1671839,
+              "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+              "upstream_algorithm": "git-sha1",
+              "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+            },
+            "model.safetensors": {
+              "bytes": 988097824,
+              "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+              "upstream_algorithm": "sha256",
+              "upstream_digest": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+            },
+            "tokenizer.json": {
+              "bytes": 7031645,
+              "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+              "upstream_algorithm": "git-sha1",
+              "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+            },
+            "tokenizer_config.json": {
+              "bytes": 7305,
+              "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+              "upstream_algorithm": "git-sha1",
+              "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+            },
+            "vocab.json": {
+              "bytes": 2776833,
+              "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+              "upstream_algorithm": "git-sha1",
+              "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+            }
+          }
+        },
+        "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+        "corpus_policy": {
+          "version": 1,
+          "priming_tokens": 256,
+          "scored_tokens_per_window": 256,
+          "calibration_windows": 2,
+          "heldout_windows": 8,
+          "selection": "First consecutive nonoverlapping 513-token blocks from each pinned body anchor; no shuffle, filtering or candidate-dependent selection",
+          "tokenization": "Pinned Qwen tokenizer; add_special_tokens=False; no chat template or normalization",
+          "partition": "Different books and authors; calibration only chooses format, heldout never tunes it",
+          "format_selection": "Among 32F16,64F32,64F16,128F16 (<=8.5 matrix bits/weight), minimize calibration mean KL, then maximize top1, then minimize cross entropy, then label"
+        },
+        "weight_storage": "bfloat16",
+        "arithmetic": "fp32",
+        "kv_dtype": "float32",
+        "attention": "Transformers eager",
+        "head_chunk_rows": 1024,
+        "threads": 1,
+        "versions": {
+          "torch": "2.8.0+cpu",
+          "transformers": "4.56.2",
+          "safetensors": "0.6.2",
+          "tokenizers": "0.22.1",
+          "huggingface-hub": "0.35.3",
+          "numpy": "2.3.3"
+        }
+      }
+    },
+    "evidence": [
+      {
+        "label": "g128f16",
+        "report": "cal-g128f16.json",
+        "sha256": "5cc47f4129a4b7540258a61ab2e05b93e0ab8ffce156c5fa1f380678af4672f3",
+        "split": "calibration",
+        "backend": "native",
+        "settings": {
+          "group_size": 128,
+          "scale_dtype": "f16",
+          "kv_dtype": "f16",
+          "kernel": "simd512x4",
+          "attention": "blocked",
+          "scheduler": "pool",
+          "affinity": "strict",
+          "cpu_set": [
+            0,
+            1
+          ],
+          "threads": 2,
+          "weight_dtype": "int8"
+        },
+        "aggregate": {
+          "positions": 512,
+          "mean_kl_reference_candidate_nats": 0.0012161085830287765,
+          "p99_kl_reference_candidate_nats": 0.004394612083133647,
+          "p99_method": "numpy.quantile linear over all scored positions",
+          "max_kl_reference_candidate_nats": 0.007612558709490022,
+          "top1_agreement": 0.96875,
+          "reference_next_token_cross_entropy_nats": 3.2284852243397184,
+          "reference_perplexity": 25.241392949903435,
+          "next_token_cross_entropy_nats": 3.22963871991631,
+          "perplexity": 25.270525583970223
+        },
+        "model_identity": {
+          "files": {
+            "config.json": {
+              "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+              "bytes": 659
+            },
+            "model.safetensors": {
+              "sha256": "a870d0c9f7755ab093fd01450416fa7c53a0c46150e251de6e4174b3c75755ca",
+              "bytes": 502016336
+            }
+          },
+          "sha256": "4083870f6fb1421d3984e54b0ca3ef1da7e8f52e1dc705caa08e4379ad65fe06"
+        },
+        "binary_identity": {
+          "engine_binary_sha256": "741410a44016b4b036306e188890e3afc94e7b6ce1f02e4f8e84f585f67b78f5"
+        },
+        "oracle_identity": {
+          "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+          "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+          "verified_source": {
+            "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+            "stored_dtype": "bfloat16",
+            "files": {
+              "LICENSE": {
+                "bytes": 11343,
+                "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+              },
+              "README.md": {
+                "bytes": 4917,
+                "sha256": "b19c806a904db6dc878a0462e70b551f6b7ac78dfbb88c2eb966ca2b9109ae15",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4b8373851d093eb9f3017443f27781c6971eff24"
+              },
+              "config.json": {
+                "bytes": 659,
+                "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "0dbb161213629a23f0fc00ef286e6b1e366d180f"
+              },
+              "generation_config.json": {
+                "bytes": 242,
+                "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+              },
+              "merges.txt": {
+                "bytes": 1671839,
+                "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+              },
+              "model.safetensors": {
+                "bytes": 988097824,
+                "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+                "upstream_algorithm": "sha256",
+                "upstream_digest": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+              },
+              "tokenizer.json": {
+                "bytes": 7031645,
+                "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+              },
+              "tokenizer_config.json": {
+                "bytes": 7305,
+                "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+              },
+              "vocab.json": {
+                "bytes": 2776833,
+                "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+              }
+            }
+          },
+          "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+          "corpus_policy": {
+            "version": 1,
+            "priming_tokens": 256,
+            "scored_tokens_per_window": 256,
+            "calibration_windows": 2,
+            "heldout_windows": 8,
+            "selection": "First consecutive nonoverlapping 513-token blocks from each pinned body anchor; no shuffle, filtering or candidate-dependent selection",
+            "tokenization": "Pinned Qwen tokenizer; add_special_tokens=False; no chat template or normalization",
+            "partition": "Different books and authors; calibration only chooses format, heldout never tunes it",
+            "format_selection": "Among 32F16,64F32,64F16,128F16 (<=8.5 matrix bits/weight), minimize calibration mean KL, then maximize top1, then minimize cross entropy, then label"
+          },
+          "weight_storage": "bfloat16",
+          "arithmetic": "fp32",
+          "kv_dtype": "float32",
+          "attention": "Transformers eager",
+          "head_chunk_rows": 1024,
+          "threads": 1,
+          "versions": {
+            "torch": "2.8.0+cpu",
+            "transformers": "4.56.2",
+            "safetensors": "0.6.2",
+            "tokenizers": "0.22.1",
+            "huggingface-hub": "0.35.3",
+            "numpy": "2.3.3"
+          }
+        }
+      },
+      {
+        "label": "g32f16",
+        "report": "cal-g32f16.json",
+        "sha256": "0265882f019ff802a66faec60c8ddc5d69488d8c15c46a9c37ddd55d0f4bf616",
+        "split": "calibration",
+        "backend": "native",
+        "settings": {
+          "group_size": 32,
+          "scale_dtype": "f16",
+          "kv_dtype": "f16",
+          "kernel": "simd512x4",
+          "attention": "blocked",
+          "scheduler": "pool",
+          "affinity": "strict",
+          "cpu_set": [
+            0,
+            1
+          ],
+          "threads": 2,
+          "weight_dtype": "int8"
+        },
+        "aggregate": {
+          "positions": 512,
+          "mean_kl_reference_candidate_nats": 0.0007153467252112733,
+          "p99_kl_reference_candidate_nats": 0.002411287421405917,
+          "p99_method": "numpy.quantile linear over all scored positions",
+          "max_kl_reference_candidate_nats": 0.008486199365647968,
+          "top1_agreement": 0.98046875,
+          "reference_next_token_cross_entropy_nats": 3.2284852243397184,
+          "reference_perplexity": 25.241392949903435,
+          "next_token_cross_entropy_nats": 3.227777715274507,
+          "perplexity": 25.223540751613562
+        },
+        "model_identity": {
+          "files": {
+            "config.json": {
+              "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+              "bytes": 659
+            },
+            "model.safetensors": {
+              "sha256": "3fc313a97a67797497074bcca39094c2f109ad76915a8ff3b2cdbeb840518153",
+              "bytes": 525170936
+            }
+          },
+          "sha256": "bee1941274597957e8c6c3f339839de25f9305d826fd649e4fec5f959037bdc2"
+        },
+        "binary_identity": {
+          "engine_binary_sha256": "741410a44016b4b036306e188890e3afc94e7b6ce1f02e4f8e84f585f67b78f5"
+        },
+        "oracle_identity": {
+          "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+          "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+          "verified_source": {
+            "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+            "stored_dtype": "bfloat16",
+            "files": {
+              "LICENSE": {
+                "bytes": 11343,
+                "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+              },
+              "README.md": {
+                "bytes": 4917,
+                "sha256": "b19c806a904db6dc878a0462e70b551f6b7ac78dfbb88c2eb966ca2b9109ae15",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4b8373851d093eb9f3017443f27781c6971eff24"
+              },
+              "config.json": {
+                "bytes": 659,
+                "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "0dbb161213629a23f0fc00ef286e6b1e366d180f"
+              },
+              "generation_config.json": {
+                "bytes": 242,
+                "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+              },
+              "merges.txt": {
+                "bytes": 1671839,
+                "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+              },
+              "model.safetensors": {
+                "bytes": 988097824,
+                "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+                "upstream_algorithm": "sha256",
+                "upstream_digest": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+              },
+              "tokenizer.json": {
+                "bytes": 7031645,
+                "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+              },
+              "tokenizer_config.json": {
+                "bytes": 7305,
+                "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+              },
+              "vocab.json": {
+                "bytes": 2776833,
+                "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+              }
+            }
+          },
+          "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+          "corpus_policy": {
+            "version": 1,
+            "priming_tokens": 256,
+            "scored_tokens_per_window": 256,
+            "calibration_windows": 2,
+            "heldout_windows": 8,
+            "selection": "First consecutive nonoverlapping 513-token blocks from each pinned body anchor; no shuffle, filtering or candidate-dependent selection",
+            "tokenization": "Pinned Qwen tokenizer; add_special_tokens=False; no chat template or normalization",
+            "partition": "Different books and authors; calibration only chooses format, heldout never tunes it",
+            "format_selection": "Among 32F16,64F32,64F16,128F16 (<=8.5 matrix bits/weight), minimize calibration mean KL, then maximize top1, then minimize cross entropy, then label"
+          },
+          "weight_storage": "bfloat16",
+          "arithmetic": "fp32",
+          "kv_dtype": "float32",
+          "attention": "Transformers eager",
+          "head_chunk_rows": 1024,
+          "threads": 1,
+          "versions": {
+            "torch": "2.8.0+cpu",
+            "transformers": "4.56.2",
+            "safetensors": "0.6.2",
+            "tokenizers": "0.22.1",
+            "huggingface-hub": "0.35.3",
+            "numpy": "2.3.3"
+          }
+        }
+      },
+      {
+        "label": "g64f16",
+        "report": "cal-g64f16.json",
+        "sha256": "e0f0eba50b5bf3641ccbcb68c6656d7420ed350ef511b4cddd0618e6f39a6fed",
+        "split": "calibration",
+        "backend": "native",
+        "settings": {
+          "group_size": 64,
+          "scale_dtype": "f16",
+          "kv_dtype": "f16",
+          "kernel": "simd512x4",
+          "attention": "blocked",
+          "scheduler": "pool",
+          "affinity": "strict",
+          "cpu_set": [
+            0,
+            1
+          ],
+          "threads": 2,
+          "weight_dtype": "int8"
+        },
+        "aggregate": {
+          "positions": 512,
+          "mean_kl_reference_candidate_nats": 0.0008012423225218815,
+          "p99_kl_reference_candidate_nats": 0.002620213861786619,
+          "p99_method": "numpy.quantile linear over all scored positions",
+          "max_kl_reference_candidate_nats": 0.005562736218797577,
+          "top1_agreement": 0.98046875,
+          "reference_next_token_cross_entropy_nats": 3.2284852243397184,
+          "reference_perplexity": 25.241392949903435,
+          "next_token_cross_entropy_nats": 3.229132568532726,
+          "perplexity": 25.257738108954086
+        },
+        "model_identity": {
+          "files": {
+            "config.json": {
+              "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+              "bytes": 659
+            },
+            "model.safetensors": {
+              "sha256": "c70c215d96047722ac638b9677e761874e46c7d41b0b01068a94ef33b12fa049",
+              "bytes": 509734624
+            }
+          },
+          "sha256": "9ea73dd269574aaca095332cfe47dd06a152aa4e84c22fc70706d3fdfdf04fba"
+        },
+        "binary_identity": {
+          "engine_binary_sha256": "741410a44016b4b036306e188890e3afc94e7b6ce1f02e4f8e84f585f67b78f5"
+        },
+        "oracle_identity": {
+          "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+          "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+          "verified_source": {
+            "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+            "stored_dtype": "bfloat16",
+            "files": {
+              "LICENSE": {
+                "bytes": 11343,
+                "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+              },
+              "README.md": {
+                "bytes": 4917,
+                "sha256": "b19c806a904db6dc878a0462e70b551f6b7ac78dfbb88c2eb966ca2b9109ae15",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4b8373851d093eb9f3017443f27781c6971eff24"
+              },
+              "config.json": {
+                "bytes": 659,
+                "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "0dbb161213629a23f0fc00ef286e6b1e366d180f"
+              },
+              "generation_config.json": {
+                "bytes": 242,
+                "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+              },
+              "merges.txt": {
+                "bytes": 1671839,
+                "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+              },
+              "model.safetensors": {
+                "bytes": 988097824,
+                "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+                "upstream_algorithm": "sha256",
+                "upstream_digest": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+              },
+              "tokenizer.json": {
+                "bytes": 7031645,
+                "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+              },
+              "tokenizer_config.json": {
+                "bytes": 7305,
+                "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+              },
+              "vocab.json": {
+                "bytes": 2776833,
+                "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+              }
+            }
+          },
+          "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+          "corpus_policy": {
+            "version": 1,
+            "priming_tokens": 256,
+            "scored_tokens_per_window": 256,
+            "calibration_windows": 2,
+            "heldout_windows": 8,
+            "selection": "First consecutive nonoverlapping 513-token blocks from each pinned body anchor; no shuffle, filtering or candidate-dependent selection",
+            "tokenization": "Pinned Qwen tokenizer; add_special_tokens=False; no chat template or normalization",
+            "partition": "Different books and authors; calibration only chooses format, heldout never tunes it",
+            "format_selection": "Among 32F16,64F32,64F16,128F16 (<=8.5 matrix bits/weight), minimize calibration mean KL, then maximize top1, then minimize cross entropy, then label"
+          },
+          "weight_storage": "bfloat16",
+          "arithmetic": "fp32",
+          "kv_dtype": "float32",
+          "attention": "Transformers eager",
+          "head_chunk_rows": 1024,
+          "threads": 1,
+          "versions": {
+            "torch": "2.8.0+cpu",
+            "transformers": "4.56.2",
+            "safetensors": "0.6.2",
+            "tokenizers": "0.22.1",
+            "huggingface-hub": "0.35.3",
+            "numpy": "2.3.3"
+          }
+        }
+      },
+      {
+        "label": "g64f32",
+        "report": "cal-g64f32.json",
+        "sha256": "bca3511cc71267c4f3e20bb8fedfd7c7648510af931fc1c93b788a3da4fef2dc",
+        "split": "calibration",
+        "backend": "native",
+        "settings": {
+          "group_size": 64,
+          "scale_dtype": "f32",
+          "kv_dtype": "f16",
+          "kernel": "simd512x4",
+          "attention": "blocked",
+          "scheduler": "pool",
+          "affinity": "strict",
+          "cpu_set": [
+            0,
+            1
+          ],
+          "threads": 2,
+          "weight_dtype": "int8"
+        },
+        "aggregate": {
+          "positions": 512,
+          "mean_kl_reference_candidate_nats": 0.0008015458152780032,
+          "p99_kl_reference_candidate_nats": 0.0025273701281874426,
+          "p99_method": "numpy.quantile linear over all scored positions",
+          "max_kl_reference_candidate_nats": 0.004395320394282546,
+          "top1_agreement": 0.982421875,
+          "reference_next_token_cross_entropy_nats": 3.2284852243397184,
+          "reference_perplexity": 25.241392949903435,
+          "next_token_cross_entropy_nats": 3.2276516126240113,
+          "perplexity": 25.220360196812315
+        },
+        "model_identity": {
+          "files": {
+            "config.json": {
+              "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+              "bytes": 659
+            },
+            "model.safetensors": {
+              "sha256": "d93c323bc5ba04c9e9e726b01e5cd2b22056aa4a79466f67d4240d58ac36561e",
+              "bytes": 525171728
+            }
+          },
+          "sha256": "854f48e247e5986affa782456875ccad5c15cd9a15a7cc01a12dfbb650f5b0dd"
+        },
+        "binary_identity": {
+          "engine_binary_sha256": "741410a44016b4b036306e188890e3afc94e7b6ce1f02e4f8e84f585f67b78f5"
+        },
+        "oracle_identity": {
+          "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+          "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+          "verified_source": {
+            "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+            "stored_dtype": "bfloat16",
+            "files": {
+              "LICENSE": {
+                "bytes": 11343,
+                "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+              },
+              "README.md": {
+                "bytes": 4917,
+                "sha256": "b19c806a904db6dc878a0462e70b551f6b7ac78dfbb88c2eb966ca2b9109ae15",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4b8373851d093eb9f3017443f27781c6971eff24"
+              },
+              "config.json": {
+                "bytes": 659,
+                "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "0dbb161213629a23f0fc00ef286e6b1e366d180f"
+              },
+              "generation_config.json": {
+                "bytes": 242,
+                "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+              },
+              "merges.txt": {
+                "bytes": 1671839,
+                "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+              },
+              "model.safetensors": {
+                "bytes": 988097824,
+                "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+                "upstream_algorithm": "sha256",
+                "upstream_digest": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+              },
+              "tokenizer.json": {
+                "bytes": 7031645,
+                "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+              },
+              "tokenizer_config.json": {
+                "bytes": 7305,
+                "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+              },
+              "vocab.json": {
+                "bytes": 2776833,
+                "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+              }
+            }
+          },
+          "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+          "corpus_policy": {
+            "version": 1,
+            "priming_tokens": 256,
+            "scored_tokens_per_window": 256,
+            "calibration_windows": 2,
+            "heldout_windows": 8,
+            "selection": "First consecutive nonoverlapping 513-token blocks from each pinned body anchor; no shuffle, filtering or candidate-dependent selection",
+            "tokenization": "Pinned Qwen tokenizer; add_special_tokens=False; no chat template or normalization",
+            "partition": "Different books and authors; calibration only chooses format, heldout never tunes it",
+            "format_selection": "Among 32F16,64F32,64F16,128F16 (<=8.5 matrix bits/weight), minimize calibration mean KL, then maximize top1, then minimize cross entropy, then label"
+          },
+          "weight_storage": "bfloat16",
+          "arithmetic": "fp32",
+          "kv_dtype": "float32",
+          "attention": "Transformers eager",
+          "head_chunk_rows": 1024,
+          "threads": 1,
+          "versions": {
+            "torch": "2.8.0+cpu",
+            "transformers": "4.56.2",
+            "safetensors": "0.6.2",
+            "tokenizers": "0.22.1",
+            "huggingface-hub": "0.35.3",
+            "numpy": "2.3.3"
+          }
+        }
+      },
+      {
+        "label": "q8_0-calibration",
+        "report": "cal-q8_0.json",
+        "sha256": "c8ae3d0b909a705ea009930242b25f8b3839625cde157be44573adf34e72823d",
+        "split": "calibration",
+        "backend": "llama",
+        "settings": {
+          "weight_dtype": "Q8_0",
+          "kv_dtype": "f16",
+          "flash_attention": "auto",
+          "threads": 2
+        },
+        "aggregate": {
+          "positions": 512,
+          "mean_kl_reference_candidate_nats": 0.0023639697296422707,
+          "p99_kl_reference_candidate_nats": 0.006974944310375773,
+          "p99_method": "numpy.quantile linear over all scored positions",
+          "max_kl_reference_candidate_nats": 0.009089288272380374,
+          "top1_agreement": 0.97265625,
+          "reference_next_token_cross_entropy_nats": 3.2284852243397184,
+          "reference_perplexity": 25.241392949903435,
+          "next_token_cross_entropy_nats": 3.2281120183938126,
+          "perplexity": 25.231974469597333
+        },
+        "model_identity": {
+          "files": {
+            "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf": {
+              "sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7",
+              "bytes": 531068416
+            }
+          },
+          "sha256": "1ec359cd08376a2be65a72d0e11e54ecdddb451e59ce301a93012f63e2665fdb"
+        },
+        "binary_identity": {
+          "llama_commit": "6c73b3e12dc501de35fe5f6979960d06921a2f6c",
+          "artifact_manifest_sha256": "279e4cf73d66a6f226c15f95bd4b1bfe6aa538ce49c3bc5b6f6ab13c05592e0a",
+          "reader_binary_sha256": "34bfe4eb1fb132178a323692e56aa1af071fa03346890a4a37128f64562e955b",
+          "shared_libraries": {
+            "libggml-base.so.0": {
+              "resolved_path": "$LLAMA_BUILD/bin/libggml-base.so.0.26.0",
+              "sha256": "1319b58b3dd8598240c60ced8833bbffd0154ab5a6f989bea0ec336a8b27f718",
+              "bytes": 956024
+            },
+            "libggml-cpu.so.0": {
+              "resolved_path": "$LLAMA_BUILD/bin/libggml-cpu.so.0.26.0",
+              "sha256": "f5bd6ba7950fbbab882215b897293147cd7254af278c6d5f282d53f864b77fab",
+              "bytes": 1662008
+            },
+            "libggml.so.0": {
+              "resolved_path": "$LLAMA_BUILD/bin/libggml.so.0.26.0",
+              "sha256": "bd28769b9e3dcb3e1a19a255bfdb4c74e71d92713bd17e641e976822028a790c",
+              "bytes": 55976
+            },
+            "libllama.so.0": {
+              "resolved_path": "$LLAMA_BUILD/bin/libllama.so.0.6.0",
+              "sha256": "3e46c1a305d410504b5a6881e9d1760f3938ec237edf435220ee404d2112bd39",
+              "bytes": 4781632
+            }
+          },
+          "build": {
+            "root": "$LLAMA_BUILD",
+            "root_sha256": "bcfcca58f2f19e1424be39c1a14c54249f48cba2f6943fc40ee01f3536191877",
+            "cache_sha256": "75b2a1772ac9cb9e6ed7e524f10f29f93ece0489413ac82c877cd8fbb9c05a66",
+            "settings": {
+              "CMAKE_BUILD_TYPE": "Release",
+              "CMAKE_CXX_COMPILER": "$LLAMA_CXX_COMPILER",
+              "GGML_ACCELERATE": "ON",
+              "GGML_ALL_WARNINGS_3RD_PARTY": "OFF",
+              "GGML_AMX_BF16": "OFF",
+              "GGML_AMX_INT8": "OFF",
+              "GGML_AMX_TILE": "OFF",
+              "GGML_AVX": "OFF",
+              "GGML_AVX2": "OFF",
+              "GGML_AVX512": "OFF",
+              "GGML_AVX512_BF16": "OFF",
+              "GGML_AVX512_VBMI": "OFF",
+              "GGML_AVX512_VNNI": "OFF",
+              "GGML_AVX_VNNI": "OFF",
+              "GGML_BACKEND_DL": "OFF",
+              "GGML_BLAS": "OFF",
+              "GGML_BMI2": "OFF",
+              "GGML_BUILD_EXAMPLES": "OFF",
+              "GGML_BUILD_TESTS": "OFF",
+              "GGML_CCACHE": "ON",
+              "GGML_CPU": "ON",
+              "GGML_CPU_ALL_VARIANTS": "OFF",
+              "GGML_CPU_HBM": "OFF",
+              "GGML_CPU_KLEIDIAI": "OFF",
+              "GGML_CPU_REPACK": "ON",
+              "GGML_CUDA": "OFF",
+              "GGML_CUDA_FA": "ON",
+              "GGML_CUDA_FA_ALL_QUANTS": "OFF",
+              "GGML_CUDA_FORCE_CUBLAS": "OFF",
+              "GGML_CUDA_FORCE_MMQ": "OFF",
+              "GGML_CUDA_GRAPHS": "ON",
+              "GGML_CUDA_NCCL": "ON",
+              "GGML_CUDA_NO_PEER_COPY": "OFF",
+              "GGML_CUDA_NO_VMM": "OFF",
+              "GGML_ET": "OFF",
+              "GGML_ET_SYSEMU": "OFF",
+              "GGML_F16C": "OFF",
+              "GGML_FMA": "OFF",
+              "GGML_GPROF": "OFF",
+              "GGML_HEXAGON": "OFF",
+              "GGML_HIP": "OFF",
+              "GGML_HIP_EXPORT_METRICS": "OFF",
+              "GGML_HIP_GRAPHS": "ON",
+              "GGML_HIP_MMQ_MFMA": "ON",
+              "GGML_HIP_NO_VMM": "ON",
+              "GGML_HIP_RCCL": "OFF",
+              "GGML_LASX": "ON",
+              "GGML_LLAMAFILE": "ON",
+              "GGML_LSX": "ON",
+              "GGML_LTO": "OFF",
+              "GGML_METAL": "OFF",
+              "GGML_METAL_EMBED_LIBRARY": "OFF",
+              "GGML_METAL_NDEBUG": "OFF",
+              "GGML_METAL_SHADER_DEBUG": "OFF",
+              "GGML_MUSA": "OFF",
+              "GGML_MUSA_GRAPHS": "OFF",
+              "GGML_MUSA_MUDNN_COPY": "OFF",
+              "GGML_NATIVE": "ON",
+              "GGML_OPENCL": "OFF",
+              "GGML_OPENCL_EMBED_KERNELS": "ON",
+              "GGML_OPENCL_PROFILING": "OFF",
+              "GGML_OPENCL_USE_ADRENO_KERNELS": "ON",
+              "GGML_OPENMP": "ON",
+              "GGML_OPENMP_FETCH": "OFF",
+              "GGML_OPENVINO": "OFF",
+              "GGML_RPC": "OFF",
+              "GGML_RVV": "ON",
+              "GGML_RV_ZFH": "ON",
+              "GGML_RV_ZICBOP": "ON",
+              "GGML_RV_ZIHINTPAUSE": "ON",
+              "GGML_RV_ZVFBFWMA": "OFF",
+              "GGML_RV_ZVFH": "ON",
+              "GGML_SANITIZE_ADDRESS": "OFF",
+              "GGML_SANITIZE_THREAD": "OFF",
+              "GGML_SANITIZE_UNDEFINED": "OFF",
+              "GGML_SCHED_NO_REALLOC": "OFF",
+              "GGML_SSE42": "OFF",
+              "GGML_STATIC": "OFF",
+              "GGML_SYCL": "OFF",
+              "GGML_SYCL_DNN": "ON",
+              "GGML_SYCL_F16": "OFF",
+              "GGML_SYCL_GRAPH": "ON",
+              "GGML_SYCL_HOST_MEM_FALLBACK": "ON",
+              "GGML_SYCL_SUPPORT_LEVEL_ZERO_API": "ON",
+              "GGML_VIRTGPU": "OFF",
+              "GGML_VIRTGPU_BACKEND": "OFF",
+              "GGML_VULKAN": "OFF",
+              "GGML_VULKAN_CHECK_RESULTS": "OFF",
+              "GGML_VULKAN_DEBUG": "OFF",
+              "GGML_VULKAN_MEMORY_DEBUG": "OFF",
+              "GGML_VULKAN_RUN_TESTS": "OFF",
+              "GGML_VULKAN_SHADER_DEBUG_INFO": "OFF",
+              "GGML_VULKAN_VALIDATE": "OFF",
+              "GGML_VXE": "ON",
+              "GGML_WEBGPU": "OFF",
+              "GGML_WEBGPU_CPU_PROFILE": "OFF",
+              "GGML_WEBGPU_DEBUG": "OFF",
+              "GGML_WEBGPU_GPU_PROFILE": "OFF",
+              "GGML_WEBGPU_JSPI": "ON",
+              "GGML_XTHEADVECTOR": "OFF",
+              "GGML_ZDNN": "OFF",
+              "GGML_ZENDNN": "OFF"
+            },
+            "compile_flags_sha256": {
+              "app/CMakeFiles/llama-app.dir/flags.make": "7d30dc941069fa37ec3e1c853373ac02074be2a06ef7b1a3ef95734f8ad28798",
+              "common/CMakeFiles/llama-common-base.dir/flags.make": "2e329a0fc76438ddd307f6cfcfb79b720a4a014b3934436b7027c204414fe2e4",
+              "common/CMakeFiles/llama-common.dir/flags.make": "6313a79ec0b031e34629b9b349c69ec00fd3e247dff3bc9659a535c97983039f",
+              "examples/batched/CMakeFiles/llama-batched.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/convert-llama2c-to-ggml/CMakeFiles/llama-convert-llama2c-to-ggml.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/debug/CMakeFiles/llama-debug.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/diffusion/CMakeFiles/llama-diffusion-cli.dir/flags.make": "561e387fba59d3964108db30f8cfa1a62b63dad7a750d2b1c094b4182b90f208",
+              "examples/diffusion/CMakeFiles/llama-diffusion.dir/flags.make": "561e387fba59d3964108db30f8cfa1a62b63dad7a750d2b1c094b4182b90f208",
+              "examples/embedding/CMakeFiles/llama-embedding.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/eval-callback/CMakeFiles/llama-eval-callback.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/gen-docs/CMakeFiles/llama-gen-docs.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/gguf/CMakeFiles/llama-gguf.dir/flags.make": "113d2883ddd1ae0db16d53d5399237de601b34a8e772bd84d8be478f2f192ea3",
+              "examples/gguf-hash/CMakeFiles/llama-gguf-hash.dir/flags.make": "55a324d731ff737a1d17b759edc36d2a15baae4f7edfc52fc06c97900598fd23",
+              "examples/idle/CMakeFiles/llama-idle.dir/flags.make": "561e387fba59d3964108db30f8cfa1a62b63dad7a750d2b1c094b4182b90f208",
+              "examples/lookahead/CMakeFiles/llama-lookahead.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/lookup/CMakeFiles/llama-lookup-create.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/lookup/CMakeFiles/llama-lookup-merge.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/lookup/CMakeFiles/llama-lookup-stats.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/lookup/CMakeFiles/llama-lookup.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/parallel/CMakeFiles/llama-parallel.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/passkey/CMakeFiles/llama-passkey.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/retrieval/CMakeFiles/llama-retrieval.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/simple/CMakeFiles/llama-simple.dir/flags.make": "e12810872d4854321d708203cf22d6b0c9206b9ec173debfefd5f60590d3875c",
+              "examples/simple-chat/CMakeFiles/llama-simple-chat.dir/flags.make": "e12810872d4854321d708203cf22d6b0c9206b9ec173debfefd5f60590d3875c",
+              "examples/speculative/CMakeFiles/llama-speculative.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/speculative-simple/CMakeFiles/llama-speculative-simple.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "examples/training/CMakeFiles/llama-finetune.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "ggml/src/CMakeFiles/ggml-base.dir/flags.make": "1420d23ba1a3fdef8035c2acd92aa336bb60a47d8580ef551b55059f1c21f06c",
+              "ggml/src/CMakeFiles/ggml-cpu.dir/flags.make": "80293e3d716fceea3a92927dc51f42d15ada1b3cdab688ff86cf1c481f6c9395",
+              "ggml/src/CMakeFiles/ggml.dir/flags.make": "39672df713fe69b62829387ac4fe780cef583b687c3dd2b99e17dfe92375bbe4",
+              "pocs/vdot/CMakeFiles/llama-q8dot.dir/flags.make": "b8e51edf648a42ec9af39531d42e1278ba9a4418a1d873cfb3910743a8b8aea9",
+              "pocs/vdot/CMakeFiles/llama-vdot.dir/flags.make": "b8e51edf648a42ec9af39531d42e1278ba9a4418a1d873cfb3910743a8b8aea9",
+              "src/CMakeFiles/llama.dir/flags.make": "103be61c70c6ece275ca8ed29aed1722c2b50d9466756544ac4fb281279ba96f",
+              "tools/batched-bench/CMakeFiles/llama-batched-bench-impl.dir/flags.make": "f3a463b2f51cff17782acfc9b37502409d99a39cb0f0df66cdb1ba8144e62912",
+              "tools/batched-bench/CMakeFiles/llama-batched-bench.dir/flags.make": "7392b094d7da528c8ff74bbcb9de150e4c6e96575344cd686ba59ef525197672",
+              "tools/completion/CMakeFiles/llama-completion-impl.dir/flags.make": "2564b0cd3464b220e3fbdea2fb7ce009743b4193e9ee4e24968177d19cb562f2",
+              "tools/completion/CMakeFiles/llama-completion.dir/flags.make": "39d903af751a9710ff325828606273c8f5a3dc8572d3aa3fe08e508196e28fb4",
+              "tools/cvector-generator/CMakeFiles/llama-cvector-generator.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "tools/export-lora/CMakeFiles/llama-export-lora.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "tools/fit-params/CMakeFiles/llama-fit-params-impl.dir/flags.make": "a102c1386f1c88d6316e72a0991b5e2807cac6e330390fa5516cfac44566d542",
+              "tools/fit-params/CMakeFiles/llama-fit-params.dir/flags.make": "11c16ed3976a261529d416f61de83a62a2254309d64db59efa8f3da56bda6dd1",
+              "tools/gguf-split/CMakeFiles/llama-gguf-split.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "tools/imatrix/CMakeFiles/llama-imatrix.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "tools/llama-bench/CMakeFiles/llama-bench-impl.dir/flags.make": "c9e5b62686eff44a36931772e01f15ba61ce1d063e9c4007dadf58476d55f34d",
+              "tools/llama-bench/CMakeFiles/llama-bench.dir/flags.make": "10671dce2ff9bb1efafdaf037cbdfd77fc6c12c1d9307ea73248c360966b097e",
+              "tools/mtmd/CMakeFiles/llama-gemma3-cli.dir/flags.make": "06baf55a7d8d1e51add138aae17e3d355d40c8d41768ff3d461c8492b6587fb7",
+              "tools/mtmd/CMakeFiles/llama-llava-cli.dir/flags.make": "06baf55a7d8d1e51add138aae17e3d355d40c8d41768ff3d461c8492b6587fb7",
+              "tools/mtmd/CMakeFiles/llama-minicpmv-cli.dir/flags.make": "06baf55a7d8d1e51add138aae17e3d355d40c8d41768ff3d461c8492b6587fb7",
+              "tools/mtmd/CMakeFiles/llama-mtmd-cli.dir/flags.make": "63111b8675e07993b7deab570927b9576c1698b1e1312f380d28a74cc9cc77ff",
+              "tools/mtmd/CMakeFiles/llama-mtmd-debug.dir/flags.make": "63111b8675e07993b7deab570927b9576c1698b1e1312f380d28a74cc9cc77ff",
+              "tools/mtmd/CMakeFiles/llama-qwen2vl-cli.dir/flags.make": "06baf55a7d8d1e51add138aae17e3d355d40c8d41768ff3d461c8492b6587fb7",
+              "tools/mtmd/CMakeFiles/mtmd.dir/flags.make": "6b15be052478c8733cbf93504ad4254fea4212ccdff1cdcb1ed380eee7bda7a1",
+              "tools/perplexity/CMakeFiles/llama-perplexity-impl.dir/flags.make": "3e2b74419fbc85bf82c196d0da54e2afc8bd5cb6fb493a9d67caa95a81c052f4",
+              "tools/perplexity/CMakeFiles/llama-perplexity.dir/flags.make": "2bc60103e44c5cb26a67f8f9cf23b144575310cc1a227bda7a65f4a3ee87bb27",
+              "tools/quantize/CMakeFiles/llama-quantize-impl.dir/flags.make": "4adf0429a39da42de5e591d0290f13a5f2b07f44b5553929ee00de35e23165ca",
+              "tools/quantize/CMakeFiles/llama-quantize.dir/flags.make": "f00590b89fa98215ab2039ffd7138540130a64ced166e49245b7a38b408b52d4",
+              "tools/results/CMakeFiles/llama-results.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "tools/tokenize/CMakeFiles/llama-tokenize.dir/flags.make": "57fdac8f1afa01c2466e32f89b07141027440ee6bb9d76e30ec676bcbcc6b1a4",
+              "tools/tts/CMakeFiles/llama-tts.dir/flags.make": "c243c628a4a39f25f559e81c6b68b4f389e5d93417f8caf019d70a9cfdc36fed",
+              "vendor/cpp-httplib/CMakeFiles/cpp-httplib.dir/flags.make": "e73daa8679b253901df3be0084ce7872b41ceb09af54270d307bafac822b9bf8",
+              "vendor/hash/CMakeFiles/vendor-hash.dir/flags.make": "16457c84e573afa098e5b5977b709b899b8030ba6241febd58f642ab5e348442",
+              "compile_commands.json": "3329b1d3a431d9d44a82603adc26927b55221dd9d8e88596f4250cdaba09f0b8"
+            }
+          },
+          "resolution": "ldd under the same inherited loader environment; resolved upstream files rehashed before and after every window",
+          "loader_environment_sha256": {
+            "LD_LIBRARY_PATH": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "LD_PRELOAD": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "LD_AUDIT": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "pin_provenance": "Preparation manifest; executable, resolved upstream libraries and build records independently hashed"
+        },
+        "oracle_identity": {
+          "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+          "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+          "verified_source": {
+            "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+            "stored_dtype": "bfloat16",
+            "files": {
+              "LICENSE": {
+                "bytes": 11343,
+                "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+              },
+              "README.md": {
+                "bytes": 4917,
+                "sha256": "b19c806a904db6dc878a0462e70b551f6b7ac78dfbb88c2eb966ca2b9109ae15",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4b8373851d093eb9f3017443f27781c6971eff24"
+              },
+              "config.json": {
+                "bytes": 659,
+                "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "0dbb161213629a23f0fc00ef286e6b1e366d180f"
+              },
+              "generation_config.json": {
+                "bytes": 242,
+                "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+              },
+              "merges.txt": {
+                "bytes": 1671839,
+                "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+              },
+              "model.safetensors": {
+                "bytes": 988097824,
+                "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+                "upstream_algorithm": "sha256",
+                "upstream_digest": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+              },
+              "tokenizer.json": {
+                "bytes": 7031645,
+                "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "443909a61d429dff23010e5bddd28ff530edda00"
+              },
+              "tokenizer_config.json": {
+                "bytes": 7305,
+                "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "07bfe0640cb5a0037f9322287fbfc682806cf672"
+              },
+              "vocab.json": {
+                "bytes": 2776833,
+                "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+                "upstream_algorithm": "git-sha1",
+                "upstream_digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+              }
+            }
+          },
+          "corpus_sha256": "05ee7119f5b639e88c174001628127b82bb840752fedea1c3e0b99db51d119f4",
+          "corpus_policy": {
+            "version": 1,
+            "priming_tokens": 256,
+            "scored_tokens_per_window": 256,
+            "calibration_windows": 2,
+            "heldout_windows": 8,
+            "selection": "First consecutive nonoverlapping 513-token blocks from each pinned body anchor; no shuffle, filtering or candidate-dependent selection",
+            "tokenization": "Pinned Qwen tokenizer; add_special_tokens=False; no chat template or normalization",
+            "partition": "Different books and authors; calibration only chooses format, heldout never tunes it",
+            "format_selection": "Among 32F16,64F32,64F16,128F16 (<=8.5 matrix bits/weight), minimize calibration mean KL, then maximize top1, then minimize cross entropy, then label"
+          },
+          "weight_storage": "bfloat16",
+          "arithmetic": "fp32",
+          "kv_dtype": "float32",
+          "attention": "Transformers eager",
+          "head_chunk_rows": 1024,
+          "threads": 1,
+          "versions": {
+            "torch": "2.8.0+cpu",
+            "transformers": "4.56.2",
+            "safetensors": "0.6.2",
+            "tokenizers": "0.22.1",
+            "huggingface-hub": "0.35.3",
+            "numpy": "2.3.3"
+          }
+        }
+      }
+    ]
+  },
+  "quantization_manifest_sha256": "5f31c6d749874dd7d00e7db6aa323e937cb0430b1cd1c2e41d8daf871cb3ee8f",
+  "chosen": {
+    "label": "g64f16",
+    "group_size": 64,
+    "scale_dtype": "f16",
+    "matrix_bits_per_weight": 8.25,
+    "model_identity": {
+      "files": {
+        "config.json": {
+          "sha256": "98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670",
+          "bytes": 660
+        },
+        "model.safetensors": {
+          "sha256": "3607bd418376ac025e84d7e5e4afa6b1789bfa0f0e456fb9d349e810ad6a4848",
+          "bytes": 1592445760
+        }
+      },
+      "sha256": "23c9b5aca89362ae4832363d77efdf3e9a815613eaa14083f81fb265d67bd210"
+    },
+    "weights_artifact_bytes": 1592445760
+  },
+  "scope": "Fixed format transferred from 0.5B calibration; no 1.5B calibration or heldout selection"
+}

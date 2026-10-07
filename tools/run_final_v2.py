@@ -1,4 +1,16 @@
-"""Run the complete final matrix sequentially, retaining every interrupted attempt."""
+"""Run frozen explicit matrices sequentially, retaining every interrupted attempt.
+
+Defaults cover all fifteen 0.5B cells. Use --thread-counts 2,6 and
+--context-lengths 128,4096 for a four-cell subset, not the fifteen-cell target.
+For unattended prepared-model runs, --matrix-config accepts a JSON file:
+{"models": [{"name": "0.5", "argv": ["--model", "...", ...]},
+            {"name": "s1", "optional": true, "argv": ["--model", "...", ...]}]}.
+Each argv is a single-model command's arguments; the first entry must cover the
+full default matrix and the optional second entry the four S1 cells. Outputs
+must be results/v2/final and results/v2/s1/final respectively. Missing optional
+inputs are explicitly skipped; present invalid inputs abort rather than skip.
+The wrapper applies to each timing chunk, never the whole multi-model run.
+"""
 from __future__ import annotations
 
 import argparse
@@ -15,7 +27,8 @@ import uuid
 
 from tools.download_model import file_hash
 from tools.measure_v2 import (CONTEXTS, DEFAULT_TOKENS, ROOT, THREADS, candidates,
-                              check_artifacts, check_quality_eligibility, digest, stamp)
+                              check_artifacts, check_quality_eligibility, digest, stamp,
+                              matrix_dimensions, matrix_list)
 from tools.portable import portable
 from tools.summarize_v2 import summarize_bandwidth, summarize_candidate
 
@@ -40,10 +53,11 @@ def load(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
-def units() -> list[dict]:
+def units(threads: list[int] = THREADS, contexts: list[int] = CONTEXTS) -> list[dict]:
+    threads, contexts = matrix_dimensions(threads, contexts)
     result = []
-    for thread in THREADS:
-        for context in CONTEXTS:
+    for thread in threads:
+        for context in contexts:
             for candidate in candidates([50]):
                 name = f"window-t{thread}-c{context}-{candidate['id']}"
                 result.append({"name": name, "stage": "window", "threads": thread,
@@ -62,6 +76,8 @@ def measure_command(args: argparse.Namespace, stage: str, output: Path, unit: di
         command += ["--kernel", args.kernel, "--affinity", args.affinity, "--kv", "f16",
                     "--attention", "blocked", "--scheduler", "pool", "--rope", "cached",
                     "--polls", "50", "--steps", "64", "--repeats", "5", "--tokens", args.tokens]
+        command += ["--thread-counts", ",".join(map(str, args.thread_counts)),
+                    "--context-lengths", ",".join(map(str, args.context_lengths))]
         if args.cpu_order:
             command += ["--cpu-order", args.cpu_order]
     if unit:
@@ -78,16 +94,22 @@ def measure_command(args: argparse.Namespace, stage: str, output: Path, unit: di
 
 
 def plan(args: argparse.Namespace) -> dict:
+    matrix = units(args.thread_counts, args.context_lengths)
     commands = [{**unit, "command": measure_command(args, unit["stage"],
-                 args.output / "attempts" / unit["name"] / "000001", unit)} for unit in units()]
+                 args.output / "attempts" / unit["name"] / "000001", unit)} for unit in matrix]
+    windows = sum(unit["stage"] == "window" for unit in matrix)
+    bandwidth = len(matrix) - windows
     return {"kind": "INFERENCE", "freeze": measure_command(args, "freeze", args.output / "attempts/freeze/000001"),
-            "units": commands, "timing_commands": len(commands), "candidate_windows": 135,
-            "bandwidth_windows": 5, "model_processes": 540, "samples_per_engine_per_candidate": 10,
-            "measured_tokens_per_engine": 86400, "bandwidth_processes": 10,
+            "threads": args.thread_counts, "contexts": args.context_lengths,
+            "matrix_scope": "full-fifteen-cell" if set(args.thread_counts) == set(THREADS) and set(args.context_lengths) == set(CONTEXTS) else "explicit-subset",
+            "units": commands, "timing_commands": len(commands), "candidate_windows": windows,
+            "bandwidth_windows": bandwidth, "model_processes": windows * 4, "samples_per_engine_per_candidate": 10,
+            "measured_tokens_per_engine": windows * 2 * 5 * 64, "bandwidth_processes": bandwidth * 2,
             "window_deadline_seconds": 1740, "hard_command_limit_seconds": 1775,
             "memory_budget": MEMORY_BUDGET,
             "sum_window_deadlines_hours": len(commands) * 1740 / 3600,
             "wall_time_estimate": "Unknown; deadlines are limits, not measured runtime; queue waits are unbounded",
+            "runtime_estimate_method": "Sum representative accepted whole-chunk elapsed times per remaining thread/context/candidate and bandwidth unit, including load/warmup/ABAB overhead; measure each model separately. Add scheduler queue waits separately; token rates alone exclude overhead.",
             "summary": ["nice", "-n", "19", sys.executable, "-m", "tools.summarize_v2", "--input", str(args.output),
                         "--output", str(args.output / "summary.json")],
             "figure": ["nice", "-n", "19", sys.executable, "-m", "tools.figure_v2", "--input", str(args.output / "summary.json"),
@@ -95,8 +117,18 @@ def plan(args: argparse.Namespace) -> dict:
 
 
 def validate_selection(selection: dict, manifest: dict) -> None:
-    if selection.get("split") != "calibration":
-        raise ValueError("format selection must use calibration, not heldout")
+    if selection.get("split") == "fixed_format_transfer":
+        if (selection.get("schema") != "fixed-format-transfer-v1" or
+                (selection["chosen"]["label"], selection["chosen"]["group_size"], selection["chosen"]["scale_dtype"])
+                != ("g64f16", 64, "f16") or selection["origin_selection"].get("split") != "calibration"):
+            raise ValueError("fixed-format transfer must retain the original calibration-selected g64f16 decision")
+        if (selection["verified_source"] != manifest["source"] or
+                selection["oracle_identity"]["verified_source"] != manifest["source"]):
+            raise ValueError("fixed-format target source differs from manifest")
+    elif selection.get("split") != "calibration":
+        raise ValueError("format selection must use calibration or an explicit fixed-format transfer, not heldout")
+    elif manifest.get("source", {}).get("model_id") == "Qwen/Qwen2.5-1.5B-Instruct":
+        raise ValueError("S1 uses a fixed-format transfer, not target-model calibration")
     chosen = selection["chosen"]
     for key in ["group_size", "scale_dtype"]:
         if chosen[key] != manifest[key]:
@@ -109,6 +141,7 @@ def validate_selection(selection: dict, manifest: dict) -> None:
 
 def specification(args: argparse.Namespace) -> dict:
     validate_selection(load(args.format_selection), load(args.model_manifest))
+    decision = load(args.format_selection)
     files = {name: {"sha256": file_hash(getattr(args, name)),
                    "location_sha256": digest({"path": str(getattr(args, name).resolve())})}
              for name in ["format_selection", "model_manifest", "preparation", "quality"]}
@@ -119,8 +152,11 @@ def specification(args: argparse.Namespace) -> dict:
                                         ["model", "engine", "llama", "gguf", "bandwidth", "output"]}),
             "wrapper_sha256": digest({"argv": shlex.split(args.wrapper)}), "memory_budget": MEMORY_BUDGET,
             "kernel": args.kernel, "affinity": args.affinity, "cpu_order": args.cpu_order, "tokens": args.tokens,
-            "units": units(), "steps": 64, "repeats": 5, "rounds": 2,
-            "chosen_label": load(args.format_selection)["chosen"]["label"]}
+            "units": units(args.thread_counts, args.context_lengths), "steps": 64, "repeats": 5, "rounds": 2,
+            "chosen_label": decision["chosen"]["label"],
+            "format_decision": {"schema": decision.get("schema"), "split": decision["split"],
+                                "policy": decision.get("policy"),
+                                "origin_selection_sha256": decision.get("origin_selection_sha256")}}
 
 
 def require_same(actual: dict, expected: dict) -> None:
@@ -237,7 +273,7 @@ def disposition(attempt: Path, status: str, error: str | None = None, **details)
 def verify_protocol(protocol: dict, args: argparse.Namespace) -> None:
     if digest({k: v for k, v in protocol.items() if k != "id"}) != protocol["id"]:
         raise ValueError("protocol changed after freeze")
-    expected = {"threads": THREADS, "contexts": CONTEXTS, "candidates": candidates([50]),
+    expected = {"threads": args.thread_counts, "contexts": args.context_lengths, "candidates": candidates([50]),
                 "steps": 64, "repeats": 5, "rounds": 2, "warmup_steps": 1,
                 "tokens": args.tokens, "development": False}
     for key, value in expected.items():
@@ -253,6 +289,9 @@ def verify_protocol(protocol: dict, args: argparse.Namespace) -> None:
 
 def check_quality_selection(args: argparse.Namespace) -> None:
     quality = load(args.quality)
+    if load(args.format_selection).get("split") == "fixed_format_transfer":
+        from tools.quality_v2 import read_selection
+        read_selection(args.format_selection, load(args.format_selection)["corpus_sha256"])
     if (quality.get("split") != "heldout" or
             quality.get("selection_sha256") != file_hash(args.format_selection) or
             quality.get("selection") != load(args.format_selection)):
@@ -280,6 +319,18 @@ def check_quality_selection(args: argparse.Namespace) -> None:
         raise ValueError("final heldout report split/selection differs")
     if report["binary_identity"].get("engine_binary_sha256") != file_hash(args.engine):
         raise ValueError("final heldout engine binary differs from timing engine")
+    if args.kernel == "vnni16":
+        from tools.measure_v2 import load_quality_eligibility
+        manifest = load(args.model_manifest)
+        artifacts = {"weights": {"sha256": file_hash(args.model / "model.safetensors")},
+            "config": {"sha256": file_hash(args.model / "config.json")},
+            "engine": {"sha256": file_hash(args.engine)}, "gguf": {"sha256": file_hash(args.gguf)}}
+        from tools.corpus_v2 import digest_json
+        artifacts["engine"]["location_sha256"] = digest_json(str(args.engine.resolve()))
+        artifacts["weights"]["model_location_sha256"] = digest_json(str(args.model.resolve()))
+        proof = load_quality_eligibility(args.quality, settings, artifacts)
+        if proof["selection"]["oracle_identity"]["verified_source"] != manifest["source"]:
+            raise ValueError("VNNI16 quality source differs from timing manifest")
 
 
 def check_current(args: argparse.Namespace, protocol: dict) -> None:
@@ -440,7 +491,7 @@ def finish(args: argparse.Namespace, complete: bool) -> None:
         if code != 0:
             raise ValueError(f"summary exit {code}; retained logs")
         summary = load(attempt / "summary.json")
-        if bool(summary["complete_final_matrix"]) != complete:
+        if bool(summary["complete_requested_matrix"]) != complete:
             raise ValueError("summary completeness disagrees with accepted units")
         summary["runner_attempts"] = dispositions(args.output)
         atomic_json(attempt / "summary.json", summary)
@@ -466,10 +517,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--engine", type=Path, default=Path("build/cpu-decode"))
     parser.add_argument("--bandwidth", type=Path, default=Path("build/read-bandwidth"))
-    parser.add_argument("--kernel", choices=["scalar", "simd256", "simd512", "simd512x4", "vnni"], required=True)
+    parser.add_argument("--kernel", choices=["scalar", "simd256", "simd512", "simd512x4", "vnni", "vnni16"], required=True)
     parser.add_argument("--affinity", choices=["strict", "unpinned"], required=True)
     parser.add_argument("--cpu-order")
     parser.add_argument("--tokens", default=DEFAULT_TOKENS)
+    parser.add_argument("--thread-counts", type=matrix_list, default=THREADS)
+    parser.add_argument("--context-lengths", type=matrix_list, default=CONTEXTS)
     parser.add_argument("--wrapper", default="", help="Runtime argv prefix (shell quoting accepted; no shell execution); nice 19 is always appended")
     parser.add_argument("--output", type=Path, default=Path("results/v2/final"))
     parser.add_argument("--plan", "--dry-run", action="store_true", dest="plan")
@@ -481,8 +534,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
-def main() -> None:
-    args = parse_args()
+def run_model(args: argparse.Namespace) -> None:
     if args.plan:
         print(json.dumps(plan(args), indent=2))
         return
@@ -500,7 +552,7 @@ def main() -> None:
             atomic_json(state_path, spec)
         protocol = freeze_once(args)
         successful = True
-        for unit in units():
+        for unit in units(args.thread_counts, args.context_lengths):
             check_current(args, protocol)
             if not recover_unit(args, unit, protocol) and not collect(args, unit, protocol):
                 successful = False
@@ -508,6 +560,78 @@ def main() -> None:
         if not successful:
             raise SystemExit("incomplete matrix; retained attempts and partial summary; rerun the identical command to resume")
 
+
+
+def configured_models(path: Path) -> list[tuple[str, bool, argparse.Namespace]]:
+    config = load(path)
+    if set(config) != {"models"} or not isinstance(config["models"], list) or not 1 <= len(config["models"]) <= 2:
+        raise ValueError("matrix config requires a models list with 0.5 then optionally s1")
+    models = []
+    for index, entry in enumerate(config["models"]):
+        name = ["0.5", "s1"][index]
+        if (not isinstance(entry, dict) or set(entry) - {"name", "optional", "argv"} or
+                entry.get("name") != name or not isinstance(entry.get("argv"), list) or
+                any(not isinstance(token, str) for token in entry["argv"]) or
+                type(entry.get("optional", False)) is not bool or (index == 0 and entry.get("optional"))):
+            raise ValueError("matrix config entries require names 0.5 then s1 and string argv; only s1 may be optional")
+        args = parse_args(entry["argv"])
+        if args.plan:
+            raise ValueError("set --plan on the combined entry, not inside model argv")
+        threads, contexts = (THREADS, CONTEXTS) if index == 0 else ([2, 6], [128, 4096])
+        output = ROOT / ("results/v2/final" if index == 0 else "results/v2/s1/final")
+        if args.thread_counts != threads or args.context_lengths != contexts or args.output != output:
+            raise ValueError(f"configured {name} must use its prescribed matrix and distinct final output")
+        models.append((name, entry.get("optional", False), args))
+    return models
+
+
+def missing_inputs(args: argparse.Namespace) -> list[str]:
+    paths = [(name, getattr(args, name)) for name in
+             ["model_manifest", "format_selection", "llama", "gguf", "preparation", "quality", "engine", "bandwidth"]]
+    paths += [("weights", args.model / "model.safetensors"), ("config", args.model / "config.json")]
+    return [name for name, path in paths if not path.is_file()]
+
+
+def run_config(path: Path, dry_run: bool = False) -> None:
+    models = configured_models(path)
+    if dry_run:
+        plans = [{"name": name, "optional": optional, **plan(args)} for name, optional, args in models]
+        print(json.dumps({"kind": "INFERENCE", "execution": "sequential-prepared-models",
+                          "models": plans, "timing_commands_if_all_ready": sum(p["timing_commands"] for p in plans)}, indent=2))
+        return
+    os.setpriority(os.PRIO_PROCESS, 0, 19)
+    # A config orchestrates already prepared artifacts only; no downloads,
+    # conversion, quality evaluation or model residency crosses child launches.
+    lock_path = ROOT / "results/v2/final-matrix.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a") as lock, interrupted_as_exception():
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        for name, optional, args in models:
+            missing = missing_inputs(args)
+            if optional and missing and not (args.output / "runner.json").exists():
+                print(json.dumps({"model": name, "status": "skipped-not-ready", "missing_inputs": missing}), flush=True)
+                continue
+            if missing:
+                raise ValueError(f"configured {name} missing prepared inputs: {', '.join(missing)}")
+            source = load(args.model_manifest)["source"]["model_id"]
+            expected = "Qwen/Qwen2.5-0.5B-Instruct" if name == "0.5" else "Qwen/Qwen2.5-1.5B-Instruct"
+            if source != expected:
+                raise ValueError(f"configured {name} model source differs from {expected}")
+            # All accepted attempts are validated by the same single-model path.
+            # Calling it directly remains sequential and shares interrupt cleanup.
+            run_model(args)
+            print(json.dumps({"model": name, "status": "complete", "output": str(args.output.relative_to(ROOT))}), flush=True)
+
+
+def main() -> None:
+    if "--matrix-config" in sys.argv[1:]:
+        parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument("--matrix-config", type=Path, required=True)
+        parser.add_argument("--plan", "--dry-run", action="store_true", dest="plan")
+        args = parser.parse_args()
+        run_config(args.matrix_config, args.plan)
+    else:
+        run_model(parse_args())
 
 if __name__ == "__main__":
     main()

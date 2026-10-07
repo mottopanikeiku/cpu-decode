@@ -10,6 +10,7 @@ from pathlib import Path
 from tools.measure_v2 import ABLATION_CELLS, ABLATION_LABELS, CONTEXTS, ROOT, THREADS, baseline_cpu_set, candidates, check_quality_eligibility, cpu_mask, digest, native_cpu_set, validate_quality_eligibility
 from tools.portable import portable
 from tools.quality_v2 import require_reader_identity
+from tools.measure_v2 import matrix_dimensions, matrix_list
 
 BYTE_COMPONENTS = ["matrix_weights", "scales", "norm_bias", "embedding", "kv_read_min", "kv_write"]
 
@@ -57,11 +58,16 @@ def profile_bytes(samples: list[dict], geometry: dict, kv_dtype: str, context: i
 
 def native_samples(invocation: dict, window: dict, protocol: dict, settings: dict) -> list[dict]:
     raw = invocation["data"]
-    if raw.get("kernel") == "vnni" and not protocol["development"] and window.get("schema") != "cpu-decode-v2-ablation":
+    if (raw.get("kernel") in ("vnni", "vnni16") and not protocol["development"]
+            and (raw.get("kernel") == "vnni16" or window.get("schema") != "cpu-decode-v2-ablation")):
         proof = protocol.get("quality_eligibility")
         if not proof:
             raise ValueError("final VNNI samples have no retained quality eligibility")
         validate_quality_eligibility(proof, protocol["native"], protocol["artifacts"])
+        if raw.get("kernel") != protocol["native"]["kernel"]:
+            raise ValueError("final integer samples differ from approved protocol kernel")
+    if raw.get("kernel") == "vnni16":
+        require(raw, {"activation_dtype": "int16", "activation_group_size": 64}, "VNNI16 activation metadata")
     expected = {"threads": window["threads"], "context": window["context"], "steps": protocol["steps"],
                 "repeats": protocol["repeats"], "warmup_steps": 1, "cpu_set": window["cpu_set"],
                 "prompt_tokens": [int(x) for x in protocol["tokens"].split(",")],
@@ -138,6 +144,8 @@ def baseline_samples(invocation: dict, window: dict, protocol: dict, candidate: 
 
 
 def summarize_candidate(window: dict, protocol: dict, candidate: dict) -> dict:
+    if window["threads"] not in protocol["threads"] or window["context"] not in protocol["contexts"]:
+        raise ValueError("window cell outside frozen matrix")
     require(window, {"protocol_id": protocol["id"], "native_settings": protocol["native"],
                      "cpu_set": native_cpu_set(protocol, window["threads"])}, "window settings")
     if window["environment"]["nice"] < 19:
@@ -181,6 +189,8 @@ def select_best(rows: list[dict]) -> dict:
 
 
 def summarize_bandwidth(raw: dict, protocol: dict) -> dict:
+    if raw["threads"] not in protocol["threads"]:
+        raise ValueError("bandwidth thread count outside frozen matrix")
     require(raw, {"protocol_id": protocol["id"], "cpu_set": native_cpu_set(protocol, raw["threads"])}, "bandwidth affinity")
     if raw["environment"]["nice"] < 19:
         raise ValueError("bandwidth needs nice 19")
@@ -211,7 +221,8 @@ def summarize_bandwidth(raw: dict, protocol: dict) -> dict:
 
 def summarize(directory: Path, allow_partial: bool = False, target_ratio: float = 1.0,
               target_short_best_ceiling_percent: float = 85.0,
-              target_long_all_ceiling_percent: float = 75.0) -> dict:
+              target_long_all_ceiling_percent: float = 75.0,
+              thread_counts: list[int] | None = None, context_lengths: list[int] | None = None) -> dict:
     thresholds = {"native_over_best_baseline": target_ratio,
                   "short_best_percent_of_ceiling": target_short_best_ceiling_percent,
                   "long_all_percent_of_ceiling": target_long_all_ceiling_percent}
@@ -220,6 +231,10 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
     protocol = json.loads((directory / "protocol.json").read_text())
     if digest({k: v for k, v in protocol.items() if k != "id"}) != protocol["id"]:
         raise ValueError("frozen protocol digest mismatch")
+    threads, contexts = matrix_dimensions(protocol["threads"], protocol["contexts"])
+    if ((thread_counts is not None and thread_counts != threads) or
+            (context_lengths is not None and context_lengths != contexts)):
+        raise ValueError("requested summary matrix differs from frozen matrix")
     if not allow_partial and (protocol["development"] or protocol["steps"] < 64 or protocol["repeats"] < 5 or protocol["rounds"] != 2):
         raise ValueError("final summary requires final sampling settings")
     check_quality_eligibility(protocol, directory)
@@ -275,7 +290,7 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
                         "percent_of_ceiling": percentage,
                         "targets": None,
                         "noisy_over_5_percent": winner["native_tps"]["noisy_over_5_percent"] or winner["baseline_tps"]["noisy_over_5_percent"] or bool(bw and bw["winner"]["GB_per_s"]["noisy_over_5_percent"])})
-    expected_cells = {(t, c) for t in THREADS for c in CONTEXTS}
+    expected_cells = {(t, c) for t in threads for c in contexts}
     cells = {(r["threads"], r["context"]) for r in results}
     complete = cells == expected_cells and all(not r["missing_candidates"] and r["read_ceiling_tps"] is not None for r in results) and not failures
     ablations = []
@@ -315,13 +330,17 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
                         "missing_labels": [label for label in ABLATION_LABELS if label not in {r["label"] for r in matched}]})
     final = (complete and not protocol["development"] and protocol["steps"] >= 64
              and protocol["repeats"] >= 5 and protocol["rounds"] == 2)
+    full_target_matrix = (set(threads) == set(THREADS) and set(contexts) == set(CONTEXTS)
+                          and protocol.get("source_model", {}).get("model_id", "Qwen/Qwen2.5-0.5B-Instruct")
+                          == "Qwen/Qwen2.5-0.5B-Instruct")
+    target_eligible = final and full_target_matrix
     short = [r for r in results if r["context"] == 128]
     long = [r for r in results if r["context"] == 4096]
     target_predicates = {
-        "native_over_best_baseline": final and all(r["native_over_best_baseline"] >= target_ratio for r in results),
-        "short_best_percent_of_ceiling": final and any(r["percent_of_ceiling"] >= target_short_best_ceiling_percent for r in short),
-        "long_all_percent_of_ceiling": final and all(r["percent_of_ceiling"] >= target_long_all_ceiling_percent for r in long)}
-    if final:
+        "native_over_best_baseline": target_eligible and all(r["native_over_best_baseline"] >= target_ratio for r in results),
+        "short_best_percent_of_ceiling": target_eligible and any(r["percent_of_ceiling"] >= target_short_best_ceiling_percent for r in short),
+        "long_all_percent_of_ceiling": target_eligible and bool(long) and all(r["percent_of_ceiling"] >= target_long_all_ceiling_percent for r in long)}
+    if target_eligible:
         for row in results:
             row["targets"] = {
                 "native_over_best_baseline": row["native_over_best_baseline"] >= target_ratio,
@@ -330,7 +349,7 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
                 "long_all_percent_of_ceiling": (row["percent_of_ceiling"] >= target_long_all_ceiling_percent
                                                  if row["context"] == 4096 else None)}
     scaling = []
-    for context in CONTEXTS:
+    for context in contexts:
         by_thread = {r["threads"]: r for r in results if r["context"] == context}
         if 12 not in by_thread or any(t not in by_thread for t in THREADS if t < 12):
             continue
@@ -344,8 +363,20 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
                         "12_over_strongest_lower": rate12 / reference,
                         "decrease_percent_vs_strongest_lower": max(0.0, 100 * (1 - rate12 / reference)),
                         "below_strongest_lower": rate12 < reference})
+    runner_path = directory / "runner.json"
+    runner_record = json.loads(runner_path.read_text()) if runner_path.exists() else {}
     return {"schema": "cpu-decode-v2-summary", "protocol_id": protocol["id"], "development": protocol["development"],
-            "complete_final_matrix": final, "missing_cells": sorted(expected_cells - cells),
+            "complete_final_matrix": final and full_target_matrix, "missing_cells": sorted(expected_cells - cells),
+            "complete_requested_matrix": final, "full_fifteen_cell_target_matrix": full_target_matrix,
+            "matrix_scope": "full-fifteen-cell" if full_target_matrix else "explicit-subset",
+            "requested_threads": threads, "requested_contexts": contexts,
+            "expected_cells": sorted(expected_cells), "expected_candidate_windows": len(expected_cells) * len(expected_candidates),
+            "expected_bandwidth_windows": len(threads), "missing_bandwidth_threads": sorted(set(threads) - set(bandwidth)),
+            "target_eligible": target_eligible,
+            "target_scope": "0.5B fifteen-cell user targets; a complete requested subset is not acceptance of these targets",
+            "source_model": protocol.get("source_model"),
+            "native_format": {key: protocol["native"][key] for key in ["group_size", "scale_dtype"]},
+            "format_decision": runner_record.get("format_decision"),
             "selection": protocol["selection"], "selection_bias": "winner selected and reported on the same samples; no independent holdout",
             "quality_eligibility": protocol.get("quality_eligibility"),
             "statistic": "median rates; min/max and 100*(max-min)/median spread; >5% disclosed, never discarded",
@@ -354,7 +385,7 @@ def summarize(directory: Path, allow_partial: bool = False, target_ratio: float 
             "threshold_basis": "user" if (target_ratio, target_short_best_ceiling_percent, target_long_all_ceiling_percent) == (1.0, 85.0, 75.0) else "custom",
             "target_predicates": target_predicates,
             "numeric_targets_met": all(target_predicates.values()),
-            "thread12_scaling": {"kind": "MEAS", "complete_final_matrix": final, "comparisons": scaling,
+            "thread12_scaling": {"kind": "MEAS", "complete_final_matrix": final and full_target_matrix, "comparisons": scaling,
                                  "acceptance": None,
                                  "definition": "12-thread native median divided by 6-thread and strongest lower-thread native medians at each context; any decrease is reported, not assigned a collapse tolerance",
                                  "limitation": "No numeric collapse cutoff was specified; numeric_targets_met does not establish no-collapse acceptance"},
@@ -372,6 +403,8 @@ def main() -> None:
     parser.add_argument("--input", type=Path, default=Path("results/v2"))
     parser.add_argument("--output", type=Path, default=Path("results/v2/summary.json"))
     parser.add_argument("--allow-partial", action="store_true")
+    parser.add_argument("--thread-counts", type=matrix_list, help="Assert frozen matrix thread counts; never override")
+    parser.add_argument("--context-lengths", type=matrix_list, help="Assert frozen matrix context lengths; never override")
     parser.add_argument("--target-ratio", type=float, default=1.0)
     parser.add_argument("--target-short-best-ceiling-percent", type=float, default=85.0,
                         help="Required ceiling percentage at at least one context-128 cell (default: 85)")
@@ -381,7 +414,8 @@ def main() -> None:
     thresholds = [args.target_ratio, args.target_short_best_ceiling_percent, args.target_long_all_ceiling_percent]
     if any(not math.isfinite(value) or value <= 0 for value in thresholds):
         parser.error("target thresholds must be finite and positive")
-    summary = summarize(args.input, args.allow_partial, *thresholds)
+    summary = summarize(args.input, args.allow_partial, *thresholds,
+                        thread_counts=args.thread_counts, context_lengths=args.context_lengths)
     result_root = ROOT / "results"
     if args.output.resolve().is_relative_to(result_root) and not args.output.resolve().is_relative_to(result_root / "v2"):
         parser.error("v2 summary must not overwrite v1 results")
@@ -389,9 +423,9 @@ def main() -> None:
     summary = portable(summary, {args.input.resolve(): input_alias, Path.home(): "$HOME"})
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n")
-    print(f"{len(summary['results'])} cells; complete={summary['complete_final_matrix']}; failures={len(summary['failures'])}; noisy={summary['noisy_cells']}")
-    if not args.allow_partial and not summary["complete_final_matrix"]:
-        raise SystemExit("incomplete/invalid final matrix: summary retained with visible failures")
+    print(f"{len(summary['results'])} cells; requested_complete={summary['complete_requested_matrix']}; full_final={summary['complete_final_matrix']}; failures={len(summary['failures'])}; noisy={summary['noisy_cells']}")
+    if not args.allow_partial and not summary["complete_requested_matrix"]:
+        raise SystemExit("incomplete/invalid requested matrix: summary retained with visible failures")
 
 
 if __name__ == "__main__":

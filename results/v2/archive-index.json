@@ -1,0 +1,34 @@
+{
+  "schema": "lossless-historical-reports-v1",
+  "scope": "Superseded reports only; current approval and final-run inputs remain plain JSON",
+  "preservation": "All original member SHA256 values matched the extracted archive bytes after compression",
+  "archives": [
+    {
+      "file": "int16-pre-wide.zip",
+      "sha256": "8c6bacb9804fe75b66c44b5204f035566b36504555a60e090231854b0ff113ce",
+      "bytes": 1117565,
+      "members": {
+        "cal-g64f16-vnni16.json": "0dfdfaa34c30045201b8244d72c9f844749c276f5f4101cc66bf192946d3b91e",
+        "calibration-vnni16.json": "451751186ba25e25a189441fda186d3196f980a40fcb9449c58f49ec129e9ce7",
+        "heldout-g64f16-vnni16-f16.json": "a857025fc284c6944be171796ba7be7f5d96749075f77403c5cebd4c69c50237",
+        "heldout-g64f16-vnni16-f32.json": "ba2e91f8f1f0c5d87028b6c7667c4fe8d38375cd5eca80df8afb3ec11116204c",
+        "quality-vnni16.json": "191a43e8d20a6c3e7ac2cbbdb69b1ceeeb8de6135a58f82e1a3937e5f57be3e6"
+      }
+    },
+    {
+      "file": "historical-heldout.zip",
+      "sha256": "774159d52177d0fefdad1acec94b06a87841dc32b09fe3ce89833faaa40ad368",
+      "bytes": 1338217,
+      "members": {
+        "heldout-g32f16-f16.json": "4ef8a51a305f3330b15d420b770b40a7fd293cdf0a2acfa6b5eaf9aedefd3576",
+        "heldout-g32f16-f32.json": "26fc2b8388104a2c26302da81a9eed6d07c9d0f3f04aa35c4d7f4ee81f30dd3f",
+        "heldout-g32f16-vnni.json": "927432c2ccd780a3f6934d9558fd4fbe9dc634a03d2f76768ae7a32fba43c316",
+        "heldout-row.json": "aacbc2257b7e5a83f58e55ebc661346a3fe6ce00228827546a416dbf2fcf1ce2",
+        "heldout-q8_0.json": "e35b4a54572e8c6edfe6b0fe9216c438a873152d42f516310aa8cf32ee0a9b67",
+        "heldout-final-row.json": "07cae2a577dc06e8bae2206dd67217763d9e798581db93dbbfdd9ea68a3fc187",
+        "heldout-final-g64f16-f32.json": "9c8e0b7914cb6669403860b88bfe34a51026b8121374f687eb69edb0d128dedf",
+        "heldout-final-g64f16-vnni.json": "47ecbcf07f766437b9e20bbcfa3911600280c1b9176847506666be674393d042"
+      }
+    }
+  ]
+}

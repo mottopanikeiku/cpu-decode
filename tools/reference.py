@@ -195,7 +195,7 @@ def main() -> None:
     parser.add_argument("--head-chunk", type=int, default=1024)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--steps", type=int, default=8)
-    parser.add_argument("--kernel", choices=("scalar", "simd256", "simd512", "simd512x4"), default="scalar")
+    parser.add_argument("--kernel", choices=("scalar", "simd256", "simd512", "simd512x4", "vnni"), default="scalar")
     parser.add_argument("--atol", type=float, default=None)
     parser.add_argument("--rtol", type=float, default=None)
     parser.add_argument("--quant-max-kl", type=float, help="Optional caller-chosen maximum per-position KL; otherwise reporting only")

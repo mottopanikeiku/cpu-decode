@@ -16,7 +16,7 @@ from pathlib import Path
 from tools.download_model import file_hash
 from tools.portable import portable
 from tools.prepare_llama import LLAMA_COMMIT
-from tools.quality_v2 import reader_build_identity, reader_identity_locations, require_reader_identity
+from tools.quality_v2 import reader_build_identity, reader_identity_locations, require_reader_identity, vnni16_gate
 
 ROOT = Path(__file__).resolve().parents[1]
 THREADS = [1, 2, 4, 6, 12]
@@ -24,6 +24,25 @@ CONTEXTS = [128, 1024, 4096]
 ABLATION_CELLS = [(2, 128), (6, 4096)]
 ABLATION_LABELS = ["per-row-scalar", "simd256", "simd512x4", "blocked", "f16-kv", "pool", "grouped", "vnni"]
 DEFAULT_TOKENS = ",".join(map(str, json.loads((ROOT / "configs/prompts.json").read_text())["benchmark"]["seed_token_ids"]))
+
+
+def matrix_list(value: str) -> list[int]:
+    """Parse explicit ordered positive matrix dimensions, without duplicate cells."""
+    try:
+        result = [int(item) for item in value.split(",")]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("matrix lists must contain comma-separated positive integers") from exc
+    if not result or any(item <= 0 for item in result) or len(set(result)) != len(result):
+        raise argparse.ArgumentTypeError("matrix lists must be nonempty, positive and unique")
+    return result
+
+
+def matrix_dimensions(threads: list[int], contexts: list[int]) -> tuple[list[int], list[int]]:
+    for values in [threads, contexts]:
+        if (not isinstance(values, list) or not values or
+                any(type(value) is not int or value <= 0 for value in values) or len(set(values)) != len(values)):
+            raise ValueError("matrix dimensions must be nonempty positive unique integer lists")
+    return threads, contexts
 
 
 def digest(value: dict) -> str:
@@ -115,6 +134,33 @@ QUALITY_METRICS = ["mean_kl_reference_candidate_nats", "p99_kl_reference_candida
 
 def validate_quality_eligibility(proof: dict, native: dict, artifacts: dict) -> None:
     """Bind the retained path and independently recompute every metric comparison."""
+    if native["kernel"] == "vnni16":
+        if native.get("rope") != "cached":
+            raise ValueError("VNNI16 quality approves only cached RoPE, not direct execution")
+        gate = proof.get("gate")
+        if not gate:
+            raise ValueError("final VNNI16 has no calibration and heldout proof")
+        actual = vnni16_gate(proof["selection"], gate["selection_sha256"], gate["reports"])
+        if actual != gate or actual["approved"] is not True:
+            raise ValueError("VNNI16 rejected: both stages require three strictly better metrics than actual Q8_0")
+        report = gate["reports"]["heldout_f16"]["data"]
+        expected = {key: value for key, value in native.items() if key != "rope"}
+        if any(report["settings"].get(key) != value for key, value in expected.items()):
+            raise ValueError("VNNI16 quality execution settings differ")
+        files = report["model_identity"]["files"]
+        if (files["model.safetensors"]["sha256"] != artifacts["weights"]["sha256"]
+                or files["config.json"]["sha256"] != artifacts["config"]["sha256"]
+                or report["binary_identity"]["engine_binary_sha256"] != artifacts["engine"]["sha256"]):
+            raise ValueError("VNNI16 quality binary/weights/config differs from timing artifacts")
+        if (report["binary_identity"].get("engine_location_sha256") != artifacts["engine"].get("location_sha256")
+                or report["binary_identity"].get("model_location_sha256") != artifacts["weights"].get("model_location_sha256")
+                or "engine_location_sha256" not in report["binary_identity"]
+                or "model_location_sha256" not in report["binary_identity"]):
+            raise ValueError("VNNI16 engine/model location differs from quality evaluation")
+        q8 = gate["reports"]["q8_heldout"]["data"]["model_identity"]["files"]
+        if len(q8) != 1 or next(iter(q8.values()))["sha256"] != artifacts["gguf"]["sha256"]:
+            raise ValueError("VNNI16 actual Q8_0 identity differs from timing artifact")
+        return
     if proof["weights_sha256"] != artifacts["weights"]["sha256"] or proof["chosen_weights_sha256"] != proof["weights_sha256"]:
         raise ValueError("VNNI quality decision does not match chosen weights")
     if proof["config_sha256"] != artifacts["config"]["sha256"] or proof["engine_binary_sha256"] != artifacts["engine"]["sha256"]:
@@ -134,6 +180,8 @@ def validate_quality_eligibility(proof: dict, native: dict, artifacts: dict) -> 
 
 
 def load_quality_eligibility(path: Path, native: dict, artifacts: dict) -> dict:
+    if native["kernel"] == "vnni16":
+        return load_vnni16_eligibility(path, native, artifacts)
     quality = json.loads(path.read_text())
     if quality.get("split") != "heldout":
         raise ValueError("final VNNI needs a heldout quality decision")
@@ -172,13 +220,49 @@ def load_quality_eligibility(path: Path, native: dict, artifacts: dict) -> dict:
     return proofs[0]
 
 
+def load_vnni16_eligibility(path: Path, native: dict, artifacts: dict) -> dict:
+    quality = json.loads(path.read_text())
+    gate = quality.get("comparison", {}).get("vnni16_gate")
+    if quality.get("split") != "heldout" or not gate:
+        raise ValueError("final VNNI16 requires calibration AND heldout proof")
+    if set(gate.get("reports", {})) != {"calibration", "q8_calibration", "heldout_f16", "heldout_f32", "q8_heldout"}:
+        raise ValueError("final VNNI16 requires both calibration reports and the heldout F16/F32/Q8 pair")
+    if gate["selection_sha256"] != quality["selection_sha256"]:
+        raise ValueError("VNNI16 gate selection differs")
+    for record in gate["reports"].values():
+        filename = record["report"]
+        if Path(filename).name != filename:
+            raise ValueError("VNNI16 report must be a sibling filename")
+        linked = path.parent / filename
+        if file_hash(linked) != record["sha256"] or json.loads(linked.read_text()) != record["data"]:
+            raise ValueError("VNNI16 linked report hash/content changed")
+    for role in ("heldout_f16", "heldout_f32", "q8_heldout"):
+        record = gate["reports"][role]
+        entries = [entry for entry in quality["evidence"] if entry["label"] == record["data"]["label"]]
+        if len(entries) != 1:
+            raise ValueError("VNNI16 needs one linked heldout evidence entry")
+        entry = entries[0]
+        if (entry["report"], entry["sha256"]) != (record["report"], record["sha256"]):
+            raise ValueError("VNNI16 evidence report identity differs")
+        for key in ("label", "split", "backend", "settings", "aggregate", "model_identity", "binary_identity", "oracle_identity"):
+            if entry[key] != record["data"][key]:
+                raise ValueError("VNNI16 evidence differs from measured report")
+    proof = {"file": str(path.resolve()), "quality_sha256": file_hash(path),
+        "selection": quality["selection"], "gate": gate}
+    validate_quality_eligibility(proof, native, artifacts)
+    return proof
+
+
 def check_quality_eligibility(protocol: dict, directory: Path) -> None:
-    if protocol["development"] or protocol["native"]["kernel"] != "vnni":
+    if protocol["development"] or protocol["native"]["kernel"] not in ("vnni", "vnni16"):
         return
     proof = protocol.get("quality_eligibility")
     if not proof:
         raise ValueError("final VNNI protocol has no retained quality eligibility")
     validate_quality_eligibility(proof, protocol["native"], protocol["artifacts"])
+    if protocol["native"]["kernel"] == "vnni16":
+        if proof["selection"]["oracle_identity"]["verified_source"] != protocol["source_model"]:
+            raise ValueError("VNNI16 gate source differs from frozen timing source")
     filename = proof["file"].replace("$OUTPUT", str(directory.resolve())).replace("$HOME", str(Path.home()))
     path = Path(filename)
     if not path.is_absolute():
@@ -301,6 +385,8 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
             raise ValueError("final protocol requires >=64 measured tokens and >=5 repeats per invocation")
     if args.steps < 1 or args.repeats < 1:
         raise ValueError("steps and repeats must be positive")
+    threads, contexts = matrix_dimensions(getattr(args, "thread_counts", THREADS),
+                                         getattr(args, "context_lengths", CONTEXTS))
     if os.getpriority(os.PRIO_PROCESS, 0) < 19:
         raise ValueError("freeze commands must run at nice 19")
     if args.development and args.output.resolve() == (ROOT / "results/v2").resolve():
@@ -333,7 +419,7 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
     if not metadata["success"]:
         raise ValueError("CPU discovery unsuccessful; stdout/stderr retained")
     cpus = metadata["data"]
-    order = cpu_order(cpus, args.cpu_order, max(THREADS))
+    order = cpu_order(cpus, args.cpu_order, max(threads))
     model_settings = {"group_size": manifest["group_size"], "scale_dtype": manifest["scale_dtype"]}
     config = json.loads((args.model / "config.json").read_text())
     geometry = {"layers": config["num_hidden_layers"], "kv_heads": config["num_key_value_heads"],
@@ -344,8 +430,11 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
                  "weights": {"sha256": manifest["weights"]["sha256"], **stamp(weights)},
                  "config": {"sha256": manifest["config_sha256"], **stamp(args.model / "config.json")},
                  "gguf": {"sha256": preparation["artifacts"]["Q8_0"]["sha256"], **stamp(args.gguf)}}
+    if args.kernel == "vnni16":
+        artifacts["engine"]["location_sha256"] = digest(str(args.engine.resolve()))
+        artifacts["weights"]["model_location_sha256"] = digest(str(args.model.resolve()))
     protocol = {"schema": "cpu-decode-v2-protocol", "development": args.development,
-                "threads": THREADS, "contexts": CONTEXTS, "steps": args.steps, "repeats": args.repeats,
+                "threads": threads, "contexts": contexts, "steps": args.steps, "repeats": args.repeats,
                 "rounds": 2, "warmup_steps": 1, "tokens": args.tokens, "cpu_order": order,
                 "cpu_metadata": cpus, "candidates": candidates([int(x) for x in args.polls.split(",")]),
                 "native": {"kernel": args.kernel, "kv_dtype": "f16", "attention": args.attention,
@@ -359,8 +448,11 @@ def freeze(args: argparse.Namespace, locations: dict) -> None:
                 "model_manifest": manifest, "preparation": preparation, "environment": environment(locations),
                 "selection": "highest pooled median baseline rate; native uses only the same candidate's ABAB window"}
     protocol["quality_eligibility"] = (load_quality_eligibility(args.quality, protocol["native"], artifacts)
-                                       if args.kernel == "vnni" and not args.development else None)
-    protocol["experimental_vnni"] = args.kernel == "vnni" and args.development
+                                       if args.kernel in ("vnni", "vnni16") and not args.development else None)
+    if args.kernel == "vnni16" and not args.development:
+        if protocol["quality_eligibility"]["selection"]["oracle_identity"]["verified_source"] != manifest["source"]:
+            raise ValueError("VNNI16 calibration/heldout source differs from timing model source")
+    protocol["experimental_vnni"] = args.kernel in ("vnni", "vnni16") and args.development
     protocol = portable(protocol, locations)
     protocol["id"] = digest(protocol)
     with (args.output / "protocol.json").open("x") as stream:
@@ -379,6 +471,11 @@ def check_artifacts(args: argparse.Namespace, protocol: dict, locations: dict, a
             raise ValueError(f"frozen artifact changed or missing: {name}")
         if name in {"engine", "llama"} and file_hash(path) != protocol["artifacts"][name]["sha256"]:
             raise ValueError(f"frozen binary changed: {name}")
+    if protocol["native"]["kernel"] == "vnni16" and not protocol["development"]:
+        if (digest(str(args.engine.resolve())) != protocol["artifacts"]["engine"]["location_sha256"]
+                or digest(str(args.model.resolve())) != protocol["artifacts"]["weights"]["model_location_sha256"]
+                or file_hash(args.model / "model.safetensors") != protocol["artifacts"]["weights"]["sha256"]):
+            raise ValueError("VNNI16 execution location or selected weights changed")
     check_baseline_identity(args.llama, protocol, locations)
 
 
@@ -398,13 +495,17 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("results/v2"))
     parser.add_argument("--threads", type=int)
     parser.add_argument("--contexts", type=int)
+    parser.add_argument("--thread-counts", type=matrix_list, default=THREADS,
+                        help="Frozen matrix thread counts (default: 1,2,4,6,12)")
+    parser.add_argument("--context-lengths", type=matrix_list, default=CONTEXTS,
+                        help="Frozen matrix context lengths (default: 128,1024,4096)")
     parser.add_argument("--candidate", default="all")
     parser.add_argument("--cpu-order")
     parser.add_argument("--polls", default="50")
     parser.add_argument("--steps", type=int, default=64)
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--tokens", default=DEFAULT_TOKENS)
-    parser.add_argument("--kernel", choices=["auto", "scalar", "simd256", "simd512", "simd512x4", "vnni"], default="auto")
+    parser.add_argument("--kernel", choices=["auto", "scalar", "simd256", "simd512", "simd512x4", "vnni", "vnni16"], default="auto")
     parser.add_argument("--kv", choices=["f16", "f32"], default="f16")
     parser.add_argument("--attention", choices=["blocked", "scalar"], default="blocked")
     parser.add_argument("--scheduler", choices=["pool", "openmp"], default="pool")
@@ -480,6 +581,10 @@ def main() -> None:
         settings = {"kernel": args.kernel, "kv_dtype": args.kv, "attention": args.attention,
                     "scheduler": args.scheduler, "affinity": args.affinity, "rope": args.rope}
         cpus = native_cpu_set(protocol, thread, settings)
+        if settings["kernel"] == "vnni16" and not protocol["development"]:
+            if protocol["native"]["kernel"] != "vnni16":
+                raise ValueError("final VNNI16 ablation needs a VNNI16 approved protocol; use development for experiments")
+            check_quality_eligibility(protocol, args.output)
         name = f"ablation-t{thread}-c{context}-{args.label}"
     path = args.output / f"{name}.json"
     if path.exists():
@@ -488,7 +593,7 @@ def main() -> None:
               "protocol_id": protocol["id"], "threads": thread, "context": context, "cpu_set": cpus,
               "candidates": matches if bundled else [], "native_settings": settings, "label": args.label,
               "environment": environment(locations), "invocations": []}
-    record["experimental_vnni"] = settings["kernel"] == "vnni" and (not bundled or protocol["development"])
+    record["experimental_vnni"] = settings["kernel"] in ("vnni", "vnni16") and (not bundled or protocol["development"])
     if not bundled:
         record["weights_sha256"] = file_hash(args.model / "model.safetensors")
     save(path, portable(record, locations))
@@ -505,7 +610,7 @@ def main() -> None:
                               execute_baseline(invocation_command, args.llama, protocol, stem, locations, deadline))
                 invocation["process_cpu_set"] = cpus if engine == "native" else baseline_cpu_set(protocol, thread, candidate)
                 if (engine == "native" and bundled and not protocol["development"]
-                        and invocation["data"] and invocation["data"].get("kernel") == "vnni"
+                        and invocation["data"] and invocation["data"].get("kernel") in ("vnni", "vnni16")
                         and not protocol.get("quality_eligibility")):
                     invocation["success"] = False
                     invocation["error"] = "final auto-selected VNNI has no retained quality eligibility"

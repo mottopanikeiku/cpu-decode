@@ -48,11 +48,11 @@ void emit(const Json& json, const std::string& path) {
 void usage() {
     std::cout << "cpu-decode cpus\n"
                  "cpu-decode quantize --model HF_SNAPSHOT --output INT8_DIR [--group-size 0|32|64|128 --scale-dtype f16|f32]\n"
-                 "cpu-decode logits --model DIR --tokens ID,ID --output PREFIX [--threads N --kernel scalar|simd256|simd512|simd512x4]\n"
+                 "cpu-decode logits --model DIR --tokens ID,ID --output PREFIX [--threads N --kernel auto|scalar|simd256|simd512|simd512x4|vnni|vnni16]\n"
                  "cpu-decode generate --model DIR --tokens ID,ID --steps N [--output JSON --threads N --kernel ...]\n"
                  "cpu-decode bench --model DIR --tokens ID,ID --context N --steps N --repeats N [--output JSON --threads N --kernel ...]\n"
                  "Forward modes: --rope cached|direct --kv f16|f32 --attention blocked|scalar --scheduler pool|openmp --affinity strict|unpinned --cpu-set IDS.\n"
-                 "Kernel defaults to auto (FP32 activations); vnni quantizes activations in groups of32.\n"
+                 "Kernel defaults to auto (FP32 activations); vnni uses int8 activations/groups of32; vnni16 uses int16 activations/groups of64. Both require int8 weights.\n"
                  "logits accepts --logits-start N to skip the head on priming positions.\n"
                  "Token IDs only; generation does not stop at EOS. logits writes PREFIX.bin float32 [positions,vocab] and PREFIX.json.\n";
 }

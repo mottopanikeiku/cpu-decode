@@ -16,6 +16,7 @@ from tools.measure_v2 import baseline_cpu_set, candidates, check_baseline_identi
 from tools.summarize_v2 import profile_bytes, select_best, spread, summarize, summarize_candidate
 from tools.portable import portable
 from tools.quality_v2 import reader_build_identity, reader_identity_locations
+from tools.measure_v2 import matrix_dimensions, matrix_list
 
 
 @pytest.fixture
@@ -615,7 +616,8 @@ def test_custom_target_thresholds_reject_invalid_values(tmp_path, kwargs):
         summarize(tmp_path, **kwargs)
 
 
-def test_freeze_uses_resolved_build_for_relocated_benchmark(tmp_path, monkeypatch, protocol):
+@pytest.mark.parametrize("threads,contexts", [([1, 2, 4, 6, 12], [128, 1024, 4096]), ([2, 6], [128, 4096])])
+def test_freeze_uses_resolved_build_for_relocated_benchmark(tmp_path, monkeypatch, protocol, threads, contexts):
     executable, build, libraries, _ = resolved_baseline_fixture(tmp_path, monkeypatch)
     model = tmp_path / "model"
     model.mkdir()
@@ -647,11 +649,12 @@ def test_freeze_uses_resolved_build_for_relocated_benchmark(tmp_path, monkeypatc
     args = SimpleNamespace(model=model, engine=engine, llama=executable, gguf=gguf, bandwidth=bw,
         model_manifest=manifest, preparation=preparation, output=output, development=False,
         kv="f16", steps=64, repeats=5, cpu_order=None, polls="50", tokens="1,2,3",
-        kernel="simd512x4", attention="blocked", scheduler="pool", affinity="strict", rope="cached")
+        kernel="simd512x4", attention="blocked", scheduler="pool", affinity="strict", rope="cached",
+        thread_counts=threads, context_lengths=contexts)
     monkeypatch.setattr(os, "getpriority", lambda *a: 19)
     monkeypatch.setattr("tools.measure_v2.observation", lambda command: {"command": command})
     monkeypatch.setattr("tools.measure_v2.environment", lambda locations: {"fixture": "isolated host observation"})
-    cpus = {"allowed_cpu_ids": list(range(12)), "preferred_cpu_ids": list(range(12))}
+    cpus = {"allowed_cpu_ids": list(range(max(threads))), "preferred_cpu_ids": list(range(max(threads)))}
     monkeypatch.setattr("tools.measure_v2.execute", lambda *a, **kw: {"success": True, "data": cpus})
     locations = {tmp_path: "$FIXTURE"}
     freeze(args, locations)
@@ -663,5 +666,66 @@ def test_freeze_uses_resolved_build_for_relocated_benchmark(tmp_path, monkeypatc
     assert identity["shared_libraries"]["libggml-cpu.so"]["sha256"] == file_hash(libraries["libggml-cpu.so"])
     assert identity["reader_binary_sha256"] == file_hash(executable)
     assert frozen["source_model"] == source
+    assert frozen["threads"] == threads and frozen["contexts"] == contexts
+    assert len(frozen["cpu_order"]) == max(threads)
     assert str(tmp_path) not in json.dumps(frozen)
     check_baseline_identity(executable, frozen, {tmp_path: "$FIXTURE"})
+
+
+@pytest.mark.parametrize("value", ["", "2,2", "0,6", "-1,2", "2,", "two,6"])
+def test_matrix_options_reject_invalid_lists(value):
+    import argparse
+    with pytest.raises(argparse.ArgumentTypeError, match="matrix lists"):
+        matrix_list(value)
+
+
+def test_matrix_options_preserve_explicit_order():
+    assert matrix_list("6,2") == [6, 2]
+    assert matrix_dimensions([6, 2], [4096, 128]) == ([6, 2], [4096, 128])
+
+
+@pytest.mark.parametrize("threads,contexts", [([], [128]), ([2, 2], [128]),
+                                             ([True], [128]), ([2], [0]),
+                                             ([2], [128, 128]), ("2,6", [128])])
+def test_frozen_matrix_dimensions_reject_duplicates_and_invalid_types(threads, contexts):
+    with pytest.raises(ValueError, match="matrix dimensions"):
+        matrix_dimensions(threads, contexts)
+
+
+def test_summary_asserts_requested_dimensions_without_overriding_protocol(tmp_path, protocol):
+    protocol.update(threads=[2, 6], contexts=[128, 4096])
+    protocol["id"] = digest({key: value for key, value in protocol.items() if key != "id"})
+    save_target_matrix(tmp_path, protocol, [86, 86], [76, 76])
+    summary = summarize(tmp_path, thread_counts=[2, 6], context_lengths=[128, 4096])
+    assert summary["complete_requested_matrix"] and summary["matrix_scope"] == "explicit-subset"
+    assert not summary["numeric_targets_met"] and not summary["target_eligible"]
+    assert summary["expected_candidate_windows"] == 36 and summary["expected_bandwidth_windows"] == 2
+    assert summary["thread12_scaling"]["comparisons"] == []
+    with pytest.raises(ValueError, match="differs from frozen matrix"):
+        summarize(tmp_path, thread_counts=[1, 2, 4, 6, 12])
+    with pytest.raises(ValueError, match="differs from frozen matrix"):
+        summarize(tmp_path, context_lengths=[128])
+
+
+@pytest.mark.parametrize("outside", ["thread", "context", "bandwidth"])
+def test_subset_summary_rejects_foreign_cells_and_bandwidth(tmp_path, protocol, outside):
+    protocol.update(threads=[2, 6], contexts=[128, 4096])
+    protocol["id"] = digest({key: value for key, value in protocol.items() if key != "id"})
+    save_target_matrix(tmp_path, protocol, [86, 86], [76, 76])
+    raw = (bandwidth(protocol, 1) if outside == "bandwidth" else
+           window(protocol, 1 if outside == "thread" else 2, 1024 if outside == "context" else 128))
+    (tmp_path / "foreign.json").write_text(json.dumps(raw))
+    summary = summarize(tmp_path)
+    assert not summary["complete_requested_matrix"]
+    assert summary["failures"]
+    assert all("outside frozen matrix" in failure["error"] for failure in summary["failures"])
+
+
+def test_full_larger_model_matrix_is_not_original_model_user_target(tmp_path, protocol):
+    protocol["source_model"] = {"model_id": "Qwen/Qwen2.5-1.5B-Instruct"}
+    protocol["id"] = digest({key: value for key, value in protocol.items() if key != "id"})
+    save_target_matrix(tmp_path, protocol, [86] * 5, [76] * 5)
+    summary = summarize(tmp_path)
+    assert summary["complete_requested_matrix"]
+    assert not summary["full_fifteen_cell_target_matrix"]
+    assert not summary["numeric_targets_met"]

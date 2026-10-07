@@ -211,3 +211,84 @@ the rejected singleton-claim API was subsequently removed. These are
 parent-executed outcomes, not independent reviewer reproduction. The quiet
 full final matrix and final-binary heldout confirmation remain distinct.
 
+## Signed-int16 arithmetic and streamed-oracle review
+
+Two source-only reviews examined the signed-word VNNI kernel and the
+layer-resident FP32 oracle. Neither reviewer executed tests or models.
+
+The arithmetic review found premature FP32 multiplication of weight and
+activation scales: an underflow could erase a representable result, and an
+overflow could turn an exact zero integer dot into NaN. The corrected path
+retains the fast FP32 vector FMA for ordinary coefficients, but recomputes a
+whole row with wide integer dots and FP64 scales/accumulation for subnormal
+or excessively large coefficients. The conservative constant leaves range
+for any addressable row, including final reduction. Regressions use
+independently widened scale products and check a normal tiny result,
+overflowing coefficient with zero weights, and cancellation of large
+opposite SIMD lanes. They cover row/32/64/128 scales and both F16/F32 storage.
+
+Activation groups have 64 values, clip to ±32767 and round half away from
+zero. A positive scale floor of FLT_MIN intentionally loses relative
+precision for sufficiently tiny inputs; no universal relative-error claim
+is made. Four -128×-32767 products fit both int32 and exact FP32 conversion
+before scaling; integer accumulators reset at each applicable weight group.
+FP32 kernels allocate no integer activation representation.
+
+Parent execution on the final native binary passed three CTest checks.
+The Python integration after S1/original-int16 tooling passed 326 tests
+with two explicitly optional model skips. The actual pinned 0.5B reference
+suite subsequently passed all eleven tests, using g64f16 and the final
+binary's FP32 path. The full 512 calibration and 2048 heldout signed-int16
+reports independently satisfy all three requested actual-Q8 comparisons;
+perplexity is worse and is display-only. F32 KV is a required linked control,
+not an extra format-selection condition.
+
+The streamed-oracle source review found no concrete defect: layer-major
+execution preserves priming/cached causality, tensors are independently
+widened from original BF16, and tied-head chunks and raw mapping lifetimes
+are bounded. Real S1 completion and process memory are separate executions,
+not established by that source inspection.
+
+## Final v2 binding and publication review
+
+Two further source-only reviews checked the corrected int16 arithmetic and
+quality binding, upstream streamed GGUF, real-thread reporting and completed
+matrix publication. They ran no checks and changed no files.
+
+No additional mathematical defect was found in the whole-row wide fallback,
+integer bounds, supported scales/groups/tails or shared activation work.
+One binding defect remained: direct-RoPE measurement could reuse cached-RoPE
+quality. Final signed-int16 validation now explicitly rejects anything but
+cached RoPE; synthetic regressions exercise both direct validation and
+linked-report loading.
+
+The publication review found a copied approval flag could outlive its
+linked quality files. Publication now requires the sibling retained protocol,
+recomputes its digest and matches the summary's source and quality decision,
+then invokes the existing validator to reload the comparison and all five
+linked reports before rendering or changing any output. Regressions mutate
+the protocol, copied approval, comparison and each linked report while
+checking that publication files remain unchanged.
+
+The second finding concerned old prepared caches: changing the private
+manifest filename could reject previously verified GGUFs. A one-time
+migration now validates exact source/commit and all existing artifact hashes
+before retiring the old manifest. Valid and mutated synthetic cache cases
+exercise this behavior.
+
+Parent executions after these changes passed **550 Python tests**, with two
+explicitly optional model checks skipped. Actual pinned-upstream synthetic
+integration ran for both model configurations; an initially missing
+subclass architecture declaration was fixed before those integrations passed.
+The exact CI C++ configure/build and all three CTest checks also passed.
+Both actual final-artifact preflight freezes completed; neither collects
+final timing samples.
+
+Separate parent executions established whole-file equality of the actual
+0.5B streamed and original upstream BF16 GGUF, genuine upstream S1 Q8
+conversion, its 2048-position quality comparison and a native
+4096-context/4160-capacity run at the imposed 2000 MiB cap. A debugger actually
+stepped across upstream Q8 `vpdpbusd`; the twenty real 0.5B thread-check
+processes were bitwise invariant within each kernel/KV pair. These are
+parent-observed records, not independent reviewer reproduction. The full
+final timing matrix remains **not run**.

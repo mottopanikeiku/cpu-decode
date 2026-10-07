@@ -1,0 +1,67 @@
+{
+  "schema": "cpu-decode-v2-checks",
+  "scope": "Parent-executed checks; full final timing matrix not run",
+  "ci": {
+    "commands": [
+      "uv sync --locked --python 3.12",
+      "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPU_DECODE_NATIVE=OFF",
+      "cmake --build build -j4",
+      "ctest --test-dir build --output-on-failure",
+      "uv run pytest -q tests"
+    ],
+    "status": "pass",
+    "ctest_passed": 3,
+    "python_passed": 550,
+    "python_skipped": 2,
+    "pytest_environment": {
+      "CPU_DECODE_LLAMA_SOURCE": "$LLAMA_SOURCE"
+    },
+    "extra_scope": "Both actual pinned-upstream synthetic GGUF writer integrations ran; two optional model integrations skipped",
+    "lint_format_typecheck": "not run; none configured"
+  },
+  "actual_reference": {
+    "passed": 11,
+    "skipped": 0,
+    "scope": "0.5B, g64f16, final immutable binary FP32 path"
+  },
+  "int16_quality": {
+    "calibration_positions": 512,
+    "heldout_positions": 2048,
+    "record": "quality-vnni16-final.json",
+    "approved": true,
+    "policy": "Strictly lower mean/p99 KL and higher top1 than actual Q8 in both stages; perplexity display only; F32 KV linked control"
+  },
+  "actual_thread_invariance": {
+    "record": "thread-invariance-final.json",
+    "processes": 20,
+    "positions_per_process": 129,
+    "status": "pass",
+    "scope": "Bitwise invariance within each kernel/KV pair across five thread counts"
+  },
+  "actual_upstream_instruction": {
+    "record": "hot-kernel-q8.json",
+    "status": "executed vpdpbusd then single-stepped"
+  },
+  "s1": {
+    "actual_gguf_equivalence": "s1/gguf-equivalence-0.5b.json",
+    "equivalence": "whole-file equal",
+    "upstream_preparation": "s1/llama-preparation.json",
+    "heldout": "s1/quality-heldout.json",
+    "native_cache_fit": "s1/cache-4096-check.json",
+    "upstream_cache_fit": "s1/q8-cache-4096-check.json"
+  },
+  "final_preflight": {
+    "status": "pass",
+    "timing_samples_collected": 0,
+    "protocol_ids": {
+      "0.5": "e2891913da9dde2c9a9a8411b404f1b447bc673209a0960f9d674befa6603bde",
+      "s1": "01773b374deb3bb474c34703936033f4f4704420a31b68ae7094cff21b039f55"
+    }
+  },
+  "publication_negative": {
+    "input": "int16-shipped-short/summary.json",
+    "exit_code": 2,
+    "result": "Rejected unsupported development summary before any publication"
+  },
+  "full_final_matrix": "not run"
+}

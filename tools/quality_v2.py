@@ -23,6 +23,28 @@ not used to select a format. No passing format is an error, not a fallback.
 VNNI is retained only when its
 held-out mean KL, p99 KL, top1 agreement and perplexity are all at least as good
 as actual Q8_0.
+VNNI16 is a separate int16-activation/groups64 decision, not the int8 VNNI rule.
+After selecting fixed g64 weights, evaluate them with --kernel vnni16 on
+calibration using the existing --selection. Comparing that candidate and actual
+Q8_0 with --split calibration writes a separate decision without reselection.
+Then evaluate the same native binary/weights/settings on heldout with both KV
+dtypes. Heldout compare additionally requires --vnni16-calibration-report and
+--q8-calibration-report. Keep all five linked reports beside its output.
+Calibration and shipped heldout F16 must strictly improve mean KL, p99 KL and
+top1; F32 KV is a required cache control, and PPL remains report-only. The final
+runner rehashes reports and recomputes this
+decision; rejected decisions and raw measurements are retained.
+
+For the pinned 1.5B snapshot, reuse the original corpus.json unchanged:
+  nice -n 19 uv run python -m tools.quality_v2 oracle --model-id Qwen/Qwen2.5-1.5B-Instruct --model "$MODEL15" --streamed-oracle --split heldout --head-chunk 1024 --raw-dir "$RAW15" --output results/v2/s1/oracle-summary.json
+  nice -n 19 uv run python -m tools.quality_v2 fixed-format --model-id Qwen/Qwen2.5-1.5B-Instruct --model "$G64F16_15" --origin-selection results/v2/format-selection.json --raw-dir "$RAW15" --output results/v2/s1/fixed-format.json
+Then evaluate native F16/FP32 KV and actual pinned Q8_0 with --model-id
+Qwen/Qwen2.5-1.5B-Instruct --split heldout --selection results/v2/s1/fixed-format.json
+--raw-dir "$RAW15", and compare the same reports/selection/model ID.
+This transfers g64f16; it never evaluates/selects 1.5B calibration formats.
+Run one model process at a time under an external 2000M memory limit. The
+streamed oracle retains one FP32 decoder layer, not a full BF16/FP32 model;
+the runtime/allocator peak is unmeasured until the command is exercised.
 """
 import os
 import sys
@@ -32,6 +54,7 @@ if not __package__:
 
 import argparse
 import gc
+import hashlib
 import json
 import math
 import re
@@ -41,6 +64,7 @@ import struct
 
 from tools.corpus_v2 import FORMAT_CHOICES, POLICY, SOURCES, digest_json, load_manifest, prepare, protect_destination, window_alignment, write_json
 from tools.download_model import MODEL_ID, REVISION, file_hash, verify_snapshot
+from tools import download_model
 from tools.portable import ROOT, portable
 from tools.prepare_llama import LLAMA_COMMIT, LLAMA_URL
 from tools.reference import load_oracle, project_last, versions
@@ -51,6 +75,54 @@ FORMAT_SELECTION_POLICY = (
     "bytes, then mean KL, p99 KL, negative top1, label; perplexity is report-only; "
     "no fallback or heldout reselection"
 )
+
+S1_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
+FIXED_FORMAT_POLICY = (
+    "Transfer the 0.5B calibration-selected g64f16 format unchanged; "
+    "no 1.5B calibration or heldout format reselection"
+)
+
+VNNI16_POLICY = (
+    "Fixed calibration-selected g64 weights; F16 calibration AND shipped F16 heldout mean KL "
+    "and p99 KL strictly below actual Q8_0 AND top1 strictly above; F32 KV is a linked control; "
+    "perplexity is report-only; identical native binary and execution path; no reselection"
+)
+
+
+def requested_model_id(args) -> str:
+    return getattr(args, "model_id", MODEL_ID)
+
+
+def pinned_revision(model_id: str) -> str:
+    if model_id == MODEL_ID:
+        return REVISION
+    return download_model.PINNED_MODELS[model_id]["revision"]
+
+
+def tokenizer_transfer(source: dict) -> dict:
+    records = {}
+    for name in ("tokenizer.json", "tokenizer_config.json", "vocab.json", "merges.txt"):
+        size, algorithm, digest = download_model.FILES[name]
+        actual = source["files"][name]
+        if (actual["bytes"], actual["upstream_algorithm"], actual["upstream_digest"]) != (size, algorithm, digest):
+            raise ValueError("Target tokenizer differs from the protected 0.5B corpus tokenizer")
+        records[name] = actual
+    return {"origin_model_id": MODEL_ID, "origin_revision": REVISION,
+        "files": records, "policy": "Identical verified tokenizer blobs; reuse original corpus IDs and scored positions without retokenization"}
+
+
+def validate_source_pin(source: dict, model_id: str) -> None:
+    pin = download_model.PINNED_MODELS[model_id]
+    if (source["model_id"], source["revision"], source["stored_dtype"]) != (model_id, pin["revision"], "bfloat16"):
+        raise ValueError("Verified source does not match pinned model")
+    if set(source["files"]) != set(pin["files"]):
+        raise ValueError("Verified source file inventory differs from pin")
+    for name, (size, algorithm, digest) in pin["files"].items():
+        record = source["files"][name]
+        if (record["bytes"], record["upstream_algorithm"], record["upstream_digest"]) != (size, algorithm, digest):
+            raise ValueError("Verified source blob identity differs from pin")
+        if algorithm == "sha256" and record["sha256"] != digest:
+            raise ValueError("Verified source weights SHA256 differs from pin")
 
 
 def normalize_dtype(value: str) -> str:
@@ -114,18 +186,30 @@ def checked_logits(path: Path, record: dict, verify_hash=True):
 
 
 def oracle_identity(args, corpus: dict, source: dict) -> dict:
-    return {"model_id": MODEL_ID, "revision": REVISION, "verified_source": source,
+    model_id = requested_model_id(args)
+    identity = {"model_id": model_id, "revision": pinned_revision(model_id), "verified_source": source,
         "corpus_sha256": file_hash(args.corpus), "corpus_policy": corpus["policy"],
         "weight_storage": "bfloat16", "arithmetic": "fp32", "kv_dtype": "float32",
         "attention": "Transformers eager", "head_chunk_rows": args.head_chunk,
         "threads": args.threads, "versions": versions()}
+    if getattr(args, "streamed_oracle", False):
+        identity["implementation"] = "layer-resident unmodified Transformers Qwen2DecoderLayer"
+        identity["execution"] = "Layer-major; 256-token priming batch then single-token cached calls; one layer KV resident"
+        identity["embedding_chunk_rows"] = args.head_chunk
+    if model_id != MODEL_ID:
+        identity["tokenizer_transfer"] = tokenizer_transfer(source)
+    return identity
 
 
 def oracle(args) -> None:
     protect_destination(args.output)
     protect_destination(args.raw_dir)
     corpus = load_manifest(args.corpus)
-    source = verify_snapshot(args.model)
+    model_id = requested_model_id(args)
+    streamed = getattr(args, "streamed_oracle", False)
+    if model_id != MODEL_ID and (not streamed or args.split != "heldout"):
+        raise ValueError("1.5B requires --streamed-oracle --split heldout; no S1 calibration")
+    source = verify_snapshot(args.model) if model_id == MODEL_ID else verify_snapshot(args.model, model_id=model_id)
     import numpy as np
     import torch
 
@@ -148,7 +232,12 @@ def oracle(args) -> None:
         else:
             pending.append(window)
     if pending:
-        model = load_oracle(args.model, args.threads, "fp32")
+        if streamed:
+            from tools.streamed_oracle import StreamedOracle
+
+            model = StreamedOracle(args.model, args.threads, args.head_chunk)
+        else:
+            model = load_oracle(args.model, args.threads, "fp32")
         with torch.inference_mode():
             for window in pending:
                 inputs, positions, targets = window_alignment(window)
@@ -156,23 +245,34 @@ def oracle(args) -> None:
                 path = args.raw_dir / name
                 protect_destination(path)
                 shape = [len(positions), model.config.vocab_size]
-                logits = np.memmap(path, dtype="<f4", mode="w+", shape=tuple(shape))
-                priming = model.model(input_ids=torch.tensor([inputs[:POLICY['priming_tokens']]], dtype=torch.long), use_cache=True, return_dict=True)
-                cache = priming.past_key_values
-                del priming
+                if path.exists():
+                    raise ValueError("Oracle raw output already exists without a completed record")
+                if streamed:
+                    model.write_window(inputs, positions, path, POLICY["priming_tokens"])
+                else:
+                    logits = np.memmap(path, dtype="<f4", mode="w+", shape=tuple(shape))
+                    priming = model.model(input_ids=torch.tensor([inputs[:POLICY['priming_tokens']]], dtype=torch.long), use_cache=True, return_dict=True)
+                    cache = priming.past_key_values
+                    del priming
+                    for index, position in enumerate(positions):
+                        result = model.model(input_ids=torch.tensor([[inputs[position]]], dtype=torch.long), past_key_values=cache, use_cache=True, return_dict=True)
+                        cache = result.past_key_values
+                        row = project_last(model, result.last_hidden_state, "fp32", args.head_chunk)
+                        logits[index] = row.numpy()
+                        del result, row
+                    logits.flush()
+                    logits._mmap.close()
+                    del logits, cache
                 diagnostics = []
+                logits = checked_logits(path, {"shape": shape}, verify_hash=False)
                 for index, (position, target) in enumerate(zip(positions, targets, strict=True)):
-                    result = model.model(input_ids=torch.tensor([[inputs[position]]], dtype=torch.long), past_key_values=cache, use_cache=True, return_dict=True)
-                    cache = result.past_key_values
-                    row = project_last(model, result.last_hidden_state, "fp32", args.head_chunk)
-                    logits[index] = row.numpy()
-                    logp = log_probabilities(row.numpy())
+                    logp = log_probabilities(logits[index])
                     diagnostics.append({"window_id": window["id"], "input_position": position,
                         "target": target, "reference_top1": int(logp.argmax()),
                         "reference_cross_entropy_nats": float(-logp[target])})
-                    del result, row, logp
-                logits.flush()
-                del logits, cache
+                    del logp
+                logits._mmap.close()
+                del logits
                 record = {"id": window["id"], "split": window["split"], "tokens_sha256": window["tokens_sha256"],
                     "input_tokens": inputs, "logit_positions": positions, "targets": targets,
                     "logits": name, "shape": shape, "sha256": file_hash(path), "positions": diagnostics}
@@ -212,8 +312,13 @@ def read_oracle(args, corpus: dict) -> dict:
     identity = metadata["identity"]
     if (identity["corpus_sha256"] != file_hash(args.corpus)
             or (identity["model_id"], identity["revision"], identity["weight_storage"], identity["arithmetic"], identity["kv_dtype"])
-            != (MODEL_ID, REVISION, "bfloat16", "fp32", "float32")):
+            != (requested_model_id(args), pinned_revision(requested_model_id(args)), "bfloat16", "fp32", "float32")):
         raise ValueError("Oracle identity does not match pinned FP32 reference/corpus")
+    if requested_model_id(args) != MODEL_ID:
+        validate_source_pin(identity["verified_source"], requested_model_id(args))
+        if (identity.get("tokenizer_transfer") != tokenizer_transfer(identity["verified_source"])
+                or identity.get("implementation") != "layer-resident unmodified Transformers Qwen2DecoderLayer"):
+            raise ValueError("S1 oracle must bind identical tokenizer blobs and layer-resident FP32 implementation")
     windows = {window["id"]: window for window in corpus["windows"]}
     if len({case["id"] for case in metadata["windows"]}) != len(metadata["windows"]):
         raise ValueError("Duplicate oracle windows")
@@ -311,7 +416,47 @@ def require_reader_identity(expected: dict, actual: dict) -> None:
 
 
 def read_selection(path: Path, corpus_hash: str) -> dict:
-    selection = json.loads(path.read_text())
+    return validate_selection(json.loads(path.read_text()), corpus_hash)
+
+
+def validate_selection(selection: dict, corpus_hash: str) -> dict:
+    if selection.get("split") == "fixed_format_transfer":
+        origin = selection["origin_selection"]
+        chosen = selection["chosen"]
+        target = selection["oracle_identity"]
+        source = selection["verified_source"]
+        validate_source_pin(source, S1_MODEL_ID)
+        if (selection.get("schema") != "fixed-format-transfer-v1"
+                or selection["corpus_sha256"] != corpus_hash or selection["policy"] != FIXED_FORMAT_POLICY
+                or (chosen["label"], chosen["group_size"], chosen["scale_dtype"]) != ("g64f16", 64, "f16")
+                or target["model_id"] != S1_MODEL_ID or target["revision"] != pinned_revision(S1_MODEL_ID)
+                or target["verified_source"] != source
+                or source["model_id"] != S1_MODEL_ID or source["revision"] != pinned_revision(S1_MODEL_ID)
+                or target["corpus_sha256"] != corpus_hash
+                or chosen["matrix_bits_per_weight"] != 8.25
+                or target.get("tokenizer_transfer") != tokenizer_transfer(source)
+                or target.get("implementation") != "layer-resident unmodified Transformers Qwen2DecoderLayer"
+                or (target["weight_storage"], target["arithmetic"], target["kv_dtype"]) != ("bfloat16", "fp32", "float32")
+                or any(key in selection for key in ("aggregate", "evidence", "format_table"))
+                or any(key in chosen for key in ("aggregate", "settings"))
+                or not re.fullmatch(r"[0-9a-f]{64}", selection["origin_selection_sha256"])
+                or selection["origin_selection_sha256"] != hashlib.sha256(
+                    (json.dumps(origin, indent=2, allow_nan=False) + "\n").encode()).hexdigest()):
+            raise ValueError("Fixed-format transfer identity/policy differs")
+        if origin["split"] != "calibration":
+            raise ValueError("Fixed-format origin must be actual 0.5B calibration")
+        validate_selection(origin, corpus_hash)
+        origin_oracle = origin["oracle_identity"]
+        validate_source_pin(origin_oracle["verified_source"], MODEL_ID)
+        if ((origin_oracle["model_id"], origin_oracle["revision"]) != (MODEL_ID, REVISION)
+                or (origin["chosen"]["group_size"], origin["chosen"]["scale_dtype"]) != (64, "f16")):
+            raise ValueError("Transfer origin did not select 0.5B g64f16")
+        files = chosen["model_identity"]["files"]
+        if (chosen["model_identity"]["sha256"] != digest_json(files)
+                or chosen["weights_artifact_bytes"] != files["model.safetensors"]["bytes"]
+                or files["config.json"] != {key: source["files"]["config.json"][key] for key in ("sha256", "bytes")}):
+            raise ValueError("Transferred candidate artifact/config identity differs")
+        return selection
     if (selection["corpus_sha256"] != corpus_hash or selection["split"] != "calibration"
             or selection["policy"] not in (POLICY["format_selection"], FORMAT_SELECTION_POLICY)
             or (selection["chosen"]["group_size"], selection["chosen"]["scale_dtype"]) not in FORMAT_CHOICES):
@@ -326,16 +471,64 @@ def read_selection(path: Path, corpus_hash: str) -> dict:
     return selection
 
 
+def fixed_format(args) -> None:
+    protect_destination(args.output)
+    if requested_model_id(args) != S1_MODEL_ID:
+        raise ValueError("Fixed-format transfer is only for the pinned 1.5B model")
+    corpus = load_manifest(args.corpus)
+    corpus_hash = file_hash(args.corpus)
+    origin = read_selection(args.origin_selection, corpus_hash)
+    if (json.dumps(origin, indent=2, allow_nan=False) + "\n").encode() != args.origin_selection.read_bytes():
+        raise ValueError("Origin decision must retain the quality tool's exact JSON serialization")
+    if origin["split"] != "calibration":
+        raise ValueError("Transfer requires a 0.5B calibration origin")
+    metadata = read_oracle(args, corpus)
+    source = metadata["identity"]["verified_source"]
+    identity = model_identity(args.model, "native")
+    provenance_path = args.model / "quantization.json"
+    provenance = json.loads(provenance_path.read_text())
+    if (provenance["source"] != source
+            or provenance["weights"]["sha256"] != identity["files"]["model.safetensors"]["sha256"]
+            or provenance["weights"]["bytes"] != identity["files"]["model.safetensors"]["bytes"]
+            or provenance["config_sha256"] != identity["files"]["config.json"]["sha256"]
+            or (provenance["group_size"], provenance["scale_dtype"]) != (64, "f16")):
+        raise ValueError("Transferred artifact does not match pinned target quantization provenance")
+    preflight_native_model(args.model, identity, None, source)
+    decision = {"schema": "fixed-format-transfer-v1", "split": "fixed_format_transfer",
+        "corpus_sha256": corpus_hash, "oracle_identity": metadata["identity"], "verified_source": source,
+        "policy": FIXED_FORMAT_POLICY, "origin_selection_sha256": file_hash(args.origin_selection),
+        "origin_selection": origin,
+        "quantization_manifest_sha256": file_hash(provenance_path),
+        "chosen": {"label": "g64f16", "group_size": 64, "scale_dtype": "f16",
+            "matrix_bits_per_weight": 8.25, "model_identity": identity,
+            "weights_artifact_bytes": identity["files"]["model.safetensors"]["bytes"]},
+        "scope": "Fixed format transferred from 0.5B calibration; no 1.5B calibration or heldout selection"}
+    validate_selection(decision, corpus_hash)
+    write_json(args.output, decision, exclusive=True)
+
+
 def native_settings(metadata: dict) -> dict:
-    return {"group_size": metadata["group_size"], "scale_dtype": normalize_dtype(metadata["scale_dtype"]),
+    settings = {"group_size": metadata["group_size"], "scale_dtype": normalize_dtype(metadata["scale_dtype"]),
         "kv_dtype": normalize_dtype(metadata["kv_dtype"]), "kernel": metadata["kernel"],
         "attention": metadata["attention"], "scheduler": metadata["scheduler"], "affinity": metadata["affinity"],
         "cpu_set": metadata["cpu_set"], "threads": metadata["threads"], "weight_dtype": metadata["weight_dtype"]}
+    if metadata["kernel"] == "vnni16":
+        settings.update(activation_dtype=metadata["activation_dtype"],
+            activation_group_size=metadata["activation_group_size"])
+        if (settings["activation_dtype"], settings["activation_group_size"]) != ("int16", 64):
+            raise ValueError("VNNI16 activation metadata differs from int16 groups64")
+    return settings
 
 
 def validate_heldout_settings(settings: dict, identity: dict, selection: dict) -> None:
     if settings["weight_dtype"] != "int8":
         raise ValueError("Heldout native candidates must be v1 int8 or the calibration-selected int8 format")
+    if selection.get("split") == "fixed_format_transfer":
+        chosen = selection["chosen"]
+        if ((settings["group_size"], settings["scale_dtype"]) != (64, "f16")
+                or identity != chosen["model_identity"]):
+            raise ValueError("S1 heldout requires unchanged transferred g64f16 artifacts")
+        return
     if (settings["group_size"], settings["scale_dtype"]) == (0, "f32"):
         source = selection.get("oracle_identity", {}).get("verified_source")
         if identity != archived_v1_identity(source):
@@ -377,8 +570,11 @@ def evaluate(args) -> None:
     protect_destination(args.raw_dir)
     corpus = load_manifest(args.corpus)
     corpus_hash = file_hash(args.corpus)
-    selection = read_selection(args.selection, corpus_hash) if args.split == "heldout" else None
-    if args.split == "calibration" and args.selection.exists():
+    is16 = getattr(args, "backend", "native") == "native" and getattr(args, "kernel", None) == "vnni16"
+    selection = read_selection(args.selection, corpus_hash) if args.split == "heldout" or is16 else None
+    if requested_model_id(args) != MODEL_ID and (args.split != "heldout" or selection.get("split") != "fixed_format_transfer"):
+        raise ValueError("S1 supports fixed-format heldout evaluation only")
+    if args.split == "calibration" and args.selection.exists() and not is16:
         raise ValueError("Calibration is closed after format selection")
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.label):
         raise ValueError("Label must be a simple filename identifier")
@@ -416,13 +612,19 @@ def evaluate(args) -> None:
     else:
         preflight = preflight_native_model(args.model, identity, selection, metadata["identity"]["verified_source"])
         pinned = {"engine_binary_sha256": file_hash(args.engine)}
+        if is16 and (preflight["group_size"] != 64 or identity != selection["chosen"]["model_identity"]):
+            raise ValueError("VNNI16 calibration must use the previously selected fixed g64 weights")
+        if is16:
+            pinned["engine_location_sha256"] = digest_json(str(args.engine.resolve()))
+            pinned["model_location_sha256"] = digest_json(str(args.model.resolve()))
     records, all_rows = [], []
     settings = None
     for window, prefix in zip(windows, prefixes, strict=True):
+        if args.backend == "native" and file_hash(args.engine) != pinned["engine_binary_sha256"]:
+            raise ValueError("Native engine binary changed between quality windows")
         if args.backend == "llama":
             require_reader_identity(reader_identity, reader_build_identity(args.reader))
         case = cases[window["id"]]
-        reference = checked_logits(raw_file(args.raw_dir, case["logits"]), case)
         common = ["--model", str(args.model.resolve()), "--tokens", ",".join(map(str, case["input_tokens"])),
             "--output", str(prefix), "--threads", str(args.threads), "--logits-start", str(POLICY["priming_tokens"])]
         if args.backend == "native":
@@ -433,8 +635,13 @@ def evaluate(args) -> None:
         else:
             command = [str(args.reader.resolve()), *common]
         subprocess.run(command, check=True)
+        if args.backend == "native" and file_hash(args.engine) != pinned["engine_binary_sha256"]:
+            raise ValueError("Native engine binary changed during quality window; raw outputs retained")
         if args.backend == "llama":
             require_reader_identity(reader_identity, reader_build_identity(args.reader))
+        # The candidate process has exited before raw mappings are opened.
+        # Close both mappings explicitly below before loading the next model.
+        reference = checked_logits(raw_file(args.raw_dir, case["logits"]), case)
         actual = json.loads(prefix.with_suffix(".json").read_text())
         if (actual["shape"] != case["shape"] or actual["tokens"] != case["input_tokens"]
                 or actual["logit_positions"] != case["logit_positions"]):
@@ -470,6 +677,8 @@ def evaluate(args) -> None:
                 source_target_token=window["source_token_start"] + position + 1,
                 context_tokens=position + 1)
             rows.append(row)
+        reference._mmap.close()
+        candidate._mmap.close()
         del reference, candidate
         if actual["argmax"] != [row["candidate_top1"] for row in rows]:
             raise ValueError("Candidate argmax metadata differs from raw logits")
@@ -484,6 +693,8 @@ def evaluate(args) -> None:
         "scope": f"Teacher-forced {args.split} next-token likelihood, full-vocabulary KL(reference||candidate), fresh cache per window; no independent generation or tuning on heldout"}
     if result["aggregate"]["positions"] != POLICY[f"{args.split}_windows"] * 256:
         raise ValueError("Incomplete scored corpus")
+    if model_identity(args.model, args.backend) != identity:
+        raise ValueError("Candidate weights/config changed during quality evaluation; raw outputs retained")
     if args.backend == "llama":
         result["binary_identity"] = portable(pinned, reader_identity_locations(reader_identity))
     write_json(args.output, result, exclusive=True)
@@ -588,7 +799,7 @@ def heldout_comparison(reports: list[dict], selection: dict) -> dict:
     native = [report for report in reports if report["backend"] == "native"]
     for report in native:
         validate_heldout_settings(report["settings"], report["model_identity"], selection)
-    if not any((report["settings"]["group_size"], report["settings"]["scale_dtype"]) == (0, "f32") for report in native):
+    if selection.get("split") != "fixed_format_transfer" and not any((report["settings"]["group_size"], report["settings"]["scale_dtype"]) == (0, "f32") for report in native):
         raise ValueError("Heldout comparison requires the unchanged v1 per-row baseline")
     chosen = [report for report in native if report["settings"]["group_size"] != 0]
     pairs = []
@@ -625,17 +836,144 @@ def heldout_comparison(reports: list[dict], selection: dict) -> dict:
     return {"positions": baseline["aggregate"]["positions"], "q8_0_label": baseline["label"],
         "kv_comparisons": pairs, "vnni_decisions": vnni,
         "vnni_measured": bool(vnni), "thresholds": None,
-        "tuning": "Format chosen on calibration before heldout; no heldout format reselection"}
+        "tuning": (FIXED_FORMAT_POLICY if selection.get("split") == "fixed_format_transfer"
+            else "Format chosen on calibration before heldout; no heldout format reselection")}
+
+
+def strict16_decision(candidate: dict, q8: dict) -> dict:
+    keys = ("mean_kl_reference_candidate_nats", "p99_kl_reference_candidate_nats", "top1_agreement")
+    if any(not math.isfinite(row[key]) for row in (candidate["aggregate"], q8["aggregate"]) for key in keys):
+        raise ValueError("VNNI16 metrics must be finite")
+    retained = beats_q8_calibration(candidate, q8)
+    return {"label": candidate["label"], "retained": retained,
+        "decision": "retained" if retained else "rejected quality tradeoff",
+        "candidate": candidate["aggregate"], "q8_0": q8["aggregate"]}
+
+
+def validate16_reports(selection: dict, selection_sha256: str, reports: dict) -> None:
+    """Recompute aggregates from positions and bind both stages, not summary flags."""
+    validate_selection(selection, selection["corpus_sha256"])
+    if selection["split"] != "calibration" or selection["chosen"]["group_size"] != 64:
+        raise ValueError("VNNI16 requires actual previously selected fixed g64 calibration weights")
+    if not re.fullmatch(r"[0-9a-f]{64}", selection_sha256):
+        raise ValueError("VNNI16 selection SHA256 is invalid")
+    encoded_selection = (json.dumps(selection, indent=2, allow_nan=False) + "\n").encode()
+    if hashlib.sha256(encoded_selection).hexdigest() != selection_sha256:
+        raise ValueError("VNNI16 selection content differs from its SHA256")
+    corpus = load_manifest(ROOT / "results/v2/corpus.json")
+    native = [reports[key] for key in ("calibration", "heldout_f16", "heldout_f32") if key in reports]
+    q8s = [reports[key] for key in ("q8_calibration", "q8_heldout") if key in reports]
+    expected_keys = {"calibration", "q8_calibration"}
+    if "heldout_f16" in reports or "heldout_f32" in reports or "q8_heldout" in reports:
+        expected_keys |= {"heldout_f16", "heldout_f32", "q8_heldout"}
+    if set(reports) != expected_keys:
+        raise ValueError("VNNI16 needs calibration/Q8 and the complete heldout F16/F32/Q8 pair")
+    cal = reports["calibration"]
+    for role, report in reports.items():
+        split = "calibration" if "calibration" in role else "heldout"
+        validate_reports([report], corpus, selection["corpus_sha256"], split)
+        if (report["split"] != split or report["corpus_sha256"] != selection["corpus_sha256"]
+                or report["oracle_identity"] != selection["oracle_identity"]):
+            raise ValueError("VNNI16 report split/corpus/source/oracle differs")
+        positions = report["positions"]
+        if len(positions) != POLICY[f"{split}_windows"] * 256:
+            raise ValueError("VNNI16 report aggregate or scored position count differs")
+        windows = report["windows"]
+        if (len(windows) != POLICY[f"{split}_windows"]
+                or len({window["id"] for window in windows}) != len(windows)
+                or {row["window_id"] for row in positions} != {window["id"] for window in windows}):
+            raise ValueError("VNNI16 raw window identities differ")
+        corpus_windows = {window["id"]: window for window in corpus["windows"] if window["split"] == split}
+        for window in windows:
+            source = corpus_windows[window["id"]]
+            command = window["command"]
+            tokens = ",".join(map(str, window_alignment(source)[0]))
+            expected = {"--tokens": tokens, "--logits-start": str(POLICY["priming_tokens"]),
+                "--model": "$CANDIDATE_MODEL", "--threads": str(report["settings"]["threads"])}
+            if (window["tokens_sha256"] != source["tokens_sha256"] or any(
+                    command.count(key) != 1 or command.index(key) + 1 >= len(command)
+                    or command[command.index(key) + 1] != value for key, value in expected.items())):
+                raise ValueError("VNNI16 recorded context/command differs from protected corpus")
+            if role.startswith("q8_") and command[0] != "$LLAMA_LOGITS":
+                raise ValueError("VNNI16 actual Q8 reader execution path differs")
+        q8 = reports[f"q8_{split}"]
+        alignment = ("window_id", "input_position", "target", "source_target_token", "context_tokens")
+        if [[row[key] for key in alignment] for row in positions] != [[row[key] for key in alignment] for row in q8["positions"]]:
+            raise ValueError("VNNI16 candidate and actual Q8 context/targets differ")
+        if role.startswith("q8_"):
+            if (report["backend"] != "llama" or report["settings"] != q8s[0]["settings"]
+                    or report["model_identity"] != q8s[0]["model_identity"]
+                    or report["binary_identity"] != q8s[0]["binary_identity"]
+                    or report["settings"].get("weight_dtype") != "Q8_0"
+                    or report["settings"].get("kv_dtype") != "f16"
+                    or report["settings"].get("flash_attention") != "auto"
+                    or report["settings"]["threads"] != cal["settings"]["threads"]
+                    or report["binary_identity"].get("llama_commit") != LLAMA_COMMIT
+                    or not all(key in report["binary_identity"] for key in ("reader_binary_sha256", "shared_libraries", "build", "artifact_manifest_sha256"))):
+                raise ValueError("VNNI16 needs the same actual pinned Q8_0 artifact/reader/settings in both stages")
+            weights_artifact_bytes(report)
+            if split == "heldout" and report["selection_sha256"] != selection_sha256:
+                raise ValueError("VNNI16 heldout Q8 selection differs")
+            continue
+        settings = report["settings"]
+        expected_kv = "f32" if role == "heldout_f32" else "f16"
+        if (report["backend"] != "native" or settings["kernel"] != "vnni16"
+                or settings.get("activation_dtype") != "int16" or settings.get("activation_group_size") != 64
+                or settings["weight_dtype"] != "int8" or settings["group_size"] != 64
+                or settings["kv_dtype"] != expected_kv
+                or report["model_identity"] != selection["chosen"]["model_identity"]
+                or settings["scale_dtype"] != selection["chosen"]["scale_dtype"]
+                or report["binary_identity"] != cal["binary_identity"]
+                or report["selection_sha256"] != selection_sha256
+                or {k: v for k, v in settings.items() if k != "kv_dtype"}
+                    != {k: v for k, v in cal["settings"].items() if k != "kv_dtype"}):
+            raise ValueError("VNNI16 binary/weights/config/selection/execution path differs across stages")
+        for window in windows:
+            command = window["command"]
+            expected = {"--kernel": "vnni16", "--kv": expected_kv, "--threads": str(settings["threads"]),
+                "--attention": settings["attention"], "--scheduler": settings["scheduler"],
+                "--affinity": settings["affinity"], "--model": "$CANDIDATE_MODEL"}
+            if command[:2] != ["$ENGINE", "logits"] or any(
+                    command.count(key) != 1 or command.index(key) + 1 >= len(command)
+                    or command[command.index(key) + 1] != value for key, value in expected.items()):
+                raise ValueError("VNNI16 measured command execution path differs")
+    for report in native + q8s:
+        files = report["model_identity"]["files"]
+        if report["model_identity"]["sha256"] != digest_json(files):
+            raise ValueError("VNNI16 model identity digest differs")
+
+
+def vnni16_gate(selection: dict, selection_sha256: str, records: dict) -> dict:
+    reports = {role: record["data"] for role, record in records.items()}
+    validate16_reports(selection, selection_sha256, reports)
+    calibration = strict16_decision(reports["calibration"], reports["q8_calibration"])
+    heldout = [strict16_decision(reports[key], reports["q8_heldout"])
+        for key in ("heldout_f16", "heldout_f32") if key in reports]
+    return {"schema": "vnni16-quality-v1", "policy": VNNI16_POLICY,
+        "selection_sha256": selection_sha256, "calibration": calibration,
+        "heldout": heldout, "approved": calibration["retained"] and len(heldout) == 2
+            and heldout[0]["retained"], "reports": records}
+
+
+def linked16_record(path: Path, directory: Path) -> dict:
+    if path.resolve().parent != directory.resolve():
+        raise ValueError("VNNI16 linked reports must be siblings of the comparison output")
+    return {"report": path.name, "sha256": file_hash(path), "data": json.loads(path.read_text())}
 
 
 def compare(args) -> None:
     protect_destination(args.output)
     if args.split == "calibration":
         protect_destination(args.selection)
+    reports = [json.loads(path.read_text()) for path in args.reports]
+    has16 = any(report.get("settings", {}).get("kernel") == "vnni16" for report in reports)
     corpus = load_manifest(args.corpus)
     corpus_hash = file_hash(args.corpus)
-    reports = [json.loads(path.read_text()) for path in args.reports]
     validate_reports(reports, corpus, corpus_hash, args.split)
+    if any(report["oracle_identity"]["model_id"] != requested_model_id(args) for report in reports):
+        raise ValueError("Comparison model ID differs from reports")
+    if requested_model_id(args) != MODEL_ID and args.split != "heldout":
+        raise ValueError("S1 cannot perform calibration format selection")
     if args.output.exists():
         raise ValueError("Comparison output already exists")
     evidence = [{"label": report["label"], "report": path.name, "sha256": file_hash(path),
@@ -644,7 +982,17 @@ def compare(args) -> None:
         "model_identity": report["model_identity"], "binary_identity": report["binary_identity"],
         "oracle_identity": report["oracle_identity"]} for path, report in zip(args.reports, reports, strict=True)]
     evidence.sort(key=lambda entry: entry["label"])
-    if args.split == "calibration":
+    if has16 and args.split == "calibration":
+        selection = read_selection(args.selection, corpus_hash)
+        native = [path for path, report in zip(args.reports, reports, strict=True) if report["backend"] == "native"]
+        q8 = [path for path, report in zip(args.reports, reports, strict=True) if report["backend"] == "llama"]
+        if len(native) != 1 or len(q8) != 1:
+            raise ValueError("VNNI16 calibration comparison requires one fixed candidate and actual Q8_0")
+        records = {"calibration": linked16_record(native[0], args.output.parent),
+            "q8_calibration": linked16_record(q8[0], args.output.parent)}
+        summary = {"split": "calibration", "selection": selection,
+            "vnni16_gate": vnni16_gate(selection, file_hash(args.selection), records)}
+    elif args.split == "calibration":
         if args.selection.exists():
             raise ValueError("Calibration decision already exists; never reselect after heldout")
         chosen = choose_format(reports)
@@ -671,6 +1019,24 @@ def compare(args) -> None:
             raise ValueError("Heldout oracle differs from the calibration oracle")
         summary = {"split": "heldout", "corpus_sha256": corpus_hash, "selection_sha256": selection_hash,
             "selection": selection, "evidence": evidence, "comparison": heldout_comparison(reports, selection)}
+        if has16:
+            cal_path = getattr(args, "vnni16_calibration_report", None)
+            q8_path = getattr(args, "q8_calibration_report", None)
+            if cal_path is None or q8_path is None:
+                raise ValueError("VNNI16 requires explicit --vnni16-calibration-report and --q8-calibration-report")
+            records = {"calibration": linked16_record(cal_path, args.output.parent),
+                "q8_calibration": linked16_record(q8_path, args.output.parent)}
+            for role, backend, kv in (("heldout_f16", "native", "f16"),
+                    ("heldout_f32", "native", "f32"), ("q8_heldout", "llama", "f16")):
+                paths = [path for path, report in zip(args.reports, reports, strict=True)
+                    if report["backend"] == backend and report["settings"]["kv_dtype"] == kv
+                    and (backend == "llama" or report["settings"]["kernel"] == "vnni16")]
+                if len(paths) != 1:
+                    raise ValueError("VNNI16 requires exactly one heldout F16/F32 native pair and actual Q8_0")
+                records[role] = linked16_record(paths[0], args.output.parent)
+            validate_reports([records[key]["data"] for key in ("calibration", "q8_calibration")],
+                corpus, corpus_hash, "calibration")
+            summary["comparison"]["vnni16_gate"] = vnni16_gate(selection, selection_hash, records)
     write_json(args.output, summary, exclusive=True)
     print(json.dumps(summary, indent=2, allow_nan=False))
 
@@ -684,6 +1050,7 @@ def main() -> None:
     preparation.add_argument("--raw-dir", type=Path, default=Path("external/quality-v2/sources"))
     reference = commands.add_parser("oracle", help="BF16 storage/FP32 arithmetic Transformers, streaming whole-vocabulary projection")
     reference.add_argument("--model", type=Path, required=True)
+    reference.add_argument("--streamed-oracle", action="store_true", help="One FP32 layer at a time; required for 1.5B")
     reference.add_argument("--split", choices=("all", "calibration", "heldout"), default="all")
     reference.add_argument("--head-chunk", type=int, default=1024)
     reference.add_argument("--threads", type=int, default=1)
@@ -696,7 +1063,7 @@ def main() -> None:
     evaluation.add_argument("--artifact-manifest", type=Path, default=Path("results/llama-preparation.json"))
     evaluation.add_argument("--label", required=True)
     evaluation.add_argument("--threads", type=int, default=1)
-    evaluation.add_argument("--kernel", choices=("auto", "scalar", "simd256", "simd512", "simd512x4", "vnni"), default="scalar")
+    evaluation.add_argument("--kernel", choices=("auto", "scalar", "simd256", "simd512", "simd512x4", "vnni", "vnni16"), default="scalar")
     evaluation.add_argument("--kv", choices=("f16", "f32"), default="f16")
     evaluation.add_argument("--attention", choices=("blocked", "scalar"), default="blocked")
     evaluation.add_argument("--scheduler", choices=("pool", "openmp"), default="pool")
@@ -704,6 +1071,14 @@ def main() -> None:
     evaluation.add_argument("--cpu-set")
     comparison = commands.add_parser("compare", help="Select on calibration, or report heldout KV/kernel/Q8_0 comparisons")
     comparison.add_argument("--reports", type=Path, nargs="+", required=True)
+    comparison.add_argument("--vnni16-calibration-report", type=Path,
+        help="Real fixed-g64 VNNI16 F16 calibration report, separate from format selection")
+    comparison.add_argument("--q8-calibration-report", type=Path,
+        help="Actual pinned Q8_0 calibration report, not a historical aggregate")
+    transfer = commands.add_parser("fixed-format", help="Bind fixed g64f16 to 1.5B artifacts and the original 0.5B calibration decision")
+    transfer.add_argument("--model", type=Path, required=True, help="Prepared 1.5B g64f16 directory")
+    transfer.add_argument("--origin-selection", type=Path, required=True)
+    transfer.add_argument("--output", type=Path, required=True)
     for command in (evaluation, comparison):
         command.add_argument("--split", choices=("calibration", "heldout"), required=True)
         command.add_argument("--selection", type=Path, default=Path("results/v2/format-selection.json"),
@@ -713,6 +1088,10 @@ def main() -> None:
         command.add_argument("--corpus", type=Path, default=Path("results/v2/corpus.json"))
     for command in (reference, evaluation):
         command.add_argument("--raw-dir", type=Path, default=Path("external/quality-v2"))
+    transfer.add_argument("--raw-dir", type=Path, required=True)
+    transfer.add_argument("--corpus", type=Path, default=Path("results/v2/corpus.json"))
+    for command in (reference, evaluation, comparison, transfer):
+        command.add_argument("--model-id", choices=(MODEL_ID, S1_MODEL_ID), default=MODEL_ID)
     args = parser.parse_args()
     if hasattr(args, "threads") and args.threads < 1 or hasattr(args, "head_chunk") and args.head_chunk < 1:
         parser.error("threads and head-chunk must be positive")
@@ -721,6 +1100,8 @@ def main() -> None:
         print(json.dumps({"corpus_sha256": file_hash(args.output_dir / "corpus.json")}))
     elif args.stage == "oracle":
         oracle(args)
+    elif args.stage == "fixed-format":
+        fixed_format(args)
     elif args.stage == "evaluate":
         evaluate(args)
     else:

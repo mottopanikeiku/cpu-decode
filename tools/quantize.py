@@ -10,28 +10,31 @@ import json
 import subprocess
 from pathlib import Path
 
-from tools.download_model import file_hash, verify_snapshot
+from tools.download_model import MODEL_ID, PINNED_MODELS, file_hash, verify_snapshot
 from tools.portable import portable
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model-id", choices=tuple(PINNED_MODELS), default=MODEL_ID)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--engine", type=Path, default=Path("build/cpu-decode"))
-    parser.add_argument("--manifest", type=Path, default=Path("results/v2/quantized-manifest.json"))
+    parser.add_argument("--manifest", type=Path, help="Defaults to results/v2/quantized-manifest.json for 0.5B or results/v2/s1/quantized-manifest.json for 1.5B")
     parser.add_argument("--group-size", type=int, choices=(0, 32, 64, 128), default=0)
     parser.add_argument("--scale-dtype", choices=("f16", "f32"), default="f32")
     args = parser.parse_args()
-    source = verify_snapshot(args.source)
+    source = verify_snapshot(args.source, model_id=args.model_id)
+    if args.manifest is None:
+        args.manifest = Path("results/v2/quantized-manifest.json" if args.model_id == MODEL_ID else "results/v2/s1/quantized-manifest.json")
     manifest_path = args.output / "quantization.json"
     weights = args.output / "model.safetensors"
     if weights.exists():
         manifest = json.loads(manifest_path.read_text())
         if manifest.get("group_size", 0) != args.group_size or manifest.get("scale_dtype", "f32") != args.scale_dtype:
             raise ValueError("Existing artifact uses a different quantization format")
-        if manifest["source"]["revision"] != source["revision"] or manifest["weights"]["sha256"] != file_hash(weights):
-            raise ValueError("Existing int8 artifact does not match its manifest")
+        if manifest["source"] != source or manifest["weights"]["sha256"] != file_hash(weights):
+            raise ValueError("Existing int8 artifact does not match its pinned source/manifest")
         if manifest["config_sha256"] != file_hash(args.output / "config.json"):
             raise ValueError("Existing int8 configuration differs from its manifest")
     else:
