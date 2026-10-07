@@ -45,7 +45,7 @@ simultaneous test; host load, boost and NUMA placement remain uncontrolled.
 I do not measure a cloud read-bandwidth ceiling.
 
 The [Modal launcher](../tools/cloud_modal.py) runs one ephemeral CPU container:
-eight requested cores, 8 GiB, no GPU and a 50-minute limit. It streams every
+eight requested cores, 8 GiB, no GPU and a 40-minute limit. It streams every
 completed cell immediately so a timeout preserves returned samples, alongside
 preparation manifests, CPU flags/topology, settings and hashes.
 Run it with `uvx --from modal==1.5.3 modal run tools/cloud_modal.py --output results/v2/cloud`

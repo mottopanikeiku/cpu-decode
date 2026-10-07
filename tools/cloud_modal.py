@@ -58,7 +58,7 @@ def annotate(raw: dict, started: float):
     return raw
 
 
-@app.function(image=image, cpu=8, memory=8192, timeout=3000, max_containers=1)
+@app.function(image=image, cpu=8, memory=8192, timeout=2400, max_containers=1)
 def execute():
     started = time.time()
     design = json.loads(Path("/assets/tools/cloud_design.json").read_text())
@@ -74,7 +74,7 @@ def execute():
                 (["git", "fetch", "--depth", "1", "origin", design["native_commit"]], source),
                 (["git", "checkout", "--detach", design["native_commit"]], source)]
     for command, cwd in commands:
-        subprocess.run(command, cwd=cwd, check=True, timeout=min(3000, cutoff_seconds()))
+        subprocess.run(command, cwd=cwd, check=True, timeout=min(2400, cutoff_seconds()))
     for file in Path("/assets/tools").iterdir():
         shutil.copyfile(file, source / "tools" / file.name)
     # Keep the pinned engine's source list even after later repo changes. Only
@@ -82,7 +82,7 @@ def execute():
     cmake = source / "CMakeLists.txt"
     cmake.write_text(cmake.read_text() + "\nif(CPU_DECODE_LLAMA_ROOT)\n  include(tools/cloud_targets.cmake)\nendif()\n")
     subprocess.run(["uv", "sync", "--locked"], cwd=source, check=True,
-                   timeout=min(3000 - (time.time() - started), cutoff_seconds()))
+                   timeout=min(2400 - (time.time() - started), cutoff_seconds()))
     runner = subprocess.Popen(
         [str(source / ".venv/bin/python"), "-m", "tools.cloud_run", "--source", str(source),
          "--work", str(work), "--output", str(output), "--design", str(source / "tools/cloud_design.json")],
@@ -114,7 +114,7 @@ def execute():
     raw_path.write_text(json.dumps(raw, indent=2, allow_nan=False) + "\n")
     subprocess.run([str(source / ".venv/bin/python"), "-m", "tools.cloud_summary", "--input", str(raw_path),
                     "--output", str(output / "summary.json"), "--csv", str(output / "table.csv")],
-                   cwd=source, check=True, timeout=min(3000 - (time.time() - started), cutoff_seconds()))
+                   cwd=source, check=True, timeout=min(2400 - (time.time() - started), cutoff_seconds()))
     yield {"event": "complete", "payload": pack_outputs(output, raw)}
 
 
