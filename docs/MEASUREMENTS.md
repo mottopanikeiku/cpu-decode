@@ -47,6 +47,205 @@ The oracle keeps one widened layer at a time and passes a small hidden-state fil
 
 The v2 tools write only under `results/v2`; the original results and the archived protocol below are unchanged. This is still single-stream decode on one pinned Qwen2.5-0.5B-Instruct model, not prompt processing, batched serving or a downstream-task benchmark. Native and llama.cpp use F16 K/V and native CPU Release builds. The baseline is the verified Q8_0 GGUF and commit in `results/llama-preparation.json`, converted from the same BF16 snapshot as the native artifact. Formats need not be numerically identical: native group size/scale dtype and quality are recorded separately.
 
+### VNNI-only cloud comparison
+
+I completed all six final cells on **2026-10-07 at 14:46 PDT**, using one
+accepted CPU-only container, `156d2866d2bf47d4bf16fbf994c6b006`.
+The host is **AMD Zen 4 EPYC (family 25, model 17; the model name wasn't
+exposed)**. Decimal family/model 25/17 correspond to 19h/11h; AMD's
+[revision guide](https://docs.amd.com/api/khub/documents/LZ~6p62H~zRDhkNiPAE9NQ/content)
+identifies this range and Genoa CPUIDs as EPYC 9004, while its
+[architecture guide](https://docs.amd.com/api/khub/documents/ScFqtjHuoA5CBw6e~hb01Q/content)
+describes Zen 4. This identifies the processor class, not an observed SKU.
+The sandbox exposes 24 virtual CPUs, not proven dedicated physical cores.
+Every native cell reports `vnni16`, int16 activations and
+F16 KV. The [complete table](../results/v2/cloud-vnni/final/table.csv)
+contains 192 timed observations and 24,576 full forwards. Native's median
+paired throughput ratios range from **1.0898× to 1.5306×**; all six
+individual 95% ABBA-bootstrap intervals are above one. They are not
+simultaneous intervals or a claim about other hosts.
+
+The [separate runtime pilot](../results/v2/cloud-vnni/runtime-pilot/raw.json)
+is excluded. Three final startup candidates were rejected for missing
+AVX-512 flags before checkout; the fourth completed the whole matrix.
+The accepted function took **36.6264 minutes before export**, versus
+**37.33 client minutes**, including setup and rejected starts. The latter
+is used in [cost accounting](../results/v2/cloud-vnni/run-cost.json),
+which also includes failed work, not just successful sampling.
+
+
+I committed the [unchanged six-cell workload](../tools/cloud_vnni_design.json)
+at `21481f3` before collecting new results. I searched twelve fresh CPU
+containers: [five reported every required flag](../results/v2/cloud-vnni/probes-cpu.json).
+All reported CPU model “unknown”; fresh containers do not prove distinct
+physical hosts. I bound the overall search to twenty probes, with GPU-host
+fallback only if the CPU-only search fails.
+
+The [timing launcher](../tools/cloud_modal.py) checks its own CPU at startup,
+before source checkout, model access or compilation. It requires exactly the
+ISA used by `parse_kernel("vnni16")`: `avx512f`, `avx512_vnni`, `avx512bw`,
+`avx2`, `f16c`. It retries at most five fresh rejected starts, not failed
+accepted benchmarks. The driver must then report `vnni16` and int16
+activations. I never relabel an FP32 fallback as this result.
+
+I [prepare pinned assets on CPU](../tools/cloud_assets_modal.py) in the named
+`cpu-decode-day-vnni-assets` Modal Volume. Timing reads those models offline,
+copies only cached upstream source and compiles both engines and the driver
+fresh on its actual host. I never reuse the preparation CPU's native builds.
+If I rent a GPU container for its CPU instructions, I record that request and
+still disable all GPU layers, backends and operation offload.
+
+My first VNNI runtime pilot returned no complete cell: a baseline response
+timed out after twenty minutes. I did not recover its flash setting or sample
+index, and source review did not establish a cause. Before another attempt,
+I changed baseline idle control to GGML's public pool pause/resume API:
+the caller blocks on the command pipe and the real pool is paused after each
+complete window, then resumed before rewind. I no longer externally suspend
+GGML's pthreads; native still uses confirmed process-group suspension.
+These calls and diagnostic writes are outside the decode clock. I do not
+claim that this change proves why the earlier attempt stalled.
+
+I bound sample responses to two minutes and readiness to twenty minutes.
+A timeout aborts the cell, not an outlier filter. Failure logs stay in the
+Volume's separate diagnostics directory; they are not decode results.
+Offline timing rebuilds only the upstream libraries used by the driver,
+not unused converters or benchmark front ends. I still verify both cached
+GGUF hashes and record the actual freshly built library hashes.
+
+A separate full t2/c4096 runtime pilot determines the final forecast:
+`ceil(pilot function minutes × 6 × 1.3)`. It took **21.3668 function minutes**,
+so the forecast was **167 minutes**. Its pairs never enter final inference.
+Before final collection I extended the booking to **175 minutes**, the
+experiment deadline to **17:15 PDT**, and the allocation to **$2.74**.
+I changed only collection order: c128 at threads 1/2/4, then c4096 at
+threads 1/2/4. Threads, contexts, 128 full forwards, sixteen pairs and eight
+ABBA quartets per cell remain unchanged. The [booking record](../results/v2/cloud-vnni/booking.json)
+and [pilot design](../results/v2/cloud-vnni/runtime-pilot/design.json) precede
+the final run. Every
+completed cell is committed to the Volume before it is streamed to my client.
+An explicit `--resume` retains local startup history; a matching server
+checkpoint reuses completed sixteen-pair cells, never partial pairs. A
+CPU-only `--recover-only` fetch also regenerates any missing summary/table.
+Pilot and final checkpoints have separate names. Resuming measurement must
+match the current design hash and run mode; read-only recovery can fetch an
+older saved experiment after validating its mode and complete cells, without
+merging it into a new run. Each cell links to its measurement container's
+environment, actual build hashes and resources. If resumed cells span
+containers, I report that and do not infer absolute thread scaling across
+them. I retain the same worker-lifetime `CpuBinding` scope described below,
+not unchanged per-operator laptop CLI performance.
+
+The launcher accepts an optional UTC deadline and reserves forty seconds for
+process cleanup, including a thirty-five-second termination grace period.
+The earlier AVX2 partial run remains separate under `results/v2/cloud`.
+
+#### Reproducing the VNNI run
+
+I use the Python 3.12 Modal client, not the system interpreter. A Modal
+account is required. Choose a new Volume name: asset preparation refuses a
+nonempty model cache. These commands use a fresh result directory and keep
+the sizing pilot separate from the final observations.
+
+```sh
+python3.12 -m venv .venv-modal
+.venv-modal/bin/pip install modal==1.5.3
+VOLUME=cpu-decode-day-reproduction
+OUT=results/v2/cloud-vnni/reproduction
+.venv-modal/bin/modal run tools/cloud_host_modal.py --gpu none --count 12 --minutes 3 --output "$OUT/probes.json"
+.venv-modal/bin/modal run tools/cloud_assets_modal.py --volume-name "$VOLUME" --minutes 10 --output "$OUT/assets.json"
+.venv-modal/bin/modal run tools/cloud_modal.py --volume-name "$VOLUME" --runtime-pilot --run-name reproduction-pilot --minutes 30 --output "$OUT/pilot"
+MINUTES=$(.venv-modal/bin/python -c 'import json,math,sys; d=json.load(open(sys.argv[1])); print(math.ceil(d["cost"]["function_wall_minutes_before_export"]*6*1.3))' "$OUT/pilot/raw.json")
+.venv-modal/bin/modal run tools/cloud_modal.py --volume-name "$VOLUME" --run-name reproduction-final --minutes "$MINUTES" --output "$OUT/final"
+```
+
+Timing requests eight CPU cores, 8 GiB and one container, with GPU computation
+disabled. Probes request one core/512 MiB; preparation requests two cores/8
+GiB. If a client disconnects, repeat the final command with `--resume`; the
+five-start bound includes earlier local startup history. Alternatively,
+`--recover-only --run-name reproduction-final --minutes 3 --output "$OUT/recovered"`
+retrieves committed observations and regenerates the summary on one CPU
+core/512 MiB, without running either decoder. Volume commits occur inside
+the function before client streaming, following
+[Modal's persistence semantics](https://modal.com/docs/guide/volumes).
+After committing my results, I use `--cleanup-assets --minutes 3` on the same
+Volume to delete its model/weight caches while retaining result checkpoints.
+That cleanup requests one CPU core/512 MiB and performs no inference.
+
+
+### Earlier AVX2 partial comparison
+
+I completed **2/6 planned cells** before the function timed out. Both favor
+llama.cpp: native/llama paired ratios are 0.4108 [0.4061, 0.4428] at one
+thread/context 128 and 0.3079 [0.3070, 0.3117] at two threads/context 4096.
+These are 95% per-cell block-bootstrap intervals. Missing cells are
+(1,4096), (2,128), (4,128) and (4,4096); I publish no unfinished cell.
+[Raw data](../results/v2/cloud/raw.json), [derived summary](../results/v2/cloud/summary.json)
+and [cost accounting](../results/v2/cloud/run-cost.json) preserve the outcome.
+
+The sandbox reports 24 exposed CPUs, one thread per exposed core and CPU
+model “unknown”. It reports AVX2 and F16C but no AVX-512/VNNI; native resolves
+to `simd256` with FP32 activations. Both paths were compiled with GCC 12.2.0
+inside the measured container. llama.cpp resolves flash to on in both cells;
+repacking was enabled, but its logs show a mapped rather than repacked model
+buffer. F16 KV capacity is 256 for both at the short context; at the long
+context native allocates 4224 positions and llama.cpp rounds to 4352.
+
+I keep this comparison separate from the laptop matrix. The
+[committed design](../tools/cloud_design.json) fixes the v2 source, model,
+g64f16 weights and upstream commit before measurement. I build both paths with
+`-march=native` inside one running CPU-only container. I request `vnni16` only
+when the reported CPU flags support it; otherwise I record the resolved
+FP32 dispatcher fallback. This transfers the format choice, not a new quality
+evaluation on the cloud CPU.
+
+I measure threads 1/2/4 at initial contexts 128/4096. Both engines prefill the
+same repeated seed IDs and warm all 128 decode steps. Each sample rewinds to
+the original prefix and measures 128 complete token forwards, including the
+LM head, greedy argmax and final consumed token. Load, prefill, warmup, rewind
+and JSON are excluded. Both models stay resident; I confirm the inactive
+process group's suspension with `waitpid` before activating the other.
+Each engine follows its own greedy trajectory without EOS stopping; I retain
+the token IDs and check repeat consistency, not cross-engine equality.
+
+I hold the native caller's public v2 `CpuBinding` for its whole worker lifetime.
+This avoids expensive repeated affinity syscalls in the cloud sandbox; the
+laptop path binds per operator. The measured cloud scope is therefore kernel
+and threading speed without that syscall cost, not unchanged CLI performance.
+The pinned engine source and arithmetic stay unchanged.
+
+I choose flash on/off/auto using three separate pilot observations per setting
+and cell, breaking median-time ties in that order. Pilot data stays visible
+but does not enter final inference. The baseline uses F16 KV, strict matching
+CPU sets, poll50 and repacking, with `GGML_OPENMP=OFF` for its real persistent
+CPU pool. This is not the strongest-of-nine laptop baseline.
+
+Eight ABBA quartets produce sixteen chronological pairs per cell. I report
+the median paired ratio `llama_seconds/native_seconds`, each engine's median
+and min/max throughput, and a 95% percentile interval from 20,000 whole-ABBA
+bootstrap draws with seed 20261007. An interval above 1 favors native, below 1
+favors llama.cpp, and one touching 1 is inconclusive. I retain every cell and
+do not remove performance outliers. These are per-cell intervals, not a
+simultaneous test; host load, boost and NUMA placement remain uncontrolled.
+I do not measure a cloud read-bandwidth ceiling.
+
+My earlier launcher at commit `cf266bf` requested eight cores, 8 GiB, no GPU
+and a forty-minute limit. Streaming retained the two completed cells, alongside
+preparation manifests, CPU flags/topology, settings and hashes. The current
+launcher instead requires VNNI and the CPU-prepared Volume described above.
+I keep the original design and data unchanged, rather than mixing these
+fallback observations into the VNNI study. The
+[summarizer](../tools/cloud_summary.py) rejects an incomplete six-cell matrix
+unless `--allow-partial` is explicit. Partial publication lists missing cells;
+each published cell still needs all sixteen chronological pairs.
+
+To regenerate this partial summary from the retained raw data:
+
+```sh
+uv run python -m tools.cloud_summary --input results/v2/cloud/raw.json \
+  --output results/v2/cloud/summary.json --csv results/v2/cloud/table.csv \
+  --allow-partial --markdown
+```
+
 ### Development checks against the unchanged original engine
 
 These are short diagnostics, not the final comparison: two rounds, three repeats per invocation, 16 measured tokens, two threads and context 128. Each process exits before the next model loads. The original binary comes from commit `d98ba9c`; native v2 uses the unchanged per-row artifact, F16 KV and blocked attention. Commands, binary/source hashes, affinity, individual samples and operation timings are retained in each directory. This does not establish the calibrated grouped format's speed or quality.

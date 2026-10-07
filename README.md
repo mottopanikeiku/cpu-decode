@@ -1,74 +1,67 @@
 # cpu-decode
 
-A from-scratch C++ int8 decoder for pinned Qwen2.5-0.5B-Instruct on a CPU.
-
-**Question:** What can repeated context and softmax invariance buy in a small decoder?
-
-I built lossless greedy [prompt lookup](src/generate.cpp), a layer-major [batched forward](src/model.cpp), and [int8 KV caches](src/kv_cache.cpp). Four-column [projection tiles](src/kernels.cpp) share weight loads while preserving single-token arithmetic. Centered keys use a fixed per-head mean estimated from the first 64 post-RoPE keys; the shared score shift cancels in softmax.
-
-**Result:** [768/768 generated tokens](results/v3/lookup-acceptance.json) match plain greedy. Draft acceptance is **53.9% on copy-heavy prompts**, versus **6.7% on open-ended prompts**. [Mean-centered int8 KV](results/v3/kv-quality.json) saves **45.3%** of F16 cache storage at capacity 4096 and lowers plain-int8 mean KL from **0.030889 to 0.005105 nats**, but remains worse than F16. **Speed is not yet measured.**
-
-## Lossless prompt lookup
-
-I search earlier occurrences of the longest context suffix, draft up to four tokens, and verify them with the model in one batched pass. At the first disagreement I emit the model's greedy prediction and rewind rejected cache entries. This preserves greedy decoding for the chosen kernel/cache; it is not sampling and does not improve answer quality.
-
-The [public prompt suite](configs/lookup-prompts.json) was committed before measuring: copying, editing and summarizing quoted text, alongside explanations, stories and code. [Raw token sequences and counts](results/v3/lookup-cases/) give:
-
-| Prompt group | Prompts | Accepted / proposed drafts | Acceptance | Exact generated tokens |
-|---|---:|---:|---:|---:|
-| Copy-heavy | 6 | 228 / 423 | 53.9% | 384 / 384 |
-| Open-ended | 6 | 35 / 521 | 6.7% | 384 / 384 |
-| All | 12 | 263 / 944 | 27.9% | 768 / 768 |
-
-Acceptance counts all proposals, including unused tokens after a mismatch. Lookup can do extra work on open-ended text; acceptance alone is not a speedup.
-
-## KV storage and long-context quality
-
-I reused the unchanged heldout Austen text, concatenated its windows without cache resets, and scored [64 fixed positions near 2k and 4k](results/v3/long-context-inputs.json). The oracle widens the original BF16 weights to FP32 and uses unmodified Transformers layers with causal chunks. All native rows use the same g64f16 weights and signed-int16 activations.
-
-[Measured results](results/v3/kv-quality.json), allocated cache bytes at capacity 4096; MB is decimal:
-
-| KV cache | MB | Mean KL, nats | p99 KL, nats | Oracle top-1 |
-|---|---:|---:|---:|---:|
-| F32 | 100.66 | 0.000849 | 0.003234 | 64 / 64 |
-| F16 | 50.33 | 0.000855 | 0.003254 | 64 / 64 |
-| Plain int8 | 26.74 | 0.030889 | 0.370448 | 57 / 64 |
-| Mean-centered int8 | 27.54 | 0.005105 | 0.038579 | 64 / 64 |
-
-Centering helps both context bands, but does not recover F16 distributions. The centered cache keeps raw prefix keys until the mean is available; values are int8 from the start. Storage includes padding, FP32 scales, the mean and retained prefix—not model/attention workspaces or peak process memory. **F16 remains the default.**
-
-## Earlier weight-quality comparison
-
 <!-- FINAL_RESULT_START -->
-The earlier [2,048-position heldout comparison](results/v2/quality-vnni16-final.json) gives g64f16/int16 mean KL **0.00093877**, versus actual llama.cpp Q8_0 **0.00240027**. Perplexity is slightly worse. This is a different, short-window evaluation; the new KV table does not rerun the upstream baseline.
+**v2 result:** My pinned VNNI/int16 decoder beat llama.cpp Q8_0 in **all six pre-specified cloud cells**, at **1.090–1.531× paired throughput**. This is **one virtual host with worker-lifetime CPU binding**, not unchanged laptop CLI performance. My selected weights improve KL agreement but slightly worsen perplexity.
 <!-- FINAL_RESULT_END -->
 
+I wrote the C++ [decoder](src/model.cpp), [kernels](src/kernels.cpp) and [attention](src/attention.cpp) from scratch.
+
+## v2 quality
+
+I selected g64f16 through [four-format calibration](results/v2/format-calibration.json) and [separate int16 checks](results/v2/quality-vnni16-final.json), against original BF16-storage/FP32-arithmetic weights. Matrix storage is 8.25 versus Q8_0's 8.50 bits/weight; artifacts are 509.73 versus 531.07 MB, including container overhead.
+
+[Heldout](results/v2/corpus.json): 2,048 positions, fresh F16 KV and 512-input windows. Agreement is not task accuracy.
+
+| Path | Mean KL, nats | p99 KL, nats | Top-1 agreement | Perplexity |
+|---|---:|---:|---:|---:|
+| [g64f16/int16](results/v2/heldout-g64f16-vnni16-final-f16.json) | 0.00093877 | 0.00336880 | 97.75% | 16.60984 |
+| [llama.cpp Q8_0](results/v2/heldout-final-q8_0.json) | 0.00240027 | 0.00813769 | 95.90% | 16.60406 |
+
+## v2 cloud timing
+
+The host is **AMD Zen 4 EPYC (family 25, model 17; the model name wasn't exposed)**, identified from family/model, not an observed SKU. The sandbox exposes 24 virtual CPUs, not proven dedicated physical cores. Both engines use F16 KV, matching strict CPU sets and fresh GCC 12.2.0 `-march=native` builds.
+
+| Threads | Initial context | Native tokens/s | llama tokens/s | Paired ratio | Individual 95% CI |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 128 | 39.887 | 32.110 | 1.2335 | [1.1649, 1.2970] |
+| 2 | 128 | 55.135 | 50.394 | 1.1361 | [1.0631, 1.2054] |
+| 4 | 128 | 93.067 | 87.622 | 1.0898 | [1.0183, 1.1318] |
+| 1 | 4096 | 30.111 | 21.854 | 1.3436 | [1.3235, 1.4431] |
+| 2 | 4096 | 45.312 | 29.774 | 1.5306 | [1.4643, 1.5969] |
+| 4 | 4096 | 68.643 | 49.774 | 1.3627 | [1.2594, 1.4882] |
+
+I retained sixteen 128-forward pairs per cell in eight ABBA quartets. The clock includes LM head/argmax and the final consumed token; load, prefill, warmup and rewind are excluded. Paired medians are not ratios of displayed medians. I bootstrap quartets 20,000 times: per-cell, not simultaneous intervals. Runtime and flash-selection pilots are excluded.
+
+Native holds public `CpuBinding` for its worker lifetime; inactive native execution is stopped and the actual GGML pool paused outside clocks. llama.cpp selects flash ON/OFF/AUTO by pilot, uses poll50 and enables repacking; no repacked buffer was selected. [Raw samples](results/v2/cloud-vnni/final/raw.json), [spreads](results/v2/cloud-vnni/final/summary.json) and [methods](docs/MEASUREMENTS.md) retain provenance and failed work. [Estimated total cost](results/v2/cloud-vnni/run-cost.json): **$1.6074**, not an invoice.
+
+My separate [earlier AVX2/FP32 run](results/v2/cloud/summary.json) completed only 2/6 cells and lost both, at 0.4108× and 0.3079×. Different hosts do not establish a causal VNNI speedup.
+
+## v3: exact lookup and smaller KV
+
+I added layer-major batching and four-column projection tiles that share weight loads. [Prompt lookup](src/generate.cpp) drafts earlier context tokens, verifies greedy predictions and rewinds rejected entries. [All 768/768 tokens](results/v3/lookup-acceptance.json) matched plain greedy across twelve prompts: acceptance was **53.9% copy-heavy**, **6.7% open-ended**, **27.9% overall (263/944 proposals)**. Acceptance is not acceleration; **I claim no v3 speedup**.
+
+I center post-RoPE keys using a fixed per-head mean from the first 64 keys; the shared score offset cancels in softmax. [64 heldout positions near 2K/4K](results/v3/kv-quality.json), allocated KV at capacity 4096:
+
+| Cache | MB | Mean KL | p99 KL | Oracle top-1 |
+|---|---:|---:|---:|---:|
+| F16 | 50.33 | 0.000855 | 0.003254 | 64/64 |
+| Plain int8 | 26.74 | 0.030889 | 0.370448 | 57/64 |
+| Centered int8 | 27.54 | 0.005105 | 0.038579 | 64/64 |
+
+Centered KV saves **45.3%** versus F16 but remains numerically worse. Storage includes padding, scales, mean and retained prefix, not workspaces or peak process memory. The small probe includes a disclosed first-64-position F32-key warmup confound. **F16 remains default**.
+
+## Laptop development and limits
+
 <!-- FINAL_TABLE_START -->
-The earlier full throughput matrix is not published here. New batching, lookup and int8-KV timings are **not measured**.
+I did **not** run the full 15-cell, nine-configuration laptop matrix. Cloud v2 results do not measure v3 batching, lookup or int8-KV speed.
 <!-- FINAL_TABLE_END -->
 
-## Reproduce
+Host load, clocks and NUMA are uncontrolled; I have no cloud read-bandwidth ceiling. This is one model, not downstream-task accuracy or batched serving. Lookup exactness is relative to its chosen numerical path. [Earlier short-window measurements](results/v2/int16-shipped-short/summary.json) remain development evidence.
 
-Linux x86-64, C++17/OpenMP, CMake and uv; AVX-512 VNNI/BW and F16C for the recorded int16 path. I used a Ryzen AI 5 PRO 340, GCC 16.2.1, at most two compute threads, and **$0 paid compute**. Set `INT8` to the unchanged g64f16 artifact; [methods](docs/MEASUREMENTS.md#repeating-the-new-comparisons) cover pinned downloads, quantization and all numerical commands.
+## Reproduce and attribution
 
-```sh
-nice -n 19 uv sync --locked --python 3.12 && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2
-CPU_DECODE_QUANT_MODEL="$INT8" CPU_DECODE_KERNEL=vnni16 nice -n 19 uv run pytest -q tests/test_v3.py && ctest --test-dir build --output-on-failure
-nice -n 19 uv run python -m tools.time_v3 --model "$INT8" --case 0 --output results/v3/timing-copy.json
-```
+Linux x86-64, C++17/OpenMP, CMake and uv. [Methods](docs/MEASUREMENTS.md) cover pinned downloads, numerical checks, cloud execution, v3 reproduction and the [AMD identification source](https://docs.amd.com/api/khub/documents/LZ~6p62H~zRDhkNiPAE9NQ/content).
 
-Run timings only on an idle machine; matched conditions report separate prefill/decode medians and ranges. [Checks](results/v3/checks.json): five CTest checks and 562 Python tests passed, including real-model bitwise logits and exact greedy tests; four older optional integrations skipped.
-
-## Limitations
-
-- One model, one laptop, twelve prompts and one heldout book.
-- Fixed 64-token continuations include tokens after EOS; this is not task accuracy.
-- Centering uses a causal prefix estimate and F32-key warmup; their effects are not isolated.
-- Greedy exactness is relative to the selected numerical path, not BF16-oracle text.
-- No new speed result, batched serving, downstream evaluation or operation-level profiling for batch/int8 KV.
-
-## Prior work
-
-[Qwen weights](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct): Apache-2.0. [Transformers](https://github.com/huggingface/transformers): oracle. [Prompt lookup decoding](https://github.com/apoorvumang/prompt-lookup-decoding): drafting idea. [My attention-numerics study](https://github.com/mottopanikeiku/attention-numerics): key-centering motivation. [llama.cpp](https://github.com/ggml-org/llama.cpp): earlier baseline. [Further attribution](docs/PRIOR_WORK.md). The from-scratch engine is MIT licensed.
+[Qwen](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) weights: Apache-2.0; my decoder: MIT. [Transformers](https://github.com/huggingface/transformers): oracle. [llama.cpp](https://github.com/ggml-org/llama.cpp): baseline. [Prompt-lookup attribution](https://github.com/apoorvumang/prompt-lookup-decoding) and [prior work](docs/PRIOR_WORK.md).
 
 Written with AI coding assistance.

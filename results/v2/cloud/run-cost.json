@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "provider": "Modal",
+  "date": "2026-10-07",
+  "timezone": "America/Los_Angeles",
+  "resources_per_attempt": {"gpu": "none", "cores": 8, "memory_gib": 8, "max_containers": 1},
+  "rates_usd_per_hour": {"cpu_per_core": 0.047160, "memory_per_gib": 0.007992, "requested_resources": 0.441216},
+  "estimate_margin": 1.10,
+  "estimate_basis": "Elapsed client wall time times requested resource rates, with a 10% margin. Includes preparation, image/client time, pilots, warmups and incomplete work. This is a conservative resource-cost estimate, not a provider invoice or measured billed usage.",
+  "attempts": [
+    {"attempt": 1, "started_pdt": "05:23:54", "ended_pdt": "05:28:36", "booked_minutes": 70, "wall_minutes": 4.70, "estimated_upper_usd": 0.0380, "exit_code": 1, "outcome": "The optional driver failed to link: pinned GGML declared a threadpool getter without defining it. No decoding samples were collected."},
+    {"attempt": 2, "started_pdt": "05:36:16", "ended_pdt": "06:36:44", "booked_minutes": 60, "wall_minutes": 60.45, "estimated_upper_usd": 0.4890, "exit_code": 1, "outcome": "The function timed out. Four completion messages appeared, but the old end-only export returned no raw data. None of those lost samples is published."},
+    {"attempt": 3, "started_pdt": "07:10:19", "ended_pdt": "07:50:55", "booked_minutes": 40, "wall_minutes": 40.59, "estimated_upper_usd": 0.3283, "exit_code": 1, "harness_commit": "cf266bf", "outcome": "The function timed out; completed-cell streaming preserved two full cells. The four remaining cells have no published results."}
+  ],
+  "total_estimated_upper_usd": 0.8553,
+  "allocation_usd": 1.00,
+  "published_matrix": {"complete": false, "completed_cells": 2, "planned_cells": 6}
+}
