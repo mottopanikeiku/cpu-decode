@@ -1,18 +1,14 @@
 # cpu-decode
 
-A small C++ engine for single-stream CPU decoding of pinned Qwen checkpoints.
-
-**Question:** How close can int8 decoding get to a laptop's read-bandwidth ceiling without losing the quality comparison with llama.cpp Q8_0?
-
-I built the memory-mapped forward pass in [model.cpp](src/model.cpp), grouped-int8 kernels in [kernels.cpp](src/kernels.cpp), and shared-GQA attention in [attention.cpp](src/attention.cpp). Signed-int16 activations use AVX-512 integer dots; transposed K, vector softmax, fixed-order merges and persistent workers reduce attention and scheduling work.
+I built a memory-mapped [Qwen decoder](src/model.cpp), [grouped-int8 kernels](src/kernels.cpp) and [shared-GQA attention](src/attention.cpp) in C++. I compare numerical quality separately from decoding speed.
 
 <!-- FINAL_RESULT_START -->
-**Current result:** The [g64f16/int16 path](results/v2/quality-vnni16-final.json) beats actual Q8_0 on mean/p99 KL and oracle top-1 agreement in calibration and heldout; perplexity is slightly worse. One noisy development window favors it. The full speed matrix is **not run**: no all-context victory or read-ceiling target is claimed.
+**Result:** My selected g64f16 weights have better distribution agreement than llama.cpp Q8_0 on calibration and heldout, but slightly worse perplexity. My separate cloud comparison completed **2 of 6 planned cells**: native lost both, at **0.4108× and 0.3079×** paired throughput. The host lacked VNNI, so these are the **AVX2/FP32 activation fallback**, not int16 timings or a laptop victory.
 <!-- FINAL_RESULT_END -->
 
 ## Quality and format choice
 
-[Four-format calibration](results/v2/format-calibration.json) compares original BF16-storage/FP32-arithmetic weights on exact teacher-forced tokens. Choose the fewest bytes among formats with strictly better mean/p99 KL and top-1 agreement than Q8_0. Selected g64f16 weights pass the [separate int16 decision](results/v2/quality-vnni16-final.json) on calibration and heldout. Perplexity is disclosure only.
+I chose the smallest format passing mean/p99 KL and top-1 checks against Q8_0 in [four-format calibration](results/v2/format-calibration.json), then checked [int16 separately](results/v2/quality-vnni16-final.json). The reference uses original BF16-storage/FP32-arithmetic weights. I disclose perplexity and independent heldout:
 
 | Calibration path | Matrix bits/weight | Artifact MB | Mean KL, nats | p99 KL, nats | Top-1 agreement | Perplexity |
 |---|---:|---:|---:|---:|---:|---:|
@@ -30,33 +26,51 @@ MB includes container overhead; bits count matrix weights and scales. [Heldout](
 
 Int16 slightly lowers agreement versus native FP32, but passes Q8. The [F32-cache control](results/v2/heldout-g64f16-vnni16-final-f32.json) is recorded. Agreement is not task accuracy.
 
-## Final matrix
+## Cloud CPU result: partial matrix
 
-<!-- FINAL_TABLE_START -->
-**Not yet run.** The full 15-cell, nine-configuration comparison will appear here after completion. Every losing and noisy cell remains visible.
-<!-- FINAL_TABLE_END -->
+I retain every completed cell; four are missing after a 40-minute timeout.
 
-## Timing on a cloud CPU
+| Threads | Initial context | Native tokens/s | llama tokens/s | Paired ratio | 95% block CI | Outcome |
+|---:|---:|---:|---:|---:|---:|---|
+| 1 | 128 | 11.062 | 26.762 | 0.4108 | [0.4061, 0.4428] | llama wins |
+| 2 | 4096 | 7.042 | 22.777 | 0.3079 | [0.3070, 0.3117] | llama wins |
 
-I use a [separate cloud harness](tools/cloud_design.json), not laptop timings.
+Missing: (threads, context) **(1,4096), (2,128), (4,128), (4,4096)**.
+I use 128 full greedy forwards and 16 pairs per cell: eight ABBA quartets.
+Paired medians are not the displayed medians' ratio. I bootstrap quartets
+20,000 times. [Raw samples](results/v2/cloud/raw.json), [summary and
+spreads](results/v2/cloud/summary.json) and [fixed design](tools/cloud_design.json)
+retain the separate flash pilot.
+
+Both backends use F16 KV and matching strict CPU sets. I compile both pinned
+sources inside one CPU-only Modal container with `-march=native` and GCC
+12.2.0. The sandbox exposes 24 CPUs with model name “unknown”; AVX2/F16C are
+present but AVX-512/VNNI are absent. Native resolves to `simd256`, FP32
+activations. llama.cpp uses flash on and poll50; repacking is enabled but no
+repacked model buffer was selected.
+
 I avoid expensive per-operator affinity syscalls in the cloud sandbox by
 holding v2's public `CpuBinding` for the worker lifetime. The laptop path pins
 per operator. Cloud numbers therefore show kernel and threading speed without
-that syscall cost, not unchanged command-line performance.
+that syscall cost, not unchanged command-line performance. The
+[estimated total cost](results/v2/cloud/run-cost.json) is **$0.8553**, including
+two failed attempts, not an invoice.
 
-## Development throughput and attention
+## Laptop development, not cloud results
 
-![Retained development stages, not final throughput claims](results/v2/attention-stages.svg)
+<!-- FINAL_TABLE_START -->
+The separate full 15-cell, nine-configuration laptop comparison is **not run
+in this branch**. My partial cloud matrix does not replace it.
+<!-- FINAL_TABLE_END -->
 
-[Stage records](results/v2/attention-stages.json): g64f16, six threads, context 4096. Median attention time falls from **5.348 to 2.727 ms/token** after transposition; masked tails and parallel merges measure **2.914 / 2.894**. Singleton claims (**3.204**) were rejected. Several spreads exceed 5%; separately timed stages do not establish causality.
-
-[One ABAB window](results/v2/int16-shipped-short/summary.json), two threads/context 128: **69.58 tokens/s** native versus **65.13** Q8_0, flash-auto and selected-core pinning. Six samples per engine; spreads **5.83% / 3.43%**. Native exceeds the noise flag. This is one configuration, not the strongest-of-nine comparison.
-
-The unchanged [original per-row engine](results/tables.md) approached the short-context ceiling but lost at long contexts.
+My earlier [short ABAB window](results/v2/int16-shipped-short/summary.json)
+measured 69.58 versus 65.13 tokens/s, but native's 5.83% spread exceeded the
+noise flag: not a final speed claim. [Attention stages](results/v2/attention-stages.json)
+and the [original engine](results/tables.md) remain separate history.
 
 ## Reproduce
 
-Linux x86-64, C++17/OpenMP, CMake and uv; AVX-512 VNNI/BW and F16C for int16. Earlier laptop hardware: Ryzen AI 5 PRO 340, GCC 16.2.1, 2000 MiB process-group cap—not measured peak. Those local results used **$0 paid compute**. Use fresh output directories and exclusive timing access.
+I use Linux x86-64, C++17/OpenMP, CMake and uv. Int16 requires AVX-512 VNNI/BW and F16C; `auto` uses FP32. I require fresh outputs and exclusive laptop timing.
 
 ```sh
 nice -n 19 make prepare
@@ -64,15 +78,14 @@ nice -n 19 make quality
 nice -n 19 make final
 ```
 
-`final` uses int16 only after its quality comparison passes, otherwise FP32; runs all configurations sequentially and resumes completed units. CLI `auto` remains FP32. [Methods and numerical bounds](docs/MEASUREMENTS.md) cover scheduling and workload differences. Weights and raw logits stay outside git.
+`final` uses int16 only after its quality comparison passes, otherwise FP32. It runs laptop configurations sequentially and resumes completed units. [Methods and reproduction](docs/MEASUREMENTS.md) include the separate cloud launcher and summarizer. I keep weights and raw logits outside git.
 
 ## Limitations
 
-- One laptop and the current 0.5B model; clocks/temperatures are not fixed.
-- The read ceiling estimates minimum byte traffic, not measured DRAM utilization.
-- Native greedy trajectories and upstream synthetic tokens differ; neither timing includes prompt processing.
-- Quality uses 512-input windows, not long-context task evaluation. Heldout cannot choose a replacement format; int8 activations were rejected.
-- No batched serving, speculative decoding or downstream task evaluation.
+- I have one virtualized cloud environment, two completed cells and no cloud read-bandwidth ceiling. Clocks, host load and NUMA placement are uncontrolled; intervals are per-cell, not simultaneous.
+- I use the same cloud prefix, but each backend follows its own greedy tokens. Load, prefill, warmup and rewind are excluded.
+- My quality tests use 512-input windows, not long-context task accuracy. Heldout cannot select a replacement format.
+- This comparison does not evaluate batched serving, speculative decoding or downstream tasks.
 
 ## Prior work
 

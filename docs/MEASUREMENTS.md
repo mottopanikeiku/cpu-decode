@@ -6,6 +6,22 @@ The v2 tools write only under `results/v2`; the original results and the archive
 
 ### Separate cloud CPU comparison
 
+I completed **2/6 planned cells** before the function timed out. Both favor
+llama.cpp: native/llama paired ratios are 0.4108 [0.4061, 0.4428] at one
+thread/context 128 and 0.3079 [0.3070, 0.3117] at two threads/context 4096.
+These are 95% per-cell block-bootstrap intervals. Missing cells are
+(1,4096), (2,128), (4,128) and (4,4096); I publish no unfinished cell.
+[Raw data](../results/v2/cloud/raw.json), [derived summary](../results/v2/cloud/summary.json)
+and [cost accounting](../results/v2/cloud/run-cost.json) preserve the outcome.
+
+The sandbox reports 24 exposed CPUs, one thread per exposed core and CPU
+model “unknown”. It reports AVX2 and F16C but no AVX-512/VNNI; native resolves
+to `simd256` with FP32 activations. Both paths were compiled with GCC 12.2.0
+inside the measured container. llama.cpp resolves flash to on in both cells;
+repacking was enabled, but its logs show a mapped rather than repacked model
+buffer. F16 KV capacity is 256 for both at the short context; at the long
+context native allocates 4224 positions and llama.cpp rounds to 4352.
+
 I keep this comparison separate from the laptop matrix. The
 [committed design](../tools/cloud_design.json) fixes the v2 source, model,
 g64f16 weights and upstream commit before measurement. I build both paths with
@@ -53,6 +69,14 @@ using an authenticated Modal account and a fresh destination. The
 [summarizer](../tools/cloud_summary.py) rejects an incomplete six-cell matrix
 unless `--allow-partial` is explicit. Partial publication lists missing cells;
 each published cell still needs all sixteen chronological pairs.
+
+To regenerate this partial summary from the retained raw data:
+
+```sh
+uv run python -m tools.cloud_summary --input results/v2/cloud/raw.json \
+  --output results/v2/cloud/summary.json --csv results/v2/cloud/table.csv \
+  --allow-partial --markdown
+```
 
 ### Development checks against the unchanged original engine
 
