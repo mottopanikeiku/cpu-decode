@@ -292,3 +292,18 @@ stepped across upstream Q8 `vpdpbusd`; the twenty real 0.5B thread-check
 processes were bitwise invariant within each kernel/KV pair. These are
 parent-observed records, not independent reviewer reproduction. The full
 final timing matrix remains **not run**.
+
+## CI fixture portability
+
+Hosted CI for commit `c8b3469` found 27 synthetic thread-check setup errors:
+the fixture required twelve actual caller-allowed CPUs, but the runner exposed
+four. Those cases never execute the synthetic ELF, so their command/report
+tests now inject a twelve-CPU topology as well as the native subprocess.
+The full twenty-command matrix and all byte/report checks remain covered.
+A new four-CPU topology rejection case confirms the production preflight still
+rejects an unavailable twelve-CPU order before starting any native process.
+No production affinity requirement was relaxed and no failing case was skipped.
+
+The parent then ran the entire Python suite with actual caller affinity limited
+to four CPUs, retaining the pinned-upstream integration opt-in:
+**551 passed, 2 explicitly optional model checks skipped**.

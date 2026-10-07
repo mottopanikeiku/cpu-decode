@@ -63,5 +63,24 @@
     "exit_code": 2,
     "result": "Rejected unsupported development summary before any publication"
   },
+  "four_cpu_portability": {
+    "command": "taskset -c 0,1,2,3 uv run pytest -q tests",
+    "pytest_environment": {
+      "CPU_DECODE_LLAMA_SOURCE": "$LLAMA_SOURCE"
+    },
+    "status": "pass",
+    "python_passed": 551,
+    "python_skipped": 2,
+    "scope": "Entire suite, both actual pinned-upstream synthetic integrations; synthetic topology discovery mocked, production affinity rejection retained"
+  },
+  "observed_hosted_failure": {
+    "commit": "c8b3469",
+    "job": "https://github.com/mottopanikeiku/cpu-decode/actions/runs/37551683339/job/112568401092",
+    "python_passed": 521,
+    "python_skipped": 4,
+    "python_errors": 27,
+    "cause": "Synthetic thread fixture required twelve actual CPUs on a four-CPU runner",
+    "fix": "Mock synthetic CPU topology and add a four-CPU preflight rejection case without skipping any matrix cases"
+  },
   "full_final_matrix": "not run"
 }

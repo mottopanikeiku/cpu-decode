@@ -1,8 +1,8 @@
 """Synthetic ELF/checkpoint/native fixtures; no model, performance or timing claims.
 
-Only native subprocess execution is mocked. Corpus checks, file hashing, output
-protection and report serialization use the real helpers. Full-matrix fixtures
-use sparse zero-filled binaries, not model logits, and never execute the ELF.
+Native subprocess execution and allowed CPU topology are mocked. Corpus checks,
+file hashing, output protection and report serialization use the real helpers.
+Full-matrix fixtures use sparse zero-filled binaries, not model logits, and never execute the ELF.
 """
 from argparse import ArgumentTypeError, Namespace
 import json
@@ -33,7 +33,7 @@ def synthetic_metadata(requested, inputs, vocab, model):
 
 
 @pytest.fixture
-def synthetic_args(tmp_path):
+def synthetic_args(tmp_path, monkeypatch):
     engine = tmp_path / "synthetic-engine"
     engine.write_bytes(b"\x7fELFsynthetic fixture; never executed")
     engine.chmod(0o700)
@@ -47,10 +47,10 @@ def synthetic_args(tmp_path):
         "synthetic.weight": {"shape": [2, 64], "dtype": "I8", "data_offsets": [0, 128]}}
     encoded = json.dumps(header).encode()
     (model / "model.safetensors").write_bytes(struct.pack("<Q", len(encoded)) + encoded + bytes(128))
-    cpus = sorted(os.sched_getaffinity(0))
-    assert len(cpus) >= 12, "Thread-matrix fixture requires 12 caller-allowed CPUs"
-    # Non-sorted order detects accidental sorting or topology reselection.
-    cpus = list(reversed(cpus[:12]))
+    allowed = set(range(12))
+    monkeypatch.setattr(checker.os, "sched_getaffinity", lambda pid: allowed)
+    # Non-sorted synthetic order detects accidental sorting or topology reselection.
+    cpus = list(reversed(sorted(allowed)))
     return Namespace(engine=engine, model=model, corpus=CORPUS, raw_dir=tmp_path / "raw",
                      output=tmp_path / "report.json", cpu_order=cpus)
 
@@ -287,7 +287,7 @@ def test_synthetic_native_output_errors_written_as_failure(monkeypatch, syntheti
 
 @pytest.mark.parametrize("case", ["existing-report", "existing-raw", "raw-file", "report-symlink", "raw-symlink",
     "v1-report", "v1-raw", "artifact-conflict", "report-ancestor", "not-elf", "not-executable", "missing-engine",
-    "cpu-unavailable", "cpu-short", "cpu-duplicate", "cpu-negative", "format", "vocabulary", "corpus"])
+    "cpu-unavailable", "cpu-limited", "cpu-short", "cpu-duplicate", "cpu-negative", "format", "vocabulary", "corpus"])
 def test_synthetic_path_and_input_preflight_starts_no_native(monkeypatch, synthetic_args, tmp_path, case):
     args = synthetic_args
     original_report = None
@@ -318,6 +318,8 @@ def test_synthetic_path_and_input_preflight_starts_no_native(monkeypatch, synthe
         args.engine = tmp_path / "absent-engine"
     elif case == "cpu-unavailable":
         args.cpu_order[0] = max(os.sched_getaffinity(0)) + 1000
+    elif case == "cpu-limited":
+        monkeypatch.setattr(checker.os, "sched_getaffinity", lambda pid: set(range(4)))
     elif case == "cpu-short":
         args.cpu_order = args.cpu_order[:6]
     elif case == "cpu-duplicate":
