@@ -143,7 +143,7 @@ def compare(args, plan):
         metadata = json.loads((args.raw / f"{cache}.json").read_text())
         if (metadata["shape"] != list(shape) or metadata["logit_positions"] != plan["positions"] or
                 metadata["plan_sha256"] != file_hash(args.plan) or metadata["logits_sha256"] != file_hash(args.raw / f"{cache}.bin") or
-                metadata["kv_dtype"] != cache):
+                metadata["kv_dtype"] != ("i8_centered" if cache == "i8-centered" else cache)):
             raise ValueError("Native output differs from plan")
         identities.append(tuple(metadata[key] for key in ("binary_sha256", "weights_sha256", "config_sha256", "kernel", "threads", "cpu_set")))
         candidate = np.memmap(args.raw / f"{cache}.bin", mode="r", dtype="<f4", shape=shape)
@@ -157,7 +157,7 @@ def compare(args, plan):
                 "versus_native_f32": summarize(isolated), "rows": rows,
                 "context_bands": {"2k": summarize(rows[:32]), "4k": summarize(rows[32:])},
                 "logits_sha256": metadata["logits_sha256"]}
-        for key in ("kv_cache_components", "key_mean_prefix", "kv_quantization"):
+        for key in ("kv_key_mean_prefix", "kv_centered_warmup_keys"):
             if key in metadata:
                 item[key] = metadata[key]
         result["caches"][cache] = item

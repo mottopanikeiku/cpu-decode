@@ -307,3 +307,11 @@ No production affinity requirement was relaxed and no failing case was skipped.
 The parent then ran the entire Python suite with actual caller affinity limited
 to four CPUs, retaining the pinned-upstream integration opt-in:
 **551 passed, 2 explicitly optional model checks skipped**.
+
+## Batched prompt lookup and int8 KV review
+
+I asked a separate reviewer to read PR 3 without running its tests or models. The review traced candidate verification, first-mismatch handling, cache rewind across the 64-token mean boundary, shared-weight batch arithmetic, int8 scales and allocated bytes, sparse logit positions, and the chunked oracle's causal mask and KL direction.
+
+It found two problems. The quality summary expected the CLI label `i8-centered`, while the engine reports dtype `i8_centered`; I now compare the actual metadata spelling and preserve the key-mean/warmup fields, with an aggregation regression. The timing script dropped actual execution settings from its output; I now retain the resolved kernel, cache type, CPU set, activation/group settings, configuration hash and condition order, reject changed settings, and test that those fields survive.
+
+The reviewer re-read both fixes and found no remaining concrete source defect. It did not reproduce numerical results, execute timing scripts, or independently verify CI. My real sparse-logit integration also caught a test-only assumption that the fixed prompt had 128 tokens; it actually has 118. I now use its real final position while retaining the 63/64/65 transition checks, rather than padding or changing the prompt.

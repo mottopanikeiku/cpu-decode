@@ -20,6 +20,22 @@ def spread(values):
     return {"median_seconds": statistics.median(values), "min_seconds": min(values),
             "max_seconds": max(values), "samples_seconds": values}
 
+def execution_settings(metadata):
+    return {key: metadata[key] for key in (
+        "kernel", "kv_dtype", "threads", "cpu_set", "rope", "scheduler", "affinity",
+        "attention", "group_size", "scale_dtype", "weight_dtype", "activation_dtype",
+        "activation_group_size", "vocab_size", "kv_capacity", "kv_cache_bytes")}
+
+
+def cpu_model():
+    info = Path("/proc/cpuinfo")
+    if info.exists():
+        for line in info.read_text().splitlines():
+            if line.startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    return platform.processor()
+
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -46,7 +62,8 @@ def main():
     conditions = (("single-prefill", 0, 1), ("batched-prefill", 0, 8), ("lookup", args.lookup, 8))
     result = {"case": case["id"], "category": case["category"], "inputs_sha256": file_hash(args.inputs),
               "binary_sha256": file_hash(args.engine), "weights_sha256": file_hash(args.model / "model.safetensors"),
-              "platform": platform.platform(), "cpu": platform.processor(), "threads": args.threads,
+              "config_sha256": file_hash(args.model / "config.json"),
+              "platform": platform.platform(), "cpu": cpu_model(), "threads": args.threads,
               "scope": "Model load excluded. Prefill and decode timed separately. First token from prefill; final generated token not forwarded. One full-generation warmup per process. Requires exclusive quiet-machine access.",
               "conditions": {}}
     expected = None
@@ -60,7 +77,13 @@ def main():
                        "--kv", args.kv, "--lookup", str(lookup), "--ngram", "4", "--prefill-batch", str(prefill)]
             completed = subprocess.run(command, check=True, text=True, capture_output=True)
             data = json.loads(completed.stdout)
+            settings = execution_settings(data)
+            if "settings" in result and settings != result["settings"]:
+                raise ValueError("Execution settings changed across timed conditions")
+            result["settings"] = settings
             sample = data["samples"][0]
+            sample["repeat"] = repeat
+            sample["condition_order"] = [condition[0] for condition in order]
             if expected is None:
                 expected = sample["generated_tokens"]
             if sample["generated_tokens"] != expected:

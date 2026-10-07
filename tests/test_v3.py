@@ -47,6 +47,48 @@ def test_timing_summary_reports_spread():
         spread([0, 1])
 
 
+def test_timing_keeps_actual_kernel_cache_and_cpu_settings():
+    from tools.time_v3 import execution_settings
+
+    metadata = json.loads((ROOT / "results/v3/lookup-cases/copy-austen.json").read_text())["baseline"]
+    settings = execution_settings(metadata)
+    assert settings["kernel"] == metadata["kernel"]
+    assert settings["kv_dtype"] == metadata["kv_dtype"]
+    assert settings["cpu_set"] == metadata["cpu_set"]
+    assert settings["activation_dtype"] == metadata["activation_dtype"]
+    assert execution_settings({**metadata, "kv_dtype": "f32"}) != settings
+
+
+def test_cache_summary_accepts_engine_centered_dtype(tmp_path):
+    from argparse import Namespace
+    import numpy as np
+    from tools.download_model import file_hash
+    from tools.kv_quality_v3 import compare, save
+
+    plan = {"positions": list(range(64)), "tokens": [0] * 65}
+    path = tmp_path / "plan.json"
+    save(path, plan)
+    values = np.tile(np.array([2, 1, 0], dtype="<f4"), (64, 1))
+    values.tofile(tmp_path / "oracle.bin")
+    save(tmp_path / "oracle.json", {"plan_sha256": file_hash(path),
+         "logits_sha256": file_hash(tmp_path / "oracle.bin"), "shape": [64, 3]})
+    for cache, size in (("f32", 400), ("f16", 200), ("i8", 110), ("i8-centered", 120)):
+        values.tofile(tmp_path / f"{cache}.bin")
+        save(tmp_path / f"{cache}.json", {"shape": [64, 3], "logit_positions": plan["positions"],
+             "plan_sha256": file_hash(path), "logits_sha256": file_hash(tmp_path / f"{cache}.bin"),
+             "kv_dtype": "i8_centered" if cache == "i8-centered" else cache,
+             "binary_sha256": "test-binary", "weights_sha256": "test-weights",
+             "config_sha256": "test-config", "kernel": "scalar", "threads": 1,
+             "cpu_set": [0], "kv_cache_bytes": size, "kv_capacity": 64,
+             "kv_key_mean_prefix": 64 if cache == "i8-centered" else 0})
+    output = tmp_path / "summary.json"
+    compare(Namespace(raw=tmp_path, plan=path, output=output), plan)
+    result = json.loads(output.read_text())
+    assert result["caches"]["i8-centered"]["bytes_saved_vs_f16"] == 80
+    assert result["caches"]["i8-centered"]["kv_key_mean_prefix"] == 64
+    assert result["caches"]["f16"]["aggregate"]["mean_kl_reference_candidate_nats"] == 0
+
+
 def _oracle_chunks_equal_dense(tmp):
     from argparse import Namespace
     from unittest.mock import patch
@@ -113,9 +155,9 @@ def test_real_sparse_logits_batch_matches_single(tmp_path, kv):
     from tools.download_model import file_hash
 
     inputs = json.loads((ROOT / "results/v3/lookup-inputs.json").read_text())
-    tokens = inputs["prompts"][0]["tokens"][:128]
-    assert len(tokens) == 128
-    positions = [0, 3, 63, 64, 65, 127]
+    tokens = inputs["prompts"][0]["tokens"]
+    assert len(tokens) > 65
+    positions = [0, 3, 63, 64, 65, len(tokens) - 1]
     engine = Path(os.environ.get("CPU_DECODE_ENGINE", str(ROOT / "build/cpu-decode")))
     for batch in (1, 8):
         subprocess.run([str(engine), "logits", "--model", model, "--tokens", ",".join(map(str, tokens)),
