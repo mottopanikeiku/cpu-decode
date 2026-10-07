@@ -6,6 +6,25 @@ The v2 tools write only under `results/v2`; the original results and the archive
 
 ### VNNI-only cloud comparison
 
+I completed all six final cells on **2026-10-07 at 14:46 PDT**, using one
+accepted CPU-only container, `156d2866d2bf47d4bf16fbf994c6b006`.
+Its CPU model is unknown and it exposes 24 CPUs; these are not dedicated
+physical cores. Every native cell reports `vnni16`, int16 activations and
+F16 KV. The [complete table](../results/v2/cloud-vnni/final/table.csv)
+contains 192 timed observations and 24,576 full forwards. Native's median
+paired throughput ratios range from **1.0898× to 1.5306×**; all six
+individual 95% ABBA-bootstrap intervals are above one. They are not
+simultaneous intervals or a claim about other hosts.
+
+The [separate runtime pilot](../results/v2/cloud-vnni/runtime-pilot/raw.json)
+is excluded. Three final startup candidates were rejected for missing
+AVX-512 flags before checkout; the fourth completed the whole matrix.
+The accepted function took **36.6264 minutes before export**, versus
+**37.33 client minutes**, including setup and rejected starts. The latter
+is used in [cost accounting](../results/v2/cloud-vnni/run-cost.json),
+which also includes failed work, not just successful sampling.
+
+
 I committed the [unchanged six-cell workload](../tools/cloud_vnni_design.json)
 at `21481f3` before collecting new results. I searched twelve fresh CPU
 containers: [five reported every required flag](../results/v2/cloud-vnni/probes-cpu.json).

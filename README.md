@@ -1,14 +1,14 @@
 # cpu-decode
 
-I built a memory-mapped [Qwen decoder](src/model.cpp), [grouped-int8 kernels](src/kernels.cpp) and [shared-GQA attention](src/attention.cpp) in C++. I compare numerical quality separately from decoding speed.
-
 <!-- FINAL_RESULT_START -->
-**Result:** My selected g64f16 weights have better distribution agreement than llama.cpp Q8_0 on calibration and heldout, but slightly worse perplexity. My separate cloud comparison completed **2 of 6 planned cells**: native lost both, at **0.4108× and 0.3079×** paired throughput. The host lacked VNNI, so these are the **AVX2/FP32 activation fallback**, not int16 timings or a laptop victory.
+**Result:** On **one virtual CPU host, model unknown**, my VNNI/int16 decoder beat pinned llama.cpp Q8_0 in **all six pre-specified cells**, at **1.090–1.531× paired throughput**. These are **worker-lifetime CPU-binding** measurements, not unchanged laptop command-line performance. My g64f16 format has better distribution agreement but slightly worse perplexity than Q8_0.
 <!-- FINAL_RESULT_END -->
+I built the memory-mapped [decoder](src/model.cpp), [grouped-int8 kernels](src/kernels.cpp) and [shared-GQA attention](src/attention.cpp) in C++.
+
 
 ## Quality and format choice
 
-I chose the smallest format passing mean/p99 KL and top-1 checks against Q8_0 in [four-format calibration](results/v2/format-calibration.json), then checked [int16 separately](results/v2/quality-vnni16-final.json). The reference uses original BF16-storage/FP32-arithmetic weights. I disclose perplexity and independent heldout:
+I selected g64f16 through [four-format calibration](results/v2/format-calibration.json) and [separate int16 checks](results/v2/quality-vnni16-final.json). The oracle uses original BF16-storage/FP32-arithmetic weights. Here are calibration and independent heldout results:
 
 | Calibration path | Matrix bits/weight | Artifact MB | Mean KL, nats | p99 KL, nats | Top-1 agreement | Perplexity |
 |---|---:|---:|---:|---:|---:|---:|
@@ -24,49 +24,56 @@ MB includes container overhead; bits count matrix weights and scales. [Heldout](
 | [g64f16, int16 activations](results/v2/heldout-g64f16-vnni16-final-f16.json) | 0.00093877 | 0.00336880 | 97.75% | 16.60984 |
 | [llama.cpp Q8_0](results/v2/heldout-final-q8_0.json) | 0.00240027 | 0.00813769 | 95.90% | 16.60406 |
 
-Int16 slightly lowers agreement versus native FP32, but passes Q8. The [F32-cache control](results/v2/heldout-g64f16-vnni16-final-f32.json) is recorded. Agreement is not task accuracy.
+Int16 passes the Q8_0 checks; agreement is not task accuracy. I retain the [F32-cache control](results/v2/heldout-g64f16-vnni16-final-f32.json).
 
-## Cloud CPU result: partial matrix
+## Cloud VNNI result: complete matrix
 
-I retain every completed cell; four are missing after a 40-minute timeout.
+I retained every cell, with 16 pairs of 128 full greedy forwards each: eight
+ABBA quartets. Each clock includes the LM head and final consumed token.
 
-| Threads | Initial context | Native tokens/s | llama tokens/s | Paired ratio | 95% block CI | Outcome |
-|---:|---:|---:|---:|---:|---:|---|
-| 1 | 128 | 11.062 | 26.762 | 0.4108 | [0.4061, 0.4428] | llama wins |
-| 2 | 4096 | 7.042 | 22.777 | 0.3079 | [0.3070, 0.3117] | llama wins |
+| Threads | Initial context | Native tokens/s | llama tokens/s | Paired ratio | 95% block CI |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 128 | 39.887 | 32.110 | 1.2335 | [1.1649, 1.2970] |
+| 2 | 128 | 55.135 | 50.394 | 1.1361 | [1.0631, 1.2054] |
+| 4 | 128 | 93.067 | 87.622 | 1.0898 | [1.0183, 1.1318] |
+| 1 | 4096 | 30.111 | 21.854 | 1.3436 | [1.3235, 1.4431] |
+| 2 | 4096 | 45.312 | 29.774 | 1.5306 | [1.4643, 1.5969] |
+| 4 | 4096 | 68.643 | 49.774 | 1.3627 | [1.2594, 1.4882] |
 
-Missing: (threads, context) **(1,4096), (2,128), (4,128), (4,4096)**.
-I use 128 full greedy forwards and 16 pairs per cell: eight ABBA quartets.
-Paired medians are not the displayed medians' ratio. I bootstrap quartets
-20,000 times. [Raw samples](results/v2/cloud/raw.json), [summary and
-spreads](results/v2/cloud/summary.json) and [fixed design](tools/cloud_design.json)
-retain the separate flash pilot.
+Paired medians are not ratios of displayed medians. I bootstrap quartets
+20,000 times: per-cell, not simultaneous intervals.
+[Raw samples](results/v2/cloud-vnni/final/raw.json), [spreads](results/v2/cloud-vnni/final/summary.json)
+and [fixed design](tools/cloud_vnni_design.json) retain provenance; runtime-pilot pairs are excluded.
 
-Both backends use F16 KV and matching strict CPU sets. I compile both pinned
-sources inside one CPU-only Modal container with `-march=native` and GCC
-12.2.0. The sandbox exposes 24 CPUs with model name “unknown”; AVX2/F16C are
-present but AVX-512/VNNI are absent. Native resolves to `simd256`, FP32
-activations. llama.cpp uses flash on and poll50; repacking is enabled but no
-repacked model buffer was selected.
+Both backends use F16 KV, strict CPU sets and fresh GCC 12.2.0
+`-march=native` CPU-only builds. The sandbox exposes 24 CPUs and all required
+VNNI flags; native resolves to `vnni16`/int16. llama.cpp selects flash
+ON/OFF/AUTO by per-cell pilot, uses poll50 and enables repacking;
+no repacked buffer was selected.
 
-I avoid expensive per-operator affinity syscalls in the cloud sandbox by
-holding v2's public `CpuBinding` for the worker lifetime. The laptop path pins
-per operator. Cloud numbers therefore show kernel and threading speed without
-that syscall cost, not unchanged command-line performance. The
-[estimated total cost](results/v2/cloud/run-cost.json) is **$0.8553**, including
-two failed attempts, not an invoice.
+I hold v2's public `CpuBinding` for the native worker lifetime to avoid
+per-operator affinity syscalls. The inactive native process is stopped;
+llama.cpp's real GGML pool is paused outside the clock. The first pilot
+stalled; I do not claim a proven cause. [Methods](docs/MEASUREMENTS.md)
+document the isolation change and all failed work.
 
-## Laptop development, not cloud results
+My [earlier AVX2/FP32 run](results/v2/cloud/summary.json) completed only
+2/6 cells and lost both, at 0.4108× and 0.3079×. It remains separate:
+different hosts do not establish a causal VNNI speedup.
+[Total cost accounting](results/v2/cloud-vnni/run-cost.json) includes both
+runs, setup, pilots and failures; these are estimates, not invoices.
+
+## Laptop development
 
 <!-- FINAL_TABLE_START -->
-The separate full 15-cell, nine-configuration laptop comparison is **not run
-in this branch**. My partial cloud matrix does not replace it.
+I did **not** run the full 15-cell, nine-configuration laptop matrix in this
+branch. The complete cloud comparison is not that laptop matrix.
 <!-- FINAL_TABLE_END -->
 
-My earlier [short ABAB window](results/v2/int16-shipped-short/summary.json)
-measured 69.58 versus 65.13 tokens/s, but native's 5.83% spread exceeded the
-noise flag: not a final speed claim. [Attention stages](results/v2/attention-stages.json)
-and the [original engine](results/tables.md) remain separate history.
+My [earlier short ABAB window](results/v2/int16-shipped-short/summary.json)
+exceeded the noise flag: not a final speed claim.
+[Attention stages](results/v2/attention-stages.json) and the [original engine](results/tables.md)
+remain separate history.
 
 ## Reproduce
 
@@ -82,7 +89,7 @@ nice -n 19 make final
 
 ## Limitations
 
-- I have one virtualized cloud environment, two completed cells and no cloud read-bandwidth ceiling. Clocks, host load and NUMA placement are uncontrolled; intervals are per-cell, not simultaneous.
+- I have one final virtual host and no cloud read-bandwidth ceiling. Clocks, host load and NUMA placement are uncontrolled; intervals are per-cell, not simultaneous.
 - I use the same cloud prefix, but each backend follows its own greedy tokens. Load, prefill, warmup and rewind are excluded.
 - My quality tests use 512-input windows, not long-context task accuracy. Heldout cannot select a replacement format.
 - This comparison does not evaluate batched serving, speculative decoding or downstream tasks.

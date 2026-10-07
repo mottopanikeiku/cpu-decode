@@ -1,7 +1,7 @@
 {
   "kind": "completed_attempt_requested_resource_estimates",
   "allocation_usd": 2.74,
-  "recorded_through_pdt": "2026-10-07T14:00:22-07:00",
+  "recorded_through_pdt": "2026-10-07T14:46:15-07:00",
   "prior_night_cost_file": "../cloud/run-cost.json",
   "prior_night_total_upper_usd": 0.8553,
   "day_attempts": [
@@ -58,9 +58,23 @@
       "estimated_upper_usd": 0.1787,
       "completed_cells": 1,
       "outcome": "t2/c4096 completed sixteen pairs with true vnni16/int16; two startup hosts rejected before checkout; all pilot pairs excluded from final matrix"
+    },
+    {
+      "id": "cpu-decode-1791407335794",
+      "purpose": "complete pre-specified VNNI final matrix",
+      "start_pdt": "2026-10-07T14:08:55-07:00",
+      "end_pdt": "2026-10-07T14:46:15-07:00",
+      "requested_cpu_cores": 8,
+      "requested_memory_gib": 8,
+      "requested_gpu": "none",
+      "booked_minutes": 175,
+      "client_wall_minutes": 37.33,
+      "estimated_upper_usd": 0.3020,
+      "completed_cells": 6,
+      "outcome": "all six unchanged cells completed with sixteen pairs each, true vnni16/int16 and one accepted container; three unsupported startup hosts rejected before checkout"
     }
   ],
-  "day_total_upper_usd": 0.4494,
-  "total_upper_usd": 1.3047,
+  "day_total_upper_usd": 0.7514,
+  "total_upper_usd": 1.6067,
   "note": "These rounded elapsed-client-wall-time resource estimates include a ten-percent margin, setup, pilots and failed work. They are not Modal invoices or measured billed usage. Volume storage is not included. No timings from the failed pilot enter a final matrix."
 }
