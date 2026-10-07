@@ -53,6 +53,10 @@ def environment():
     records = {"lscpu_text": capture(["lscpu"]), "lscpu_json": json.loads(capture(["lscpu", "--json"])),
                "compiler": capture(["c++", "--version"]), "cmake": capture(["cmake", "--version"]),
                "uname": capture(["uname", "-a"]), "allowed_cpus": sorted(os.sched_getaffinity(0))}
+    records["collected_utc"] = capture(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"]).strip()
+    records["exposed_cpu_topology"] = [
+        dict(zip(("cpu", "core", "socket"), map(int, row.split(","))))
+        for row in capture(["lscpu", "-p=CPU,CORE,SOCKET"]).splitlines() if row and not row.startswith("#")]
     for name in ("cpu.max", "cpu.stat", "cpuset.cpus.effective"):
         path = Path("/sys/fs/cgroup") / name
         records[name] = path.read_text() if path.exists() else None
@@ -65,16 +69,22 @@ def environment():
 class Worker:
     def __init__(self, binary: Path, config: dict, log: Path):
         self.log = log.open("w")
-        self.process = subprocess.Popen(
-            ["taskset", "-c", ",".join(map(str, config["cpu_set"])), str(binary)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log,
-            text=True, bufsize=1, start_new_session=True)
+        self.process = None
         self.stopped = False
-        self.send(config)
-        self.ready = self.receive()
-        if self.ready.get("event") != "ready":
-            raise ValueError("Benchmark worker did not finish load/prefill/warmup")
-        self.stop()
+        self.closed = False
+        try:
+            self.process = subprocess.Popen(
+                ["taskset", "-c", ",".join(map(str, config["cpu_set"])), str(binary)],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log,
+                text=True, bufsize=1, start_new_session=True)
+            self.send(config)
+            self.ready = self.receive()
+            if self.ready.get("event") != "ready":
+                raise ValueError("Benchmark worker did not finish load/prefill/warmup")
+            self.stop()
+        except BaseException:
+            self.abort()
+            raise
 
     def send(self, value):
         self.process.stdin.write(json.dumps(value, allow_nan=False) + "\n")
@@ -87,12 +97,19 @@ class Worker:
                 raise TimeoutError("Benchmark worker response exceeded 20 minutes")
         line = self.process.stdout.readline()
         if not line:
-            raise RuntimeError(f"Benchmark worker exited: {self.process.poll()}")
+            self.log.flush()
+            detail = Path(self.log.name).read_text()[-3000:]
+            raise RuntimeError(f"Benchmark worker exited: {self.process.poll()}\n{detail}")
         return json.loads(line)
 
     def stop(self):
         if not self.stopped:
             os.killpg(self.process.pid, signal.SIGSTOP)
+            _, status = os.waitpid(self.process.pid, os.WUNTRACED)
+            if not os.WIFSTOPPED(status) or os.WSTOPSIG(status) != signal.SIGSTOP:
+                if os.WIFEXITED(status) or os.WIFSIGNALED(status):
+                    self.process.returncode = os.waitstatus_to_exitcode(status)
+                raise RuntimeError("Benchmark worker exited before confirmed suspension")
             self.stopped = True
 
     def sample(self):
@@ -105,20 +122,59 @@ class Worker:
             raise ValueError("Invalid worker timing result")
         return result
 
-    def close(self):
-        if self.process.poll() is None:
-            self.send({"command": "exit"})
-            if self.stopped:
-                os.killpg(self.process.pid, signal.SIGCONT)
-                self.stopped = False
-            try:
-                self.process.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                os.killpg(self.process.pid, signal.SIGKILL)
-                self.process.wait()
+    def abort(self):
+        if self.closed:
+            return
+        if self.process is not None:
+            if self.process.poll() is None:
+                try:
+                    os.killpg(self.process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            self.process.wait()
+            for stream in (self.process.stdin, self.process.stdout):
+                try:
+                    stream.close()
+                except BrokenPipeError:
+                    pass
         self.log.close()
+        self.closed = True
+
+    def close(self):
+        if self.closed:
+            return
+        try:
+            if self.process.poll() is None:
+                try:
+                    self.send({"command": "exit"})
+                except BrokenPipeError:
+                    pass
+                if self.stopped:
+                    try:
+                        os.killpg(self.process.pid, signal.SIGCONT)
+                    except ProcessLookupError:
+                        pass
+                    self.stopped = False
+                try:
+                    self.process.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    pass
+        finally:
+            self.abort()
         if self.process.returncode:
             raise RuntimeError(f"Benchmark worker failed with {self.process.returncode}")
+
+
+def close_workers(workers):
+    first_error = None
+    for worker in workers:
+        try:
+            worker.close()
+        except BaseException as error:
+            if first_error is None:
+                first_error = error
+    if first_error is not None:
+        raise first_error
 
 
 def prepare(source: Path, work: Path, output: Path, design: dict):
@@ -184,6 +240,10 @@ def compare(source: Path, work: Path, output: Path, design_path: Path):
     env["native_cpu_discovery"] = topology
     if len(topology["preferred_cpu_ids"]) < max(design["threads"]):
         raise ValueError("Cloud CPU set does not cover the complete design")
+    exposed = {row["cpu"]: (row["socket"], row["core"]) for row in env["exposed_cpu_topology"]}
+    selected = topology["preferred_cpu_ids"][:max(design["threads"])]
+    if len({exposed[cpu] for cpu in selected}) != len(selected):
+        raise ValueError("Selected cloud CPUs are not distinct exposed physical cores")
     kernel = "vnni16" if {"avx512_vnni", "avx512bw", "f16c"}.issubset(env["flags"]) else "auto"
     result = {"design_sha256": sha(design_path), "design": design, "environment": env,
               "artifacts": artifacts, "resources": design["resources"], "pilot": [], "cells": []}
@@ -250,8 +310,7 @@ def compare(source: Path, work: Path, output: Path, design_path: Path):
             save(output / "raw.json", result)
             print(f"Completed cloud cell threads={threads} context={context}", flush=True)
         finally:
-            for worker in workers:
-                worker.close()
+            close_workers(workers)
     result["cost"] = {"runner_wall_minutes": (time.monotonic() - start) / 60,
                       "requested_resources_hourly_usd": 8 * 0.047160 + 8 * 0.007992,
                       "note": "Runner wall time includes artifact preparation, builds, pilots and warmups, but excludes initial native checkout and environment installation. Function resource estimate is added by the launcher; neither estimate is an invoice."}
