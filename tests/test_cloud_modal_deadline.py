@@ -1,5 +1,9 @@
 """Model-free launcher tests; Modal is an optional CLI dependency."""
 import importlib.util
+import ast
+import json
+from pathlib import Path
+import tempfile
 import os
 import signal
 import subprocess
@@ -7,10 +11,11 @@ import sys
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 SDK_AVAILABLE = importlib.util.find_spec("modal") is not None
 if SDK_AVAILABLE:
-    from tools.cloud_modal import enforce_deadline, parse_deadline, remaining
+    from tools.cloud_modal import ROOT, UPLOADS, enforce_deadline, parse_deadline, persist_outputs, remaining
 
 
 @unittest.skipUnless(SDK_AVAILABLE, "install the optional Modal CLI to test its launcher")
@@ -64,6 +69,36 @@ class DeadlineTests(unittest.TestCase):
     def test_cleanup_reserve_is_not_available_for_more_work(self):
         with self.assertRaises(TimeoutError):
             remaining(time.monotonic(), 0, None)
+
+
+@unittest.skipUnless(SDK_AVAILABLE, "install the optional Modal CLI to test its launcher")
+class CheckpointTests(unittest.TestCase):
+    def test_checkpoint_is_atomic_and_committed_before_return(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            checkpoint = Path(directory) / "checkpoint"
+            source.mkdir()
+            (source / "raw.json").write_text('{"cells": []}')
+            (source / "native-preparation.json").write_text('{"source": "synthetic"}')
+            (source / "native.stderr.txt").write_text("excluded")
+            (source / "unfinished.json.tmp").write_text("excluded")
+            raw = {"cells": [{"kind": "synthetic"}]}
+            with patch("tools.cloud_modal.modal.Volume.from_name") as volume:
+                def committed():
+                    self.assertEqual(json.loads((checkpoint / "raw.json").read_text()), raw)
+                    self.assertEqual({path.name for path in checkpoint.iterdir()},
+                                     {"raw.json", "native-preparation.json"})
+                volume.return_value.commit.side_effect = committed
+                persist_outputs(source, checkpoint, raw, "cpu-decode-day-test")
+                volume.return_value.commit.assert_called_once_with()
+
+    def test_image_helpers_include_relative_import_dependencies(self):
+        uploaded = set(UPLOADS)
+        for filename in UPLOADS:
+            if filename.endswith(".py"):
+                for node in ast.walk(ast.parse((ROOT / "tools" / filename).read_text())):
+                    if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module:
+                        self.assertIn(node.module + ".py", uploaded)
 
 
 if __name__ == "__main__":

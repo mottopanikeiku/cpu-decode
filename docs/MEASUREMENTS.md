@@ -46,6 +46,36 @@ The launcher accepts an optional UTC deadline and reserves forty seconds for
 process cleanup, including a thirty-five-second termination grace period.
 The earlier AVX2 partial run remains separate under `results/v2/cloud`.
 
+#### Reproducing the VNNI run
+
+I use the Python 3.12 Modal client, not the system interpreter. A Modal
+account is required. Choose a new Volume name: asset preparation refuses a
+nonempty model cache. These commands use a fresh result directory and keep
+the sizing pilot separate from the final observations.
+
+```sh
+python3.12 -m venv .venv-modal
+.venv-modal/bin/pip install modal==1.5.3
+VOLUME=cpu-decode-day-reproduction
+OUT=results/v2/cloud-vnni/reproduction
+.venv-modal/bin/modal run tools/cloud_host_modal.py --gpu none --count 12 --minutes 3 --output "$OUT/probes.json"
+.venv-modal/bin/modal run tools/cloud_assets_modal.py --volume-name "$VOLUME" --minutes 10 --output "$OUT/assets.json"
+.venv-modal/bin/modal run tools/cloud_modal.py --volume-name "$VOLUME" --runtime-pilot --run-name reproduction-pilot --minutes 30 --output "$OUT/pilot"
+MINUTES=$(.venv-modal/bin/python -c 'import json,math,sys; d=json.load(open(sys.argv[1])); print(math.ceil(d["cost"]["function_wall_minutes_before_export"]*6*1.3))' "$OUT/pilot/raw.json")
+.venv-modal/bin/modal run tools/cloud_modal.py --volume-name "$VOLUME" --run-name reproduction-final --minutes "$MINUTES" --output "$OUT/final"
+```
+
+Timing requests eight CPU cores, 8 GiB and one container, with GPU computation
+disabled. Probes request one core/512 MiB; preparation requests two cores/8
+GiB. If a client disconnects, repeat the final command with `--resume`; the
+five-start bound includes earlier local startup history. Alternatively,
+`--recover-only --run-name reproduction-final --minutes 3 --output "$OUT/recovered"`
+retrieves committed observations and regenerates the summary on one CPU
+core/512 MiB, without running either decoder. Volume commits occur inside
+the function before client streaming, following
+[Modal's persistence semantics](https://modal.com/docs/guide/volumes).
+
+
 ### Earlier AVX2 partial comparison
 
 I completed **2/6 planned cells** before the function timed out. Both favor
