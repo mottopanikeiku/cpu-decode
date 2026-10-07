@@ -31,7 +31,7 @@ image = (modal.Image.debian_slim(python_version="3.12")
          .apt_install("build-essential", "cmake", "git", "util-linux", "ca-certificates")
          .pip_install("uv==0.12.5", "numpy==2.3.3"))
 UPLOADS = ("cloud_run.py", "cloud_summary.py", "cloud_bench.cpp", "cloud_host.py",
-           "cloud_vnni_design.json", "cloud_targets.cmake")
+           "cloud_vnni_design.json", "cloud_targets.cmake", "portable.py")
 if modal.is_local():
     for filename in UPLOADS:
         image = image.add_local_file(ROOT / "tools" / filename, "/assets/tools/" + filename, copy=True)
