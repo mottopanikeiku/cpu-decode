@@ -62,6 +62,7 @@ if(CPU_DECODE_LLAMA_ROOT)
   set_target_properties(llama-logits PROPERTIES
     BUILD_RPATH "${CPU_DECODE_LLAMA_LIBRARY_DIR}"
     INSTALL_RPATH "${CPU_DECODE_LLAMA_LIBRARY_DIR}")
+  include("${CMAKE_CURRENT_SOURCE_DIR}/tools/cloud_targets.cmake")
 endif()
 include(CTest)
 if(BUILD_TESTING)
