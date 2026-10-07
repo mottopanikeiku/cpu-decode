@@ -1,0 +1,39 @@
+{
+  "local_compute": "CPU only; no new performance measurements; no paid compute",
+  "build": {
+    "configure": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPU_DECODE_NATIVE=OFF",
+    "compile": "cmake --build build -j2",
+    "compiler": "GNU C++ 16.2.1",
+    "result": "passed"
+  },
+  "ctest": {
+    "command": "ctest --test-dir build --output-on-failure -j1",
+    "passed": 5,
+    "failed": 0,
+    "tests": ["native-synthetic", "batched-forward", "kv-cache-synthetic", "cli-help", "cli-malformed"]
+  },
+  "python": {
+    "setup": "uv sync --locked --python 3.12",
+    "command": "CPU_DECODE_QUANT_MODEL=$INT8 CPU_DECODE_KERNEL=vnni16 uv run pytest -q tests",
+    "environment": {"OMP_NUM_THREADS": "2", "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "2"},
+    "passed": 562,
+    "skipped": 4,
+    "skip_reason": "Two original BF16/reference model integrations and two pinned-upstream synthetic integrations were not enabled; all seven new native model integrations were enabled and passed.",
+    "failed": 0
+  },
+  "real_model_checks": {
+    "weights": "unchanged g64f16 Qwen2.5-0.5B-Instruct artifact",
+    "kernel": "vnni16",
+    "greedy_exactness": "Two fixed prompts, 32 generated tokens each, separately for F16, plain int8 and centered int8 KV",
+    "batch_logits": "Bitwise-identical whole-vocabulary binary files at six sparse positions, including 63/64/65, between batch sizes 1 and 8 for all four cache modes",
+    "public_prompt_suite": "All 768 generated tokens matched plain greedy across twelve fixed 64-token prompts with F16 KV; counts and token sequences are in lookup-acceptance.json and lookup-cases/"
+  },
+  "cold_review": {
+    "method": "Independent source review; no independent test, model, timing or CI execution",
+    "findings_fixed": ["Centered-cache metadata spelling in long-context aggregation", "Missing actual execution settings in later timing output"],
+    "final_verdict": "No remaining concrete source defect"
+  },
+  "timing_script": "Prepared and source-reviewed; actual execution settings covered by a regression; timing command not run",
+  "failed_then_fixed": "The first real sparse-logit test assumed the fixed prompt had 128 tokens; it actually has 118. The test now uses its actual final position and retains the 63/64/65 checks.",
+  "interrupted_checks": "Two outer command deadlines expired during a machine-wide thermal pause. Final build, CTest and full Python results above come from subsequently completed commands, not inferred completion. No wall-clock data from these runs are published."
+}

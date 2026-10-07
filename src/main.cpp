@@ -1,4 +1,5 @@
 #include "decode.hpp"
+#include "generate.hpp"
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -49,11 +50,12 @@ void usage() {
     std::cout << "cpu-decode cpus\n"
                  "cpu-decode quantize --model HF_SNAPSHOT --output INT8_DIR [--group-size 0|32|64|128 --scale-dtype f16|f32]\n"
                  "cpu-decode logits --model DIR --tokens ID,ID --output PREFIX [--threads N --kernel auto|scalar|simd256|simd512|simd512x4|vnni|vnni16]\n"
-                 "cpu-decode generate --model DIR --tokens ID,ID --steps N [--output JSON --threads N --kernel ...]\n"
+                 "cpu-decode generate --model DIR --tokens ID,ID --steps N [--lookup K --ngram N --prefill-batch K --output JSON --threads N --kernel ...]\n"
+                 "cpu-decode time-generate --model DIR --tokens ID,ID --steps N --repeats N [same generation options]\n"
                  "cpu-decode bench --model DIR --tokens ID,ID --context N --steps N --repeats N [--output JSON --threads N --kernel ...]\n"
-                 "Forward modes: --rope cached|direct --kv f16|f32 --attention blocked|scalar --scheduler pool|openmp --affinity strict|unpinned --cpu-set IDS.\n"
+                 "Forward modes: --rope cached|direct --kv f16|f32|i8|i8-centered --attention blocked|scalar --scheduler pool|openmp --affinity strict|unpinned --cpu-set IDS.\n"
                  "Kernel defaults to auto (FP32 activations); vnni uses int8 activations/groups of32; vnni16 uses int16 activations/groups of64. Both require int8 weights.\n"
-                 "logits accepts --logits-start N to skip the head on priming positions.\n"
+                 "logits accepts --logits-start N or --logits-positions N,N and --batch K (default 1).\n"
                  "Token IDs only; generation does not stop at EOS. logits writes PREFIX.bin float32 [positions,vocab] and PREFIX.json.\n";
 }
 }
@@ -65,7 +67,7 @@ int main(int argc, char** argv) {
             if (argc != 2) throw std::runtime_error("cpus takes no arguments");
             emit(decode::cpu_topology(), ""); return 0;
         }
-        std::set<std::string> known{"--model", "--output", "--tokens", "--threads", "--kernel", "--steps", "--context", "--repeats", "--rope", "--kv", "--attention", "--scheduler", "--affinity", "--cpu-set", "--group-size", "--scale-dtype", "--logits-start"};
+        std::set<std::string> known{"--model", "--output", "--tokens", "--threads", "--kernel", "--steps", "--context", "--repeats", "--rope", "--kv", "--attention", "--scheduler", "--affinity", "--cpu-set", "--group-size", "--scale-dtype", "--logits-start", "--logits-positions", "--batch", "--lookup", "--ngram", "--prefill-batch"};
         std::map<std::string, std::string> options;
         for (int i = 2; i < argc; i += 2) {
             std::string key(argv[i]);
@@ -88,7 +90,7 @@ int main(int argc, char** argv) {
             emit({{"model", output}, {"weight_dtype", "int8"}, {"group_size", group}, {"scale_dtype", scale}}, "");
             return 0;
         }
-        if (command != "logits" && command != "generate" && command != "bench") throw std::runtime_error("unknown command: " + command);
+        if (command != "logits" && command != "generate" && command != "time-generate" && command != "bench") throw std::runtime_error("unknown command: " + command);
         auto prompt = tokens(required("--tokens"));
         size_t nthreads = number(option("--threads", "1"));
         if (!nthreads || nthreads > 1024) throw std::runtime_error("threads must be 1..1024");
@@ -98,12 +100,13 @@ int main(int argc, char** argv) {
         decode::EngineOptions engine_options;
         engine_options.cached_rope = rope_mode == "cached";
         std::string kv = option("--kv", "f16"), attention = option("--attention", "blocked"), scheduler = option("--scheduler", "pool"), affinity = option("--affinity", "strict");
-        if (kv != "f16" && kv != "f32") throw std::runtime_error("kv must be f16 or f32");
+        if (kv != "f16" && kv != "f32" && kv != "i8" && kv != "i8-centered") throw std::runtime_error("kv must be f16, f32, i8 or i8-centered");
         if (attention != "blocked" && attention != "scalar") throw std::runtime_error("attention must be blocked or scalar");
         if (scheduler != "pool" && scheduler != "openmp") throw std::runtime_error("scheduler must be pool or openmp");
         if (affinity != "strict" && affinity != "unpinned") throw std::runtime_error("affinity must be strict or unpinned");
         engine_options.strict_affinity = affinity == "strict";
-        engine_options.cache_type = kv == "f16" ? decode::CacheType::f16 : decode::CacheType::f32;
+        engine_options.cache_type = kv == "f16" ? decode::CacheType::f16 : kv == "f32" ? decode::CacheType::f32 :
+                                    kv == "i8" ? decode::CacheType::i8 : decode::CacheType::i8_centered;
         engine_options.scalar_attention = attention == "scalar"; engine_options.persistent_pool = scheduler == "pool";
         if (!option("--cpu-set", "").empty()) engine_options.cpus = tokens(option("--cpu-set", ""));
         size_t steps = number(option("--steps", "16"));
@@ -111,6 +114,8 @@ int main(int argc, char** argv) {
         size_t context = command == "bench" ? number(required("--context")) : prompt.size();
         if (!context || context > 1000000) throw std::runtime_error("invalid context size");
         size_t capacity = context + (command == "logits" ? 0 : steps);
+        if (command == "bench" && (kv == "i8" || kv == "i8-centered"))
+            throw std::runtime_error("int8 KV timing uses tools.time_v3; operation-level traffic profiling is not available");
         decode::Engine engine(model, kernel, int(nthreads), capacity, engine_options);
         // Validate every supplied ID even when a short benchmark context uses only its prefix.
         for (int id : prompt) if (size_t(id) >= engine.vocab_size()) throw std::runtime_error("token ID outside vocabulary");
@@ -121,34 +126,81 @@ int main(int argc, char** argv) {
             std::string prefix = required("--output");
             size_t start = number(option("--logits-start", "0"));
             if (start >= prompt.size()) throw std::runtime_error("logits start outside input positions");
+            std::vector<int> selected;
+            if (!option("--logits-positions", "").empty()) {
+                if (options.count("--logits-start")) throw std::runtime_error("use logits start or positions, not both");
+                selected = tokens(option("--logits-positions", ""));
+                if (!std::is_sorted(selected.begin(), selected.end()) ||
+                    std::adjacent_find(selected.begin(), selected.end()) != selected.end() ||
+                    size_t(selected.back()) >= prompt.size()) throw std::runtime_error("logit positions must be increasing and within input");
+            }
+            auto wanted = [&](size_t position) {
+                return selected.empty() ? position >= start : std::binary_search(selected.begin(), selected.end(), int(position));
+            };
             result["logit_positions"] = Json::array();
             parent_dir(prefix);
             std::ofstream binary(prefix + ".bin", std::ios::binary);
             if (!binary) throw std::runtime_error("cannot open logits output");
             std::vector<int> maxima;
-            for (size_t position = 0; position < prompt.size(); ++position) {
-                const auto& logits = engine.step(prompt[position], position >= start);
-                if (position < start) continue;
-                binary.write(reinterpret_cast<const char*>(logits.data()), logits.size() * sizeof(float));
-                maxima.push_back(argmax(logits)); result["logit_positions"].push_back(position);
+            size_t batch = number(option("--batch", "1"));
+            if (!batch || batch > 64) throw std::runtime_error("batch must be 1..64");
+            std::vector<int> input;
+            input.reserve(batch);
+            for (size_t position = 0; position < prompt.size(); position += batch) {
+                size_t end = std::min(prompt.size(), position + batch);
+                size_t first_head = 0;
+                while (position + first_head < end && !wanted(position + first_head)) ++first_head;
+                if (batch == 1) {
+                    const auto& logits = engine.step(prompt[position], first_head == 0);
+                    if (first_head) continue;
+                    binary.write(reinterpret_cast<const char*>(logits.data()), logits.size() * sizeof(float));
+                    maxima.push_back(argmax(logits)); result["logit_positions"].push_back(position);
+                } else {
+                    input.assign(prompt.begin() + position, prompt.begin() + end);
+                    const auto& logits = engine.batch(input, first_head);
+                    for (size_t row = first_head; row < input.size(); ++row) {
+                        if (!wanted(position + row)) continue;
+                        auto offset = logits.begin() + (row - first_head) * engine.vocab_size();
+                        binary.write(reinterpret_cast<const char*>(&*offset), engine.vocab_size() * sizeof(float));
+                        maxima.push_back(int(std::max_element(offset, offset + engine.vocab_size()) - offset));
+                        result["logit_positions"].push_back(position + row);
+                    }
+                }
             }
+            result["forward_batch"] = batch;
             binary.close();
             if (!binary) throw std::runtime_error("logits output failed");
-            result["shape"] = {prompt.size() - start, engine.vocab_size()}; result["argmax"] = maxima;
+            result["shape"] = {maxima.size(), engine.vocab_size()}; result["argmax"] = maxima;
             result["tokens"] = prompt; result["dtype"] = "float32"; result["layout"] = "row-major little-endian";
             emit(result, prefix + ".json");
-        } else if (command == "generate") {
-            int next = 0;
-            for (size_t i = 0; i < prompt.size(); ++i) {
-                const auto& logits = engine.step(prompt[i], i + 1 == prompt.size());
-                if (i + 1 == prompt.size()) next = argmax(logits);
+        } else if (command == "generate" || command == "time-generate") {
+            decode::LookupOptions lookup;
+            lookup.draft_tokens = number(option("--lookup", "0"));
+            lookup.max_ngram = number(option("--ngram", "4"));
+            lookup.prefill_batch = number(option("--prefill-batch", "8"));
+            if (lookup.prefill_batch > 64 || lookup.max_ngram > 64) throw std::runtime_error("prefill batch and ngram must be 1..64");
+            if (command == "generate") {
+                auto generated = decode::generate(engine, prompt, steps, lookup);
+                result["generated_tokens"] = generated.tokens; result["steps"] = steps;
+                result["lookup"] = generated.json();
+            } else {
+                size_t repeats = number(option("--repeats", "5"));
+                if (!steps || !repeats || repeats > 10000) throw std::runtime_error("timing needs positive steps and 1..10000 repeats");
+                auto warmup = decode::generate(engine, prompt, steps, lookup);
+                result["samples"] = Json::array();
+                for (size_t repeat = 0; repeat < repeats; ++repeat) {
+                    decode::GenerationTiming timing;
+                    auto generated = decode::generate(engine, prompt, steps, lookup, &timing);
+                    if (generated.tokens != warmup.tokens) throw std::runtime_error("generation changed between timing repeats");
+                    result["samples"].push_back({{"prefill_seconds", timing.prefill_seconds},
+                        {"decode_seconds", timing.decode_seconds}, {"generated_tokens", generated.tokens}, {"lookup", generated.json()}});
+                }
+                result["warmup"] = "one complete untimed generation";
+                result["timing_scope"] = "prefill and greedy decode measured separately; excludes load, JSON output, and warmup; decode includes lookup, verification, and rollback; the first generated token comes from prefill and the final token is not forwarded";
+                result["steps"] = steps; result["repeats"] = repeats;
             }
-            std::vector<int> generated;
-            for (size_t i = 0; i < steps; ++i) {
-                generated.push_back(next);
-                if (i + 1 < steps) next = argmax(engine.step(next, true));
-            }
-            result["generated_tokens"] = generated; result["steps"] = steps;
+            result["lookup_draft_limit"] = lookup.draft_tokens;
+            result["lookup_max_ngram"] = lookup.max_ngram; result["prefill_batch"] = lookup.prefill_batch;
             emit(result, output);
         } else {
             if (!steps) throw std::runtime_error("benchmark steps must be positive");

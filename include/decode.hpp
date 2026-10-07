@@ -12,7 +12,7 @@ namespace decode {
 using Json = nlohmann::json;
 enum class DType { bf16, f32, f16, i8 };
 enum class Kernel { scalar, simd256, simd512, simd512x4, vnni, vnni16 };
-enum class CacheType { f16, f32 };
+enum class CacheType { f16, f32, i8, i8_centered };
 Kernel parse_kernel(const std::string& name);
 std::string kernel_name(Kernel kernel);
 float bf16_float(uint16_t value);
@@ -65,6 +65,17 @@ struct Projection { const Matrix* matrix; float* output; const float* bias = nul
 void matvec(const Matrix& matrix, const float* x, float* y, Kernel kernel, ThreadPool& pool);
 void projections(const Projection* items, size_t count, const float* x, Kernel kernel,
                  ThreadPool& pool, Activation& activation, bool swiglu = false);
+// A bounded column tile; each row traverses its weights once for all columns.
+inline constexpr size_t projection_columns = 4;
+struct BatchProjection {
+    const Matrix* matrix;
+    float* output;
+    size_t output_stride;
+    const float* bias = nullptr;
+};
+void batch_projections(const BatchProjection* items, size_t count, const float* x,
+                       size_t columns, size_t input_stride, Kernel kernel,
+                       ThreadPool& pool, Activation* activations, bool swiglu = false);
 void quantize_row(const float* source, size_t n, int8_t* out, float& scale);
 void rmsnorm(const float* x, const float* weight, float* out, size_t n, float epsilon);
 void residual_rmsnorm(float* x, const float* residual, const float* weight, float* out, size_t n, float epsilon);
@@ -104,6 +115,10 @@ public:
     Engine& operator=(const Engine&) = delete;
     void reset();
     const std::vector<float>& step(int token, bool head, Profile* profile = nullptr);
+    // Flat token-major logits for tokens[head_start:], reused until the next batch.
+    // Non-null profiling is rejected: batch traffic differs from step traffic.
+    const std::vector<float>& batch(const std::vector<int>& tokens, size_t head_start = 0,
+                                    Profile* profile = nullptr);
     size_t vocab_size() const;
     void rewind(size_t position);
     size_t position() const;
