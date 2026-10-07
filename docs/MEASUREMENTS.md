@@ -23,6 +23,12 @@ process group's suspension with `waitpid` before activating the other.
 Each engine follows its own greedy trajectory without EOS stopping; I retain
 the token IDs and check repeat consistency, not cross-engine equality.
 
+I hold the native caller's public v2 `CpuBinding` for its whole worker lifetime.
+This avoids expensive repeated affinity syscalls in the cloud sandbox; the
+laptop path binds per operator. The measured cloud scope is therefore kernel
+and threading speed without that syscall cost, not unchanged CLI performance.
+The pinned engine source and arithmetic stay unchanged.
+
 I choose flash on/off/auto using three separate pilot observations per setting
 and cell, breaking median-time ties in that order. Pilot data stays visible
 but does not enter final inference. The baseline uses F16 KV, strict matching
@@ -39,11 +45,14 @@ simultaneous test; host load, boost and NUMA placement remain uncontrolled.
 I do not measure a cloud read-bandwidth ceiling.
 
 The [Modal launcher](../tools/cloud_modal.py) runs one ephemeral CPU container:
-eight requested cores, 8 GiB, no GPU and a 60-minute limit. It returns raw
-samples, preparation manifests, CPU flags/topology, settings and hashes.
+eight requested cores, 8 GiB, no GPU and a 50-minute limit. It streams every
+completed cell immediately so a timeout preserves returned samples, alongside
+preparation manifests, CPU flags/topology, settings and hashes.
 Run it with `uvx --from modal==1.5.3 modal run tools/cloud_modal.py --output results/v2/cloud`
 using an authenticated Modal account and a fresh destination. The
-[summarizer](../tools/cloud_summary.py) rejects an incomplete six-cell matrix.
+[summarizer](../tools/cloud_summary.py) rejects an incomplete six-cell matrix
+unless `--allow-partial` is explicit. Partial publication lists missing cells;
+each published cell still needs all sixteen chronological pairs.
 
 ### Development checks against the unchanged original engine
 

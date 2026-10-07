@@ -21,6 +21,7 @@
   "native_kernel_rule": "Use vnni16 only if the cloud CPU flags include avx512_vnni, avx512bw and f16c; otherwise request auto and report the actual resolved kernel. Do not claim int16 throughput for a fallback.",
   "cache": "F16 K/V in both engines; no GPU layers or operation offload",
   "affinity": "The same first N distinct physical CPUs from native discovery for both engines; strict persistent pools. Stop the inactive process group during every other engine's timed run so idle workers cannot interfere.",
+  "caller_binding": "Hold the original v2 public CpuBinding for the native worker lifetime. The cloud sandbox makes repeated affinity syscalls expensive; the laptop path pins per operator. This harness therefore measures kernel and threading speed without that per-operator syscall cost, not unchanged laptop CLI performance. GGML already keeps its strict caller pinned.",
   "llama_build": "Release, GGML_NATIVE=ON, GGML_CUDA=OFF, GGML_VULKAN=OFF, GGML_OPENMP=OFF. Actual pinned CPU threadpool, strict affinity, poll50, repack enabled.",
   "native_build": "Release, CPU_DECODE_NATIVE=ON, CMAKE_CXX_FLAGS=-march=native. Compile inside the running container, not on the image builder's CPU.",
   "pilot": "Before final samples, compare flash on/off/auto using three pilot observations per setting in each cell. Select the smallest pilot median, breaking ties by on, off, auto order; retain all pilot data and exclude it from final inference. The first long-context cell also estimates remaining runtime before proceeding. This is not the laptop's nine-configuration or strongest-baseline result.",
@@ -28,6 +29,6 @@
   "uncertainty": "20,000 fixed-seed ABBA-block bootstrap resamples, seed 20261007, 95% percentile interval for the paired median ratio. Resample eight whole blocks, preserving each AB and BA pair. Intervals are per-cell, not simultaneous; cloud host variation is not fully controlled.",
   "decision": "Native win only if the ratio interval is entirely above 1; llama win only if entirely below 1; otherwise inconclusive. Do not omit losing, noisy or inconclusive cells or discard performance outliers.",
   "environment": "Record lscpu text/JSON, CPU flags, process affinity, cgroup quota, compiler/CMake versions, library/build settings, model/config/binary hashes and container resources.",
-  "resources": {"provider": "Modal", "gpu": "none", "cpu_cores": 8, "memory_gib": 8, "max_containers": 1, "timeout_minutes": 60, "allocation_usd": 0.60},
-  "limits": "Collect the complete matrix in one measured container, without pooling samples across containers. Complete by 07:45 PDT; no new runs after 08:00 PDT. Model downloads and native compilation happen in the cloud. No laptop timing claims."
+  "resources": {"provider": "Modal", "gpu": "none", "cpu_cores": 8, "memory_gib": 8, "max_containers": 1, "timeout_minutes": 50, "allocation_usd": 1.00},
+  "limits": "Collect the complete matrix in one measured container, without pooling samples across containers. Stream each completed cell immediately. Complete by 07:50 PDT; no new runs after 08:00 PDT or another failure. If the run is interrupted, publish only fully completed cells, explicitly labeled as a partial matrix. Model downloads and native compilation happen in the cloud. No laptop timing claims."
 }

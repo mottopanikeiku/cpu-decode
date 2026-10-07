@@ -390,3 +390,27 @@ def test_invalid_input_does_not_replace_existing_outputs(tmp_path, bad_input):
         cloud.summarize_file(source, output, table)
     assert output.read_text() == "existing summary\n"
     assert table.read_text() == "existing CSV\n"
+
+
+def test_partial_publication_requires_explicit_permission_and_lists_missing_cells():
+    raw = synthetic_raw()
+    raw["cells"] = raw["cells"][:2]
+    with pytest.raises(ValueError, match="exactly six"):
+        cloud.summarize(raw)
+    summary = cloud.summarize(raw, allow_partial=True)
+    assert summary["matrix"]["complete"] is False
+    assert summary["matrix"]["completed_cells"] == 2
+    assert summary["matrix"]["planned_cells"] == 6
+    completed = {(cell["threads"], cell["context"]) for cell in raw["cells"]}
+    missing = {(cell["threads"], cell["context"]) for cell in summary["matrix"]["missing_cells"]}
+    assert completed.isdisjoint(missing)
+    assert completed | missing == {(threads, context) for threads in (1, 2, 4) for context in (128, 4096)}
+    assert cloud.markdown_table(summary).startswith("Partial matrix: 2/6 cells completed.")
+
+
+def test_partial_permission_does_not_accept_an_unfinished_cell():
+    raw = synthetic_raw()
+    raw["cells"] = raw["cells"][:1]
+    raw["cells"][0]["pairs"] = raw["cells"][0]["pairs"][:14]
+    with pytest.raises(ValueError, match="sixteen pairs"):
+        cloud.summarize(raw, allow_partial=True)

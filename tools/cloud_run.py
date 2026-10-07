@@ -308,13 +308,17 @@ def compare(source: Path, work: Path, output: Path, design_path: Path):
                     cell["pairs"].append({"id": block * 2 + offset, "block": block, "order": order, "native": a, "llama": b})
             result["cells"].append(cell)
             save(output / "raw.json", result)
-            print(f"Completed cloud cell threads={threads} context={context}", flush=True)
+            print("CLOUD_CELL_COMPLETE", flush=True)
         finally:
             close_workers(workers)
     result["cost"] = {"runner_wall_minutes": (time.monotonic() - start) / 60,
                       "requested_resources_hourly_usd": 8 * 0.047160 + 8 * 0.007992,
                       "note": "Runner wall time includes artifact preparation, builds, pilots and warmups, but excludes initial native checkout and environment installation. Function resource estimate is added by the launcher; neither estimate is an invoice."}
     save(output / "raw.json", result)
+
+
+def cancel(_signum, _frame):
+    raise InterruptedError("Cloud runner cancelled; release its active and stopped workers")
 
 
 def main():
@@ -324,6 +328,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--design", type=Path, required=True)
     args = parser.parse_args()
+    signal.signal(signal.SIGTERM, cancel)
     compare(args.source, args.work, args.output, args.design)
 
 

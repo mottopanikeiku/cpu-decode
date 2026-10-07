@@ -36,6 +36,14 @@ Int16 slightly lowers agreement versus native FP32, but passes Q8. The [F32-cach
 **Not yet run.** The full 15-cell, nine-configuration comparison will appear here after completion. Every losing and noisy cell remains visible.
 <!-- FINAL_TABLE_END -->
 
+## Timing on a cloud CPU
+
+I use a [separate cloud harness](tools/cloud_design.json), not laptop timings.
+I avoid expensive per-operator affinity syscalls in the cloud sandbox by
+holding v2's public `CpuBinding` for the worker lifetime. The laptop path pins
+per operator. Cloud numbers therefore show kernel and threading speed without
+that syscall cost, not unchanged command-line performance.
+
 ## Development throughput and attention
 
 ![Retained development stages, not final throughput claims](results/v2/attention-stages.svg)
@@ -48,7 +56,7 @@ The unchanged [original per-row engine](results/tables.md) approached the short-
 
 ## Reproduce
 
-Linux x86-64, C++17/OpenMP, CMake and uv; AVX-512 VNNI/BW and F16C for int16. Recorded hardware: Ryzen AI 5 PRO 340, GCC 16.2.1, 2000 MiB process-group cap—not measured peak. Local CPU, free downloads, **$0 paid compute**. Use fresh output directories and exclusive timing access.
+Linux x86-64, C++17/OpenMP, CMake and uv; AVX-512 VNNI/BW and F16C for int16. Earlier laptop hardware: Ryzen AI 5 PRO 340, GCC 16.2.1, 2000 MiB process-group cap—not measured peak. Those local results used **$0 paid compute**. Use fresh output directories and exclusive timing access.
 
 ```sh
 nice -n 19 make prepare

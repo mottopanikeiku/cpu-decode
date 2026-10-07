@@ -16,6 +16,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -339,6 +340,11 @@ template<class Backend>
 void serve(const Config& config) {
     Affinity affinity(config.cpus);
     Backend backend(config);
+    // The original pool's nested bindings become no-ops when its caller is
+    // already bound. Hold that public v2 scope for the entire native worker;
+    // GGML already keeps its strict caller pinned. Arithmetic is unchanged.
+    std::optional<decode::CpuBinding> native_caller;
+    if (config.backend == "native") native_caller.emplace(config.cpus.front());
     int seed = 0;
     for (int i = 0; i < config.context; ++i)
         seed = backend.step(config.tokens[size_t(i) % config.tokens.size()], i + 1 == config.context);
@@ -358,6 +364,9 @@ void serve(const Config& config) {
     metadata["requested_kernel"] = config.kernel;
     metadata["requested_flash"] = config.flash;
     metadata["requested_poll"] = 50;
+    metadata["caller_binding"] = config.backend == "native" ?
+        "public v2 CpuBinding held for worker lifetime; per-operator affinity syscalls avoided" :
+        "GGML strict caller remains pinned";
     metadata["prompt_tokens"] = config.tokens;
     metadata["context_tokens"] = "provided token IDs repeated to context length";
     metadata["timing_scope"] = "128 complete single-token forwards including LM head and earliest-tie greedy argmax; final consumed token forwarded; excludes load, prefill, warmup, rewind and JSON; no operation timers";

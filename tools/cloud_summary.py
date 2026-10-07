@@ -72,8 +72,8 @@ def settings(value, backend: str, threads: int, context: int) -> dict:
     return value
 
 
-def validate(raw: dict) -> list[dict]:
-    """Require the full matrix and chronological AB/BA observations per block."""
+def validate(raw: dict, *, allow_partial: bool = False) -> list[dict]:
+    """Require complete ABBA cells; partial matrices need explicit permission."""
     require(isinstance(raw, dict), "raw result must be an object")
     require(isinstance(raw.get("design_sha256"), str) and
             re.fullmatch(r"[0-9a-f]{64}", raw["design_sha256"]) is not None,
@@ -81,7 +81,8 @@ def validate(raw: dict) -> list[dict]:
     for key in ("environment", "artifacts"):
         require(isinstance(raw.get(key), dict) and bool(raw[key]), f"missing/invalid {key}")
     cells = raw.get("cells")
-    require(isinstance(cells, list) and len(cells) == 6, "requires exactly six cells")
+    require(isinstance(cells, list) and (1 <= len(cells) <= 6 if allow_partial else len(cells) == 6),
+            "requires one to six completed cells" if allow_partial else "requires exactly six cells")
     seen = set()
     for cell in cells:
         require(isinstance(cell, dict), "invalid cell")
@@ -151,8 +152,8 @@ def engine_stats(seconds: list[float]) -> dict:
                                   "max": positive(STEPS / ordered[0], "max tokens/s")}}
 
 
-def summarize(raw: dict) -> dict:
-    cells = validate(raw)
+def summarize(raw: dict, *, allow_partial: bool = False) -> dict:
+    cells = validate(raw, allow_partial=allow_partial)
     # Preserve cost, pilot selection, environment and artifact identities without
     # inventing a second provenance schema or inferring settings from filenames.
     summary = deepcopy({key: value for key, value in raw.items() if key != "cells"})
@@ -164,6 +165,11 @@ def summarize(raw: dict) -> dict:
         "confidence_level": 0.95, "interval": "percentile", "percentile_method": "linear",
         "scope": "per-cell; no simultaneous or strongest-nine claim",
     }, cells=[])
+    completed = {(cell["threads"], cell["context"]) for cell in cells}
+    summary["matrix"] = {
+        "planned_cells": 6, "completed_cells": len(cells), "complete": len(cells) == 6,
+        "missing_cells": [{"threads": threads, "context": context} for threads in THREADS for context in CONTEXTS
+                          if (threads, context) not in completed]}
     for cell in cells:
         pairs = cell["pairs"]
         ratios = [positive(pair["llama"]["seconds"] / pair["native"]["seconds"], "paired ratio")
@@ -216,6 +222,8 @@ def csv_text(summary: dict) -> str:
 def markdown_table(summary: dict) -> str:
     lines = ["| Threads | Context | Native tokens/s | llama tokens/s | Paired ratio | 95% block CI | Decision |",
              "|---:|---:|---:|---:|---:|---:|---|"]
+    if not summary["matrix"]["complete"]:
+        lines = [f"Partial matrix: {summary['matrix']['completed_cells']}/6 cells completed.", "", *lines]
     for cell in summary["cells"]:
         ratio = cell["native_over_llama"]
         lines.append(f"| {cell['threads']} | {cell['context']} | "
@@ -230,12 +238,12 @@ def reject_constant(value: str) -> None:
     raise ValueError(f"non-finite JSON constant {value}")
 
 
-def summarize_file(input_path: Path, output_path: Path, csv_path: Path) -> dict:
+def summarize_file(input_path: Path, output_path: Path, csv_path: Path, *, allow_partial: bool = False) -> dict:
     paths = [path.resolve() for path in (input_path, output_path, csv_path)]
     require(len(set(paths)) == len(paths), "input and output paths must be distinct")
     source = input_path.read_bytes()
     raw = json.loads(source, parse_constant=reject_constant)
-    summary = portable(summarize(raw))
+    summary = portable(summarize(raw, allow_partial=allow_partial))
     summary["raw_result"] = {"file": portable(str(input_path)), "sha256": hashlib.sha256(source).hexdigest()}
     # Serialize before writing either output so invalid metadata cannot leave a
     # partially published result. Match the repository's indented JSON convention.
@@ -254,9 +262,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--csv", type=Path, required=True)
     parser.add_argument("--markdown", action="store_true", help="print a Markdown table to stdout")
+    parser.add_argument("--allow-partial", action="store_true", help="explicitly publish only completed cells, labeled partial")
     args = parser.parse_args(argv)
     try:
-        summary = summarize_file(args.input, args.output, args.csv)
+        summary = summarize_file(args.input, args.output, args.csv, allow_partial=args.allow_partial)
     except (ValueError, OSError, UnicodeError, OverflowError, ZeroDivisionError) as exc:
         parser.error(str(exc))
     if args.markdown:
