@@ -44,10 +44,16 @@ Offline timing rebuilds only the upstream libraries used by the driver,
 not unused converters or benchmark front ends. I still verify both cached
 GGUF hashes and record the actual freshly built library hashes.
 
-A separate full first-cell runtime pilot determines the final booking:
-`ceil(pilot function minutes × 6 × 1.3)`. Its pairs never enter the final
-six-cell inference. I keep threads 1/2/4, initial contexts 128/4096, 128 full
-forwards, sixteen pairs and eight ABBA quartets per cell unchanged. Every
+A separate full t2/c4096 runtime pilot determines the final forecast:
+`ceil(pilot function minutes × 6 × 1.3)`. It took **21.3668 function minutes**,
+so the forecast was **167 minutes**. Its pairs never enter final inference.
+Before final collection I extended the booking to **175 minutes**, the
+experiment deadline to **17:15 PDT**, and the allocation to **$2.74**.
+I changed only collection order: c128 at threads 1/2/4, then c4096 at
+threads 1/2/4. Threads, contexts, 128 full forwards, sixteen pairs and eight
+ABBA quartets per cell remain unchanged. The [booking record](../results/v2/cloud-vnni/booking.json)
+and [pilot design](../results/v2/cloud-vnni/runtime-pilot/design.json) precede
+the final run. Every
 completed cell is committed to the Volume before it is streamed to my client.
 An explicit `--resume` retains local startup history; a matching server
 checkpoint reuses completed sixteen-pair cells, never partial pairs. A

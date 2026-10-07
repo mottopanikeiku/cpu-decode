@@ -347,7 +347,7 @@ def compare(source: Path, work: Path, output: Path, design_path: Path, *,
     result["container_runs"].append({"id": container_run_id, "environment": env,
                                      "artifacts": artifacts, "resources": resources})
     expected_tokens = {}
-    cell_order = design["cell_order"][:1] if runtime_pilot else design["cell_order"]
+    cell_order = [design["runtime_pilot_cell"]] if runtime_pilot else design["cell_order"]
     completed = {(cell["threads"], cell["context"]) for cell in result["cells"]}
     for threads, context in cell_order:
         if (threads, context) in completed:
