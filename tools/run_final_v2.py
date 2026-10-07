@@ -328,7 +328,7 @@ def check_quality_selection(args: argparse.Namespace) -> None:
         from tools.corpus_v2 import digest_json
         artifacts["engine"]["location_sha256"] = digest_json(str(args.engine.resolve()))
         artifacts["weights"]["model_location_sha256"] = digest_json(str(args.model.resolve()))
-        proof = load_quality_eligibility(args.quality, settings, artifacts)
+        proof = load_quality_eligibility(args.quality, {**settings, "rope": "cached"}, artifacts)
         if proof["selection"]["oracle_identity"]["verified_source"] != manifest["source"]:
             raise ValueError("VNNI16 quality source differs from timing manifest")
 
