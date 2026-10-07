@@ -3,12 +3,12 @@
 <!-- FINAL_RESULT_START -->
 **Result:** On **one virtual CPU host, model unknown**, my VNNI/int16 decoder beat pinned llama.cpp Q8_0 in **all six pre-specified cells**, at **1.090–1.531× paired throughput**. These are **worker-lifetime CPU-binding** measurements, not unchanged laptop command-line performance. My g64f16 format has better distribution agreement but slightly worse perplexity than Q8_0.
 <!-- FINAL_RESULT_END -->
-I built the memory-mapped [decoder](src/model.cpp), [grouped-int8 kernels](src/kernels.cpp) and [shared-GQA attention](src/attention.cpp) in C++.
+I wrote the C++ [decoder](src/model.cpp), [kernels](src/kernels.cpp) and [attention](src/attention.cpp).
 
 
 ## Quality and format choice
 
-I selected g64f16 through [four-format calibration](results/v2/format-calibration.json) and [separate int16 checks](results/v2/quality-vnni16-final.json). The oracle uses original BF16-storage/FP32-arithmetic weights. Here are calibration and independent heldout results:
+I selected g64f16 through [four-format calibration](results/v2/format-calibration.json) and [separate int16 checks](results/v2/quality-vnni16-final.json). The oracle uses original BF16-storage/FP32-arithmetic weights.
 
 | Calibration path | Matrix bits/weight | Artifact MB | Mean KL, nats | p99 KL, nats | Top-1 agreement | Perplexity |
 |---|---:|---:|---:|---:|---:|---:|
@@ -96,6 +96,9 @@ nice -n 19 make final
 
 ## Prior work
 
-[Qwen](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct): Apache-2.0 weights. [Transformers](https://github.com/huggingface/transformers): oracle. [llama.cpp](https://github.com/ggml-org/llama.cpp): baseline, [pinned build](results/llama-preparation.json). [Prior work](docs/PRIOR_WORK.md) includes llama2.c, gemma.cpp, llamafile, T-MAC and BitNet. The from-scratch decoder is MIT licensed; its optional baseline-quality reader links upstream libraries.
+[Qwen](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) weights: Apache-2.0.
+My decoder: MIT. [Transformers](https://github.com/huggingface/transformers)
+is the oracle; [llama.cpp](https://github.com/ggml-org/llama.cpp) the baseline.
+I document [prior work and upstream linking](docs/PRIOR_WORK.md).
 
 Written with AI coding assistance.

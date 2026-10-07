@@ -1,7 +1,7 @@
 {
   "kind": "completed_attempt_requested_resource_estimates",
   "allocation_usd": 2.74,
-  "recorded_through_pdt": "2026-10-07T14:46:15-07:00",
+  "recorded_through_pdt": "2026-10-07T14:55:05-07:00",
   "prior_night_cost_file": "../cloud/run-cost.json",
   "prior_night_total_upper_usd": 0.8553,
   "day_attempts": [
@@ -72,9 +72,36 @@
       "estimated_upper_usd": 0.3020,
       "completed_cells": 6,
       "outcome": "all six unchanged cells completed with sixteen pairs each, true vnni16/int16 and one accepted container; three unsupported startup hosts rejected before checkout"
+    },
+    {
+      "id": "cpu-decode-1791409903184",
+      "purpose": "read-only recovery of committed final checkpoint",
+      "start_pdt": "2026-10-07T14:51:43-07:00",
+      "end_pdt": "2026-10-07T14:52:10-07:00",
+      "requested_cpu_cores": 1,
+      "requested_memory_gib": 0.5,
+      "requested_gpu": "none",
+      "booked_minutes": 3,
+      "client_wall_minutes": 0.45,
+      "estimated_upper_usd": 0.0004,
+      "raw_sha256": "13a34a277830b6037c1ca6ec7e6817170f59df9b016699ec10e7c8d731d2c353",
+      "outcome": "server-side six-cell raw data matched the locally committed matrix byte-for-byte"
+    },
+    {
+      "id": "cpu-decode-1791410089645",
+      "purpose": "remove model weight caches after results were committed",
+      "start_pdt": "2026-10-07T14:54:49-07:00",
+      "end_pdt": "2026-10-07T14:55:05-07:00",
+      "requested_cpu_cores": 1,
+      "requested_memory_gib": 0.5,
+      "requested_gpu": "none",
+      "booked_minutes": 3,
+      "client_wall_minutes": 0.27,
+      "estimated_upper_usd": 0.0003,
+      "outcome": "removed the hf and artifacts asset directories; result checkpoints retained"
     }
   ],
-  "day_total_upper_usd": 0.7514,
-  "total_upper_usd": 1.6067,
+  "day_total_upper_usd": 0.7521,
+  "total_upper_usd": 1.6074,
   "note": "These rounded elapsed-client-wall-time resource estimates include a ten-percent margin, setup, pilots and failed work. They are not Modal invoices or measured billed usage. Volume storage is not included. No timings from the failed pilot enter a final matrix."
 }
