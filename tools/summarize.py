@@ -8,8 +8,9 @@ import re
 import statistics
 from pathlib import Path
 
-# Engine label -> llama.cpp label measured with the same KV dtype; the first is the primary pair.
-PAIRS = [("q8-f16", "q8_0-f16"), ("q4h8-f16", "q4_0-f16"), ("q8-f32", "q8_0-f32"), ("q4-f16", "q4_0-f16")]
+# Engine label -> llama.cpp label, both with an F16 KV cache; the first is the primary pair.
+# (llama-bench at the pinned commit cannot run an F32 cache, so F32 is an engine-only ablation.)
+PAIRS = [("q8-f16", "q8_0-f16"), ("q4h8-f16", "q4_0-f16"), ("q4-f16", "q4_0-f16")]
 # Ablation fields, each with values ordered from "before" to "after" (the engine's optimized choice last).
 EFFECT_FIELDS = {
     "fused_projections": [False, True],
@@ -19,9 +20,6 @@ EFFECT_FIELDS = {
     "head_format": ["q8", "q4"],
     "kernel": ["scalar", "neon", "avx512"],
 }
-# llama-bench flash_attn per KV dtype: -1 = auto for F16; 0 = disabled for F32, because the
-# pinned llama.cpp casts an F32 K/V cache to F16 whenever flash attention is on.
-LLAMA_FLASH_ATTENTION = {"f16": -1, "f32": 0}
 
 
 def spread(values: list[float]) -> dict[str, float]:
@@ -64,8 +62,8 @@ def llama_rate(path: Path, engine: dict, label: str) -> dict[str, float]:
         raise ValueError(f"llama.cpp KV types {kv[0]}/{kv[1]} do not match engine kv_dtype {engine['kv_dtype']} in {path}")
     if test.get("n_gpu_layers") != 0:
         raise ValueError(f"Expected CPU-only llama.cpp run (n_gpu_layers 0) in {path}")
-    if test.get("flash_attn") != LLAMA_FLASH_ATTENTION[engine["kv_dtype"]]:
-        raise ValueError(f"Expected llama.cpp flash_attn {LLAMA_FLASH_ATTENTION[engine['kv_dtype']]} for {engine['kv_dtype']} KV, found {test.get('flash_attn')} in {path}")
+    if test.get("flash_attn") != -1:
+        raise ValueError(f"Expected llama.cpp flash attention auto (-1), found {test.get('flash_attn')} in {path}")
     quant = label.split("-")[0].upper()
     if quant not in test.get("model_type", ""):
         raise ValueError(f"llama.cpp model_type {test.get('model_type')!r} does not contain {quant} in {path}")
@@ -196,7 +194,7 @@ def main() -> None:
         rate = r["engine_tps"]
         lines.append(f"| {r['threads']} | {r['context']} | {rate['median']:.2f} ({rate['min']:.2f}–{rate['max']:.2f}) | {r['percent_of_ceiling']:.1f}% | {r['llama_tps']['median']:.2f} | {r['engine_over_llama']:.2f}× |")
     lines += ["", "## Matched pairs", "",
-              "llama.cpp runs F16 KV with flash attention auto and F32 KV with flash attention disabled: the pinned llama.cpp casts an F32 K/V cache to F16 whenever flash attention is on.", "",
+              "Both engines use an F16 KV cache; llama.cpp runs with flash attention auto. (llama-bench at the pinned commit cannot run an F32 cache.)", "",
               "| Engine | llama.cpp | Threads | Context | Engine tokens/s | llama.cpp tokens/s | Engine / llama |",
               "|---|---|---:|---:|---:|---:|---:|"]
     for r in pairs:

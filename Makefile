@@ -62,8 +62,6 @@ measure:
 	  $(ENGINE) --model $(QUANT_DIR)/q4h8 --contexts $$context || exit $$?; \
 	  $(LLAMA) --model $(GGUF_Q4) --label q4_0-f16 --contexts $$context || exit $$?; \
 	done
-	$(ENGINE) --model $(QUANT_DIR)/q8 --kv f32 --threads 6 --contexts 128,4096
-	$(LLAMA) --model $(GGUF_Q8) --kv f32 --label q8_0-f32 --threads 6 --contexts 128,4096
 	$(ENGINE) --model $(QUANT_DIR)/q8 $(ABLATION)
 	$(ENGINE) --model $(QUANT_DIR)/q8 --kv f32 $(ABLATION)
 	$(ENGINE) --model $(QUANT_DIR)/q8 --weights mmap --label q8-f16-mmap $(ABLATION)

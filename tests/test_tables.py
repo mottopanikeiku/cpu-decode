@@ -39,7 +39,7 @@ def engine(threads: int, context: int, kv: str, rates: list[float], **fields) ->
 
 def llama(threads: int, context: int, kv: str, rates: list[float], model_type: str = "qwen2 1B Q8_0") -> list[dict]:
     return [{"n_threads": threads, "n_depth": context, "n_gen": 16, "samples_ts": rates, "type_k": kv, "type_v": kv,
-             "flash_attn": -1 if kv == "f16" else 0, "n_gpu_layers": 0, "model_type": model_type}]
+             "flash_attn": -1, "n_gpu_layers": 0, "model_type": model_type}]
 
 
 def write(directory: Path, files: dict) -> None:
@@ -61,8 +61,6 @@ def test_summary_pairs_baselines_ablations_and_plot(tmp_path: Path) -> None:
         "llama-q8_0-f16-t6-c128": llama(6, 128, "f16", [20, 22, 21]),
         "engine-q4h8-f16-t6-c128": engine(6, 128, "f16", [14, 16, 15], weight_format="q4"),
         "llama-q4_0-f16-t6-c128": llama(6, 128, "f16", [25, 30, 24], "qwen2 1B Q4_0"),
-        "engine-q8-f32-t6-c128": engine(6, 128, "f32", [8, 9, 10]),
-        "llama-q8_0-f32-t6-c128": llama(6, 128, "f32", [18, 18, 18]),
         "engine-q4-f16-t6-c128": engine(6, 128, "f16", [16, 16, 16], weight_format="q4", head_format="q4"),
     })
     write(tmp_path / "ablations", {
@@ -83,7 +81,6 @@ def test_summary_pairs_baselines_ablations_and_plot(tmp_path: Path) -> None:
     assert result["operation_seconds_per_token"]["lm_head"] == pytest.approx(0.01)
     assert [(p["engine_label"], p["llama_label"], p["engine_over_llama"]) for p in summary["pairs"]] == [
         ("q8-f16", "q8_0-f16", pytest.approx(11 / 21)), ("q4h8-f16", "q4_0-f16", pytest.approx(15 / 25)),
-        ("q8-f32", "q8_0-f32", pytest.approx(9 / 18)),
         ("q4-f16", "q4_0-f16", pytest.approx(16 / 25))]
     # q4/q4 differs from q8/q8 in two fields, so it pairs with nothing here.
     assert [(e["change"], e["ratio"]) for e in summary["ablation_effects"]] == [

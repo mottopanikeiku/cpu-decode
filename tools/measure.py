@@ -17,9 +17,6 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TOKENS = ",".join(map(str, json.loads((ROOT / "configs" / "prompts.json").read_text())["benchmark"]["seed_token_ids"]))
 BANDWIDTH_KERNELS = {"x86_64": "simd256,simd512", "aarch64": "neon"}
 OMP_KEYS = ["OMP_NUM_THREADS", "OMP_PROC_BIND", "OMP_PLACES", "OMP_WAIT_POLICY"]
-# The pinned llama.cpp casts an F32 K/V cache to F16 whenever flash attention is on
-# (src/llama-graph.cpp:2727-2733), so F32 KV runs must disable it to stay F32.
-LLAMA_FLASH_ATTENTION = {"f16": "auto", "f32": "0"}
 
 
 def execute(command: list[str], destination: Path, locations: dict, env: dict[str, str]) -> dict | list:
@@ -90,7 +87,8 @@ def main() -> None:
     parser.add_argument("--threads", default="1,2,4,6,12")
     parser.add_argument("--contexts", default="128,1024,4096")
     parser.add_argument("--kernels", help="bandwidth: simd256,simd512 (x86-64) or neon (aarch64); engine: auto")
-    parser.add_argument("--kv", choices=["f16", "f32"], default="f16")
+    parser.add_argument("--kv", choices=["f16", "f32"], default="f16",
+                        help="engine KV dtype; llama-bench at the pinned commit accepts only f16/bf16/quantized caches, so llama runs use f16")
     parser.add_argument("--weights", choices=["hugepage", "mmap"], help="engine weight memory (default hugepage)")
     parser.add_argument("--fuse", choices=["on", "off"], help="engine projection fusion (default on)")
     parser.add_argument("--label", help="file label; engine default {model dir name}-{kv}, required for llama")
@@ -123,6 +121,8 @@ def main() -> None:
         for name in ["kernels", "weights", "fuse"]:
             if getattr(args, name) is not None:
                 parser.error(f"--{name} does not apply to the llama stage")
+        if args.kv != "f16":
+            parser.error("llama-bench at the pinned commit cannot use an F32 KV cache; llama runs are F16 only")
         if args.llama is None:
             parser.error("--llama is required")
         if args.label is None:
@@ -175,7 +175,7 @@ def main() -> None:
                     name = f"llama-{args.label}-t{thread}-c{context}"
                     command = [str(args.llama), "-m", str(args.model), "-p", "0", "-n", str(args.steps),
                                "-d", str(context), "-t", str(thread), "-r", str(args.repeats),
-                               "-ngl", "0", "-ctk", args.kv, "-ctv", args.kv, "-fa", LLAMA_FLASH_ATTENTION[args.kv], "-o", "json"]
+                               "-ngl", "0", "-ctk", "f16", "-ctv", "f16", "-fa", "auto", "-o", "json"]
                 path = args.output / f"{name}.json"
                 execute(command, path, locations, env)
                 records.append({"name": name, "command": command, "file": str(path)})
