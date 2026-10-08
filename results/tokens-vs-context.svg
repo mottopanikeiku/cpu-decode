@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 400" width="720" height="400" font-family="sans-serif" font-size="12">
+<rect x="0" y="0" width="720" height="400" fill="#ffffff"/>
+<text x="267.0" y="24" text-anchor="middle" font-size="15" fill="#111111">Qwen2.5-0.5B-Instruct greedy decode, 12 threads</text>
+<line x1="64" y1="344" x2="470" y2="344" stroke="#e5e5e5" stroke-width="1"/>
+<text x="58" y="348" text-anchor="end" fill="#333333">0</text>
+<line x1="64" y1="284.8" x2="470" y2="284.8" stroke="#e5e5e5" stroke-width="1"/>
+<text x="58" y="288.8" text-anchor="end" fill="#333333">100</text>
+<line x1="64" y1="225.6" x2="470" y2="225.6" stroke="#e5e5e5" stroke-width="1"/>
+<text x="58" y="229.6" text-anchor="end" fill="#333333">200</text>
+<line x1="64" y1="166.4" x2="470" y2="166.4" stroke="#e5e5e5" stroke-width="1"/>
+<text x="58" y="170.4" text-anchor="end" fill="#333333">300</text>
+<line x1="64" y1="107.2" x2="470" y2="107.2" stroke="#e5e5e5" stroke-width="1"/>
+<text x="58" y="111.2" text-anchor="end" fill="#333333">400</text>
+<line x1="64" y1="48" x2="470" y2="48" stroke="#e5e5e5" stroke-width="1"/>
+<text x="58" y="52" text-anchor="end" fill="#333333">500</text>
+<line x1="64" y1="344" x2="64" y2="349" stroke="#333333" stroke-width="1"/>
+<text x="64" y="363" text-anchor="middle" fill="#333333">128</text>
+<line x1="307.6" y1="344" x2="307.6" y2="349" stroke="#333333" stroke-width="1"/>
+<text x="307.6" y="363" text-anchor="middle" fill="#333333">1024</text>
+<line x1="470" y1="344" x2="470" y2="349" stroke="#333333" stroke-width="1"/>
+<text x="470" y="363" text-anchor="middle" fill="#333333">4096</text>
+<line id="x-axis" x1="64" y1="344" x2="470" y2="344" stroke="#333333" stroke-width="1"/>
+<line id="y-axis" x1="64" y1="48" x2="64" y2="344" stroke="#333333" stroke-width="1"/>
+<text x="267.0" y="384" text-anchor="middle" fill="#111111">context (tokens already in the KV cache, log scale)</text>
+<text x="18" y="196.0" text-anchor="middle" fill="#111111" transform="rotate(-90 18 196.0)">decode tokens/s</text>
+<polyline id="engine" points="64,163.23 307.6,192.04 470,227.51" fill="none" stroke="#1f6feb" stroke-width="2.5"/>
+<circle cx="64" cy="163.23" r="4" fill="#1f6feb"/>
+<circle cx="307.6" cy="192.04" r="4" fill="#1f6feb"/>
+<circle cx="470" cy="227.51" r="4" fill="#1f6feb"/>
+<polyline id="llama" points="64,195.78 307.6,217.54 470,252.92" fill="none" stroke="#d1495b" stroke-width="2.5"/>
+<circle cx="64" cy="195.78" r="4" fill="#d1495b"/>
+<circle cx="307.6" cy="217.54" r="4" fill="#d1495b"/>
+<circle cx="470" cy="252.92" r="4" fill="#d1495b"/>
+<polyline id="ceiling" points="64,86.87 307.6,92.13 470,108.65" fill="none" stroke="#555555" stroke-width="1.5" stroke-dasharray="6 4"/>
+<polyline id="engine-secondary" points="64,181.15 307.6,169.4 470,221.5" fill="none" stroke="#1f6feb" stroke-width="1.2"/>
+<circle cx="64" cy="181.15" r="2.5" fill="#1f6feb"/>
+<circle cx="307.6" cy="169.4" r="2.5" fill="#1f6feb"/>
+<circle cx="470" cy="221.5" r="2.5" fill="#1f6feb"/>
+<polyline id="llama-secondary" points="64,180.08 307.6,195.04 470,241.69" fill="none" stroke="#d1495b" stroke-width="1.2"/>
+<circle cx="64" cy="180.08" r="2.5" fill="#d1495b"/>
+<circle cx="307.6" cy="195.04" r="2.5" fill="#d1495b"/>
+<circle cx="470" cy="241.69" r="2.5" fill="#d1495b"/>
+<line x1="486" y1="56" x2="514" y2="56" stroke="#1f6feb" stroke-width="2.5"/>
+<text x="520" y="60" font-size="11" fill="#111111">engine q8, f16 KV</text>
+<line x1="486" y1="78" x2="514" y2="78" stroke="#d1495b" stroke-width="2.5"/>
+<text x="520" y="82" font-size="11" fill="#111111">llama.cpp Q8_0, f16 KV</text>
+<line x1="486" y1="100" x2="514" y2="100" stroke="#555555" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="520" y="104" font-size="11" fill="#111111">read-bandwidth ceiling (q8-f16)</text>
+<line x1="486" y1="122" x2="514" y2="122" stroke="#1f6feb" stroke-width="1.2"/>
+<text x="520" y="126" font-size="11" fill="#111111">engine q4h8, f16 KV</text>
+<line x1="486" y1="144" x2="514" y2="144" stroke="#d1495b" stroke-width="1.2"/>
+<text x="520" y="148" font-size="11" fill="#111111">llama.cpp Q4_0, f16 KV</text>
+</svg>

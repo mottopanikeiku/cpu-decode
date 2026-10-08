@@ -1,0 +1,2342 @@
+{
+  "statistic": "median; spread is min/max over repeated runs",
+  "bandwidth_selection": "highest median of measured read kernels at each thread count",
+  "primary_pair": {
+    "engine": "q8-f16",
+    "llama": "q8_0-f16"
+  },
+  "bandwidth": [
+    {
+      "threads": 1,
+      "kernel": "neon",
+      "median": 31.9398,
+      "min": 31.9206,
+      "max": 32.2101,
+      "file": "results/measurements/bandwidth-t1-c0-neon.json"
+    },
+    {
+      "threads": 12,
+      "kernel": "neon",
+      "median": 228.818,
+      "min": 227.646,
+      "max": 228.996,
+      "file": "results/measurements/bandwidth-t12-c0-neon.json"
+    },
+    {
+      "threads": 2,
+      "kernel": "neon",
+      "median": 53.558,
+      "min": 53.3969,
+      "max": 53.6248,
+      "file": "results/measurements/bandwidth-t2-c0-neon.json"
+    },
+    {
+      "threads": 4,
+      "kernel": "neon",
+      "median": 103.798,
+      "min": 103.186,
+      "max": 103.893,
+      "file": "results/measurements/bandwidth-t4-c0-neon.json"
+    },
+    {
+      "threads": 6,
+      "kernel": "neon",
+      "median": 145.229,
+      "min": 144.912,
+      "max": 145.263,
+      "file": "results/measurements/bandwidth-t6-c0-neon.json"
+    }
+  ],
+  "results": [
+    {
+      "threads": 1,
+      "context": 128,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 47.2517144782549,
+        "min": 46.995042962868276,
+        "max": 48.079009052919815
+      },
+      "llama_tps": {
+        "median": 49.1372,
+        "min": 48.3168,
+        "max": 49.7094
+      },
+      "read_GB_per_s": 31.9398,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 60.62862613275825,
+      "percent_of_ceiling": 77.93631076974764,
+      "engine_over_llama": 0.9616281448323245,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 526810552.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 6.14311875e-05,
+        "attention": 0.0006757888750000003,
+        "attention_merge": 6.431874999999999e-05,
+        "attention_output": 0.0008022324374999993,
+        "embedding": 2.072125e-06,
+        "lm_head": 0.005400853749999999,
+        "mlp_down": 0.0040304771875,
+        "mlp_gate_up": 0.008290948625,
+        "qkv": 0.001019366375,
+        "rmsnorm": 0.00015676443749999995,
+        "rope_kv": 3.1555437500000005e-05,
+        "silu": 0.0006211557500000007,
+        "timing_overhead_and_loop": 4.528000000000171e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t1-c128.json",
+        "results/measurements/llama-q8_0-f16-t1-c128.json",
+        "results/measurements/bandwidth-t1-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 1,
+      "context": 1024,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 38.5296597335217,
+        "min": 38.31639677949823,
+        "max": 38.761062146710785
+      },
+      "llama_tps": {
+        "median": 38.9689,
+        "min": 37.5853,
+        "max": 39.0275
+      },
+      "read_GB_per_s": 31.9398,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 59.38746117199676,
+      "percent_of_ceiling": 64.87844230608357,
+      "engine_over_llama": 0.988728440718668,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 537820600.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 5.9999249999999996e-05,
+        "attention": 0.004935845687500001,
+        "attention_merge": 6.549775e-05,
+        "attention_output": 0.0008677444375000004,
+        "embedding": 2.1599999999999996e-06,
+        "lm_head": 0.005513503937500001,
+        "mlp_down": 0.0041703105,
+        "mlp_gate_up": 0.0084700486875,
+        "qkv": 0.0010468838125000004,
+        "rmsnorm": 0.00015851562499999994,
+        "rope_kv": 3.305512499999998e-05,
+        "silu": 0.0006260263125000009,
+        "timing_overhead_and_loop": 4.564187499996736e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t1-c1024.json",
+        "results/measurements/llama-q8_0-f16-t1-c1024.json",
+        "results/measurements/bandwidth-t1-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 1,
+      "context": 4096,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 24.87873807626613,
+        "min": 24.838700274769426,
+        "max": 25.03619682482158
+      },
+      "llama_tps": {
+        "median": 21.5803,
+        "min": 21.3458,
+        "max": 21.6026
+      },
+      "read_GB_per_s": 31.9398,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 55.49253235408636,
+      "percent_of_ceiling": 44.83258741468141,
+      "engine_over_llama": 1.1528448666731292,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 575569336.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 5.9744437499999996e-05,
+        "attention": 0.019386806874999985,
+        "attention_merge": 6.521343750000003e-05,
+        "attention_output": 0.0008576259999999998,
+        "embedding": 2.1966875e-06,
+        "lm_head": 0.005448364999999999,
+        "mlp_down": 0.0041120290624999944,
+        "mlp_gate_up": 0.008386568625000004,
+        "qkv": 0.0010379221250000003,
+        "rmsnorm": 0.00016223468750000008,
+        "rope_kv": 3.64669375e-05,
+        "silu": 0.0006289600000000007,
+        "timing_overhead_and_loop": 5.11443750000895e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t1-c4096.json",
+        "results/measurements/llama-q8_0-f16-t1-c4096.json",
+        "results/measurements/bandwidth-t1-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 2,
+      "context": 128,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 87.78012640820994,
+        "min": 86.1127385820698,
+        "max": 87.78663598582264
+      },
+      "llama_tps": {
+        "median": 80.5238,
+        "min": 80.1069,
+        "max": 80.6366
+      },
+      "read_GB_per_s": 53.558,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 101.66463028629693,
+      "percent_of_ceiling": 86.34283738701754,
+      "engine_over_llama": 1.0901140583058666,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 526810552.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 6.089662499999999e-05,
+        "attention": 0.0003674641874999996,
+        "attention_merge": 4.2294000000000005e-05,
+        "attention_output": 0.00043765900000000013,
+        "embedding": 2.0073125000000003e-06,
+        "lm_head": 0.002858172875,
+        "mlp_down": 0.0021847859999999993,
+        "mlp_gate_up": 0.0043885975625,
+        "qkv": 0.0005494463125000004,
+        "rmsnorm": 0.0001562686249999999,
+        "rope_kv": 3.31655e-05,
+        "silu": 0.00031697800000000026,
+        "timing_overhead_and_loop": 3.0673750000039662e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t2-c128.json",
+        "results/measurements/llama-q8_0-f16-t2-c128.json",
+        "results/measurements/bandwidth-t2-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 2,
+      "context": 1024,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 72.76092895642451,
+        "min": 72.36069999932162,
+        "max": 72.93278272242799
+      },
+      "llama_tps": {
+        "median": 62.011,
+        "min": 60.8528,
+        "max": 62.0166
+      },
+      "read_GB_per_s": 53.558,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 99.5833926777814,
+      "percent_of_ceiling": 73.06532444807797,
+      "engine_over_llama": 1.1733551943433342,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 537820600.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 5.9822875e-05,
+        "attention": 0.002553336187500002,
+        "attention_merge": 4.6208937499999956e-05,
+        "attention_output": 0.00046915524999999983,
+        "embedding": 2.1843125000000004e-06,
+        "lm_head": 0.002885535875,
+        "mlp_down": 0.0022173516875000007,
+        "mlp_gate_up": 0.004426312312500005,
+        "qkv": 0.0005570426875000002,
+        "rmsnorm": 0.0001621541874999998,
+        "rope_kv": 3.6663937500000006e-05,
+        "silu": 0.0003207998749999996,
+        "timing_overhead_and_loop": 3.4045000000034603e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t2-c1024.json",
+        "results/measurements/llama-q8_0-f16-t2-c1024.json",
+        "results/measurements/bandwidth-t2-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 2,
+      "context": 4096,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 47.501108586809835,
+        "min": 47.49031141994324,
+        "max": 47.50599000801168
+      },
+      "llama_tps": {
+        "median": 37.962,
+        "min": 37.8532,
+        "max": 37.972
+      },
+      "read_GB_per_s": 53.558,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 93.05221221861618,
+      "percent_of_ceiling": 51.04780150224809,
+      "engine_over_llama": 1.2512804537908917,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 575569336.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 5.815087499999999e-05,
+        "attention": 0.010027374250000002,
+        "attention_merge": 4.561812499999996e-05,
+        "attention_output": 0.00048495475000000004,
+        "embedding": 2.1856874999999996e-06,
+        "lm_head": 0.0028203586875,
+        "mlp_down": 0.0021850357499999993,
+        "mlp_gate_up": 0.004363405749999998,
+        "qkv": 0.0005481166875000001,
+        "rmsnorm": 0.00016020143749999988,
+        "rope_kv": 3.6691875000000005e-05,
+        "silu": 0.0003214848749999998,
+        "timing_overhead_and_loop": 2.9940000000061584e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t2-c4096.json",
+        "results/measurements/llama-q8_0-f16-t2-c4096.json",
+        "results/measurements/bandwidth-t2-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 4,
+      "context": 128,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 145.35932584597742,
+        "min": 144.35677647384412,
+        "max": 145.4211977298842
+      },
+      "llama_tps": {
+        "median": 142.597,
+        "min": 142.234,
+        "max": 142.907
+      },
+      "read_GB_per_s": 103.798,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 197.03098126250137,
+      "percent_of_ceiling": 73.77485759577952,
+      "engine_over_llama": 1.0193715565262762,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 526810552.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 5.95356875e-05,
+        "attention": 0.0002744943750000001,
+        "attention_merge": 3.0895687500000006e-05,
+        "attention_output": 0.0002798335625,
+        "embedding": 1.9350625000000002e-06,
+        "lm_head": 0.001715361625,
+        "mlp_down": 0.0012761979999999997,
+        "mlp_gate_up": 0.0025480875624999994,
+        "qkv": 0.00033721618749999984,
+        "rmsnorm": 0.00015735850000000008,
+        "rope_kv": 3.527343749999997e-05,
+        "silu": 0.00016753843750000018,
+        "timing_overhead_and_loop": 2.648874999998732e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t4-c128.json",
+        "results/measurements/llama-q8_0-f16-t4-c128.json",
+        "results/measurements/bandwidth-t4-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 4,
+      "context": 1024,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 126.59942348838032,
+        "min": 126.42292258712786,
+        "max": 126.71710487909878
+      },
+      "llama_tps": {
+        "median": 111.942,
+        "min": 111.133,
+        "max": 112.104
+      },
+      "read_GB_per_s": 103.798,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 192.99744189791167,
+      "percent_of_ceiling": 65.59642565384189,
+      "engine_over_llama": 1.1309376595771055,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 537820600.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 5.80545e-05,
+        "attention": 0.0013694374999999991,
+        "attention_merge": 3.430537499999998e-05,
+        "attention_output": 0.0002647406874999998,
+        "embedding": 2.0240625e-06,
+        "lm_head": 0.0017103055625000002,
+        "mlp_down": 0.0012527210000000003,
+        "mlp_gate_up": 0.002514776125,
+        "qkv": 0.000330399125,
+        "rmsnorm": 0.00015837137499999992,
+        "rope_kv": 3.575906250000001e-05,
+        "silu": 0.00016600893750000014,
+        "timing_overhead_and_loop": 2.2415000000032548e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t4-c1024.json",
+        "results/measurements/llama-q8_0-f16-t4-c1024.json",
+        "results/measurements/bandwidth-t4-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 4,
+      "context": 4096,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 86.42492671193223,
+        "min": 80.17309853011243,
+        "max": 86.47814672099649
+      },
+      "llama_tps": {
+        "median": 71.828,
+        "min": 71.3999,
+        "max": 71.8737
+      },
+      "read_GB_per_s": 103.798,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 180.3396975963987,
+      "percent_of_ceiling": 47.92340669515356,
+      "engine_over_llama": 1.2032205645699758,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 575569336.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 5.9938687500000005e-05,
+        "attention": 0.0052718601875,
+        "attention_merge": 3.5424e-05,
+        "attention_output": 0.00029187087499999977,
+        "embedding": 2.1396875e-06,
+        "lm_head": 0.001697249375,
+        "mlp_down": 0.0011783383749999995,
+        "mlp_gate_up": 0.0023386092499999987,
+        "qkv": 0.00032367787500000016,
+        "rmsnorm": 0.000161280875,
+        "rope_kv": 3.770987500000002e-05,
+        "silu": 0.00016859662500000016,
+        "timing_overhead_and_loop": 2.3877499999991336e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t4-c4096.json",
+        "results/measurements/llama-q8_0-f16-t4-c4096.json",
+        "results/measurements/bandwidth-t4-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 202.4450964469949,
+        "min": 202.2164924459944,
+        "max": 203.6346131191803
+      },
+      "llama_tps": {
+        "median": 184.497,
+        "min": 183.873,
+        "max": 186.186
+      },
+      "read_GB_per_s": 145.229,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 275.6759511529298,
+      "percent_of_ceiling": 73.4358929751872,
+      "engine_over_llama": 1.097281237348005,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 526810552.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 5.972143749999999e-05,
+        "attention": 0.00015175918749999994,
+        "attention_merge": 2.8101062500000012e-05,
+        "attention_output": 0.00019487149999999995,
+        "embedding": 2.0354374999999997e-06,
+        "lm_head": 0.001201428375,
+        "mlp_down": 0.0009133931875000002,
+        "mlp_gate_up": 0.0018184310625000003,
+        "qkv": 0.0002461104374999999,
+        "rmsnorm": 0.00015786506249999995,
+        "rope_kv": 3.611756249999999e-05,
+        "silu": 0.00011879687500000002,
+        "timing_overhead_and_loop": 3.154812499998709e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t6-c128.json",
+        "results/measurements/llama-q8_0-f16-t6-c128.json",
+        "results/measurements/bandwidth-t6-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 6,
+      "context": 1024,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 173.15594920444255,
+        "min": 173.02349396268582,
+        "max": 174.41517148625022
+      },
+      "llama_tps": {
+        "median": 149.596,
+        "min": 149.46,
+        "max": 149.901
+      },
+      "read_GB_per_s": 145.229,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 270.03242345124005,
+      "percent_of_ceiling": 64.12413257317948,
+      "engine_over_llama": 1.1574905024495477,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 537820600.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 6.00504375e-05,
+        "attention": 0.0009600916874999997,
+        "attention_merge": 3.335574999999999e-05,
+        "attention_output": 0.00019699200000000003,
+        "embedding": 1.9042500000000002e-06,
+        "lm_head": 0.0012024451249999998,
+        "mlp_down": 0.0009178196874999995,
+        "mlp_gate_up": 0.0018107776875,
+        "qkv": 0.00024169799999999974,
+        "rmsnorm": 0.00015863249999999992,
+        "rope_kv": 3.5699750000000024e-05,
+        "silu": 0.00011751731250000003,
+        "timing_overhead_and_loop": 2.19337500000083e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t6-c1024.json",
+        "results/measurements/llama-q8_0-f16-t6-c1024.json",
+        "results/measurements/bandwidth-t6-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 119.59982675367097,
+        "min": 117.74770107364635,
+        "max": 119.68969369701803
+      },
+      "llama_tps": {
+        "median": 99.6188,
+        "min": 98.966,
+        "max": 100.103
+      },
+      "read_GB_per_s": 145.229,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 252.32233706070818,
+      "percent_of_ceiling": 47.39961913276648,
+      "engine_over_llama": 1.200574858898832,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 575569336.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 5.905981250000001e-05,
+        "attention": 0.0036004352500000015,
+        "attention_merge": 3.7285062499999994e-05,
+        "attention_output": 0.0002253025000000001,
+        "embedding": 2.089625e-06,
+        "lm_head": 0.001217211125,
+        "mlp_down": 0.0008878713124999999,
+        "mlp_gate_up": 0.0017744171875000003,
+        "qkv": 0.0002435873749999999,
+        "rmsnorm": 0.0001605782499999999,
+        "rope_kv": 3.790162500000004e-05,
+        "silu": 0.00011825806249999985,
+        "timing_overhead_and_loop": 2.8200000000023345e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t6-c4096.json",
+        "results/measurements/llama-q8_0-f16-t6-c4096.json",
+        "results/measurements/bandwidth-t6-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 12,
+      "context": 128,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 305.3617748817267,
+        "min": 284.9195940878757,
+        "max": 305.5694287259212
+      },
+      "llama_tps": {
+        "median": 250.364,
+        "min": 223.493,
+        "max": 256.225
+      },
+      "read_GB_per_s": 228.818,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 434.3458936638763,
+      "percent_of_ceiling": 70.30382451780113,
+      "engine_over_llama": 1.219671258175004,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 526810552.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 6.00003125e-05,
+        "attention": 0.00015954887500000021,
+        "attention_merge": 2.7411562499999994e-05,
+        "attention_output": 0.000131322625,
+        "embedding": 1.8343750000000001e-06,
+        "lm_head": 0.0007085378750000002,
+        "mlp_down": 0.0005738078125,
+        "mlp_gate_up": 0.0011277376250000003,
+        "qkv": 0.00015489268750000002,
+        "rmsnorm": 0.00018213124999999999,
+        "rope_kv": 3.641356249999998e-05,
+        "silu": 7.262649999999997e-05,
+        "timing_overhead_and_loop": 2.379062499998936e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t12-c128.json",
+        "results/measurements/llama-q8_0-f16-t12-c128.json",
+        "results/measurements/bandwidth-t12-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 12,
+      "context": 1024,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 256.6940102474174,
+        "min": 252.30530569358146,
+        "max": 263.5555124422663
+      },
+      "llama_tps": {
+        "median": 213.619,
+        "min": 181.605,
+        "max": 215.51
+      },
+      "read_GB_per_s": 228.818,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 425.4541384245974,
+      "percent_of_ceiling": 60.33411995895085,
+      "engine_over_llama": 1.2016440964868171,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 537820600.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 6.0101812500000005e-05,
+        "attention": 0.0005868735624999999,
+        "attention_merge": 4.2212062499999996e-05,
+        "attention_output": 0.0001401956874999999,
+        "embedding": 1.7292499999999998e-06,
+        "lm_head": 0.0007386540625,
+        "mlp_down": 0.0005866685625000003,
+        "mlp_gate_up": 0.0011967095625000001,
+        "qkv": 0.0001844927499999999,
+        "rmsnorm": 0.00017128281249999998,
+        "rope_kv": 4.5284187500000066e-05,
+        "silu": 8.47716875e-05,
+        "timing_overhead_and_loop": 2.0080437500000214e-05
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t12-c1024.json",
+        "results/measurements/llama-q8_0-f16-t12-c1024.json",
+        "results/measurements/bandwidth-t12-c0-neon.json"
+      ]
+    },
+    {
+      "threads": 12,
+      "context": 4096,
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
+      "engine_tps": {
+        "median": 196.76561357587303,
+        "min": 114.19393824888564,
+        "max": 197.65306991845168
+      },
+      "llama_tps": {
+        "median": 153.855,
+        "min": 153.328,
+        "max": 155.314
+      },
+      "read_GB_per_s": 228.818,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 397.55071316029944,
+      "percent_of_ceiling": 49.49446877146808,
+      "engine_over_llama": 1.2789029513234738,
+      "bytes_per_token": {
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
+        "lm_head": 136134656.0,
+        "lm_head_scales": 8508416.0,
+        "matrix_weights": 493961216.0,
+        "norm_bias": 286208.0,
+        "projection_weights": 357826560.0,
+        "scales": 30872576.0,
+        "total_min": 575569336.0
+      },
+      "operation_seconds_per_token": {
+        "argmax": 6.01084375e-05,
+        "attention": 0.0020616238750000007,
+        "attention_merge": 4.211499999999998e-05,
+        "attention_output": 0.0001323215625000001,
+        "embedding": 1.7140625e-06,
+        "lm_head": 0.0007018308125000001,
+        "mlp_down": 0.0005575330624999997,
+        "mlp_gate_up": 0.0011031958750000001,
+        "qkv": 0.00015276025,
+        "rmsnorm": 0.0001603978124999999,
+        "rope_kv": 3.590850000000001e-05,
+        "silu": 7.211793749999993e-05,
+        "timing_overhead_and_loop": 1.8566249999985365e-06
+      },
+      "files": [
+        "results/measurements/engine-q8-f16-t12-c4096.json",
+        "results/measurements/llama-q8_0-f16-t12-c4096.json",
+        "results/measurements/bandwidth-t12-c0-neon.json"
+      ]
+    }
+  ],
+  "pairs": [
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 1,
+      "context": 128,
+      "engine_tps": {
+        "median": 47.2517144782549,
+        "min": 46.995042962868276,
+        "max": 48.079009052919815
+      },
+      "llama_tps": {
+        "median": 49.1372,
+        "min": 48.3168,
+        "max": 49.7094
+      },
+      "engine_over_llama": 0.9616281448323245,
+      "files": [
+        "results/measurements/engine-q8-f16-t1-c128.json",
+        "results/measurements/llama-q8_0-f16-t1-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 1,
+      "context": 1024,
+      "engine_tps": {
+        "median": 38.5296597335217,
+        "min": 38.31639677949823,
+        "max": 38.761062146710785
+      },
+      "llama_tps": {
+        "median": 38.9689,
+        "min": 37.5853,
+        "max": 39.0275
+      },
+      "engine_over_llama": 0.988728440718668,
+      "files": [
+        "results/measurements/engine-q8-f16-t1-c1024.json",
+        "results/measurements/llama-q8_0-f16-t1-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 1,
+      "context": 4096,
+      "engine_tps": {
+        "median": 24.87873807626613,
+        "min": 24.838700274769426,
+        "max": 25.03619682482158
+      },
+      "llama_tps": {
+        "median": 21.5803,
+        "min": 21.3458,
+        "max": 21.6026
+      },
+      "engine_over_llama": 1.1528448666731292,
+      "files": [
+        "results/measurements/engine-q8-f16-t1-c4096.json",
+        "results/measurements/llama-q8_0-f16-t1-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 2,
+      "context": 128,
+      "engine_tps": {
+        "median": 87.78012640820994,
+        "min": 86.1127385820698,
+        "max": 87.78663598582264
+      },
+      "llama_tps": {
+        "median": 80.5238,
+        "min": 80.1069,
+        "max": 80.6366
+      },
+      "engine_over_llama": 1.0901140583058666,
+      "files": [
+        "results/measurements/engine-q8-f16-t2-c128.json",
+        "results/measurements/llama-q8_0-f16-t2-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 2,
+      "context": 1024,
+      "engine_tps": {
+        "median": 72.76092895642451,
+        "min": 72.36069999932162,
+        "max": 72.93278272242799
+      },
+      "llama_tps": {
+        "median": 62.011,
+        "min": 60.8528,
+        "max": 62.0166
+      },
+      "engine_over_llama": 1.1733551943433342,
+      "files": [
+        "results/measurements/engine-q8-f16-t2-c1024.json",
+        "results/measurements/llama-q8_0-f16-t2-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 2,
+      "context": 4096,
+      "engine_tps": {
+        "median": 47.501108586809835,
+        "min": 47.49031141994324,
+        "max": 47.50599000801168
+      },
+      "llama_tps": {
+        "median": 37.962,
+        "min": 37.8532,
+        "max": 37.972
+      },
+      "engine_over_llama": 1.2512804537908917,
+      "files": [
+        "results/measurements/engine-q8-f16-t2-c4096.json",
+        "results/measurements/llama-q8_0-f16-t2-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 4,
+      "context": 128,
+      "engine_tps": {
+        "median": 145.35932584597742,
+        "min": 144.35677647384412,
+        "max": 145.4211977298842
+      },
+      "llama_tps": {
+        "median": 142.597,
+        "min": 142.234,
+        "max": 142.907
+      },
+      "engine_over_llama": 1.0193715565262762,
+      "files": [
+        "results/measurements/engine-q8-f16-t4-c128.json",
+        "results/measurements/llama-q8_0-f16-t4-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 4,
+      "context": 1024,
+      "engine_tps": {
+        "median": 126.59942348838032,
+        "min": 126.42292258712786,
+        "max": 126.71710487909878
+      },
+      "llama_tps": {
+        "median": 111.942,
+        "min": 111.133,
+        "max": 112.104
+      },
+      "engine_over_llama": 1.1309376595771055,
+      "files": [
+        "results/measurements/engine-q8-f16-t4-c1024.json",
+        "results/measurements/llama-q8_0-f16-t4-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 4,
+      "context": 4096,
+      "engine_tps": {
+        "median": 86.42492671193223,
+        "min": 80.17309853011243,
+        "max": 86.47814672099649
+      },
+      "llama_tps": {
+        "median": 71.828,
+        "min": 71.3999,
+        "max": 71.8737
+      },
+      "engine_over_llama": 1.2032205645699758,
+      "files": [
+        "results/measurements/engine-q8-f16-t4-c4096.json",
+        "results/measurements/llama-q8_0-f16-t4-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 6,
+      "context": 128,
+      "engine_tps": {
+        "median": 202.4450964469949,
+        "min": 202.2164924459944,
+        "max": 203.6346131191803
+      },
+      "llama_tps": {
+        "median": 184.497,
+        "min": 183.873,
+        "max": 186.186
+      },
+      "engine_over_llama": 1.097281237348005,
+      "files": [
+        "results/measurements/engine-q8-f16-t6-c128.json",
+        "results/measurements/llama-q8_0-f16-t6-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 6,
+      "context": 1024,
+      "engine_tps": {
+        "median": 173.15594920444255,
+        "min": 173.02349396268582,
+        "max": 174.41517148625022
+      },
+      "llama_tps": {
+        "median": 149.596,
+        "min": 149.46,
+        "max": 149.901
+      },
+      "engine_over_llama": 1.1574905024495477,
+      "files": [
+        "results/measurements/engine-q8-f16-t6-c1024.json",
+        "results/measurements/llama-q8_0-f16-t6-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 6,
+      "context": 4096,
+      "engine_tps": {
+        "median": 119.59982675367097,
+        "min": 117.74770107364635,
+        "max": 119.68969369701803
+      },
+      "llama_tps": {
+        "median": 99.6188,
+        "min": 98.966,
+        "max": 100.103
+      },
+      "engine_over_llama": 1.200574858898832,
+      "files": [
+        "results/measurements/engine-q8-f16-t6-c4096.json",
+        "results/measurements/llama-q8_0-f16-t6-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 12,
+      "context": 128,
+      "engine_tps": {
+        "median": 305.3617748817267,
+        "min": 284.9195940878757,
+        "max": 305.5694287259212
+      },
+      "llama_tps": {
+        "median": 250.364,
+        "min": 223.493,
+        "max": 256.225
+      },
+      "engine_over_llama": 1.219671258175004,
+      "files": [
+        "results/measurements/engine-q8-f16-t12-c128.json",
+        "results/measurements/llama-q8_0-f16-t12-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 12,
+      "context": 1024,
+      "engine_tps": {
+        "median": 256.6940102474174,
+        "min": 252.30530569358146,
+        "max": 263.5555124422663
+      },
+      "llama_tps": {
+        "median": 213.619,
+        "min": 181.605,
+        "max": 215.51
+      },
+      "engine_over_llama": 1.2016440964868171,
+      "files": [
+        "results/measurements/engine-q8-f16-t12-c1024.json",
+        "results/measurements/llama-q8_0-f16-t12-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 12,
+      "context": 4096,
+      "engine_tps": {
+        "median": 196.76561357587303,
+        "min": 114.19393824888564,
+        "max": 197.65306991845168
+      },
+      "llama_tps": {
+        "median": 153.855,
+        "min": 153.328,
+        "max": 155.314
+      },
+      "engine_over_llama": 1.2789029513234738,
+      "files": [
+        "results/measurements/engine-q8-f16-t12-c4096.json",
+        "results/measurements/llama-q8_0-f16-t12-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 1,
+      "context": 128,
+      "engine_tps": {
+        "median": 46.35636615250291,
+        "min": 46.161517088334385,
+        "max": 46.574689630561906
+      },
+      "llama_tps": {
+        "median": 58.3868,
+        "min": 57.564,
+        "max": 58.5556
+      },
+      "engine_over_llama": 0.7939528481181176,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t1-c128.json",
+        "results/measurements/llama-q4_0-f16-t1-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 1,
+      "context": 1024,
+      "engine_tps": {
+        "median": 38.58228087482341,
+        "min": 38.32629638577755,
+        "max": 38.59902643074848
+      },
+      "llama_tps": {
+        "median": 42.2589,
+        "min": 41.9523,
+        "max": 42.3794
+      },
+      "engine_over_llama": 0.9129977560898039,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t1-c1024.json",
+        "results/measurements/llama-q4_0-f16-t1-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 1,
+      "context": 4096,
+      "engine_tps": {
+        "median": 24.872933007383704,
+        "min": 24.845372456442767,
+        "max": 24.88297892703438
+      },
+      "llama_tps": {
+        "median": 23.0207,
+        "min": 22.9814,
+        "max": 23.0508
+      },
+      "engine_over_llama": 1.0804594563755099,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t1-c4096.json",
+        "results/measurements/llama-q4_0-f16-t1-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 2,
+      "context": 128,
+      "engine_tps": {
+        "median": 88.34942484662471,
+        "min": 88.32247489466772,
+        "max": 88.74999219277412
+      },
+      "llama_tps": {
+        "median": 98.7519,
+        "min": 98.4786,
+        "max": 98.8772
+      },
+      "engine_over_llama": 0.8946605062446871,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t2-c128.json",
+        "results/measurements/llama-q4_0-f16-t2-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 2,
+      "context": 1024,
+      "engine_tps": {
+        "median": 72.16346905599552,
+        "min": 71.78752411169074,
+        "max": 72.55469610587971
+      },
+      "llama_tps": {
+        "median": 71.1641,
+        "min": 70.2558,
+        "max": 71.2715
+      },
+      "engine_over_llama": 1.0140431629992583,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t2-c1024.json",
+        "results/measurements/llama-q4_0-f16-t2-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 2,
+      "context": 4096,
+      "engine_tps": {
+        "median": 47.37606957621153,
+        "min": 47.35215705086314,
+        "max": 47.389862767517215
+      },
+      "llama_tps": {
+        "median": 41.607,
+        "min": 41.5478,
+        "max": 41.6135
+      },
+      "engine_over_llama": 1.1386562255440558,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t2-c4096.json",
+        "results/measurements/llama-q4_0-f16-t2-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 4,
+      "context": 128,
+      "engine_tps": {
+        "median": 158.98806797530872,
+        "min": 158.48257216184481,
+        "max": 159.37877500457492
+      },
+      "llama_tps": {
+        "median": 173.305,
+        "min": 172.502,
+        "max": 173.51
+      },
+      "engine_over_llama": 0.9173888114901977,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t4-c128.json",
+        "results/measurements/llama-q4_0-f16-t4-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 4,
+      "context": 1024,
+      "engine_tps": {
+        "median": 134.1435458178557,
+        "min": 133.78084139620708,
+        "max": 134.32265663820428
+      },
+      "llama_tps": {
+        "median": 127.591,
+        "min": 126.139,
+        "max": 128.251
+      },
+      "engine_over_llama": 1.0513558622305312,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t4-c1024.json",
+        "results/measurements/llama-q4_0-f16-t4-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 4,
+      "context": 4096,
+      "engine_tps": {
+        "median": 88.97669455127688,
+        "min": 88.90636936287845,
+        "max": 88.99518275750373
+      },
+      "llama_tps": {
+        "median": 78.0894,
+        "min": 78.0712,
+        "max": 78.3029
+      },
+      "engine_over_llama": 1.1394209015727728,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t4-c4096.json",
+        "results/measurements/llama-q4_0-f16-t4-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 6,
+      "context": 128,
+      "engine_tps": {
+        "median": 225.37937723198655,
+        "min": 224.09537319807012,
+        "max": 225.41102432348373
+      },
+      "llama_tps": {
+        "median": 228.594,
+        "min": 226.384,
+        "max": 229.116
+      },
+      "engine_over_llama": 0.9859374140703018,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t6-c128.json",
+        "results/measurements/llama-q4_0-f16-t6-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 6,
+      "context": 1024,
+      "engine_tps": {
+        "median": 188.84990948069748,
+        "min": 185.52561395034806,
+        "max": 188.98359578686114
+      },
+      "llama_tps": {
+        "median": 173.501,
+        "min": 173.366,
+        "max": 175.81
+      },
+      "engine_over_llama": 1.088465827175045,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t6-c1024.json",
+        "results/measurements/llama-q4_0-f16-t6-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 6,
+      "context": 4096,
+      "engine_tps": {
+        "median": 126.45889102033594,
+        "min": 126.4507486939396,
+        "max": 126.48091163520198
+      },
+      "llama_tps": {
+        "median": 109.761,
+        "min": 109.662,
+        "max": 110.26
+      },
+      "engine_over_llama": 1.1521295452878157,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t6-c4096.json",
+        "results/measurements/llama-q4_0-f16-t6-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 12,
+      "context": 128,
+      "engine_tps": {
+        "median": 275.08033334303565,
+        "min": 166.305503084437,
+        "max": 299.9451962633277
+      },
+      "llama_tps": {
+        "median": 276.896,
+        "min": 149.432,
+        "max": 277.174
+      },
+      "engine_over_llama": 0.9934427848110324,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t12-c128.json",
+        "results/measurements/llama-q4_0-f16-t12-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 12,
+      "context": 1024,
+      "engine_tps": {
+        "median": 294.93410490061405,
+        "min": 290.21580755804314,
+        "max": 300.7294832666785
+      },
+      "llama_tps": {
+        "median": 251.614,
+        "min": 251.548,
+        "max": 255.395
+      },
+      "engine_over_llama": 1.1721688972021194,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t12-c1024.json",
+        "results/measurements/llama-q4_0-f16-t12-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 12,
+      "context": 4096,
+      "engine_tps": {
+        "median": 206.92946242803737,
+        "min": 206.74264252036647,
+        "max": 207.20485468542236
+      },
+      "llama_tps": {
+        "median": 172.827,
+        "min": 171.995,
+        "max": 173.036
+      },
+      "engine_over_llama": 1.197321381659332,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t12-c4096.json",
+        "results/measurements/llama-q4_0-f16-t12-c4096.json"
+      ]
+    }
+  ],
+  "ablations": [
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": false,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 197.2673539790058,
+        "min": 196.80767616851665,
+        "max": 197.4060207306426
+      },
+      "file": "results/ablations/engine-q8-f16-unfused-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "mmap",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 202.42373322120747,
+        "min": 200.4575016502977,
+        "max": 202.42534920017445
+      },
+      "file": "results/ablations/engine-q8-f16-mmap-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f32",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 199.5150462588728,
+        "min": 199.44070842137393,
+        "max": 199.5188503165192
+      },
+      "file": "results/ablations/engine-q8-f32-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "scalar",
+      "tokens_per_second": {
+        "median": 121.11293980716412,
+        "min": 121.03999500346899,
+        "max": 121.26220801595034
+      },
+      "file": "results/ablations/engine-q8-f16-scalar-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 198.64064988963463,
+        "min": 198.07801436298345,
+        "max": 198.89428946276826
+      },
+      "file": "results/ablations/engine-q8-f16-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q4",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 225.23473048595153,
+        "min": 225.03047440038557,
+        "max": 225.34491116051515
+      },
+      "file": "results/ablations/engine-q4h8-f16-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q4",
+      "head_format": "q4",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 241.1234435538232,
+        "min": 240.184409987222,
+        "max": 241.84551343923425
+      },
+      "file": "results/ablations/engine-q4-f16-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": false,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 116.36051197810745,
+        "min": 116.3128385289709,
+        "max": 116.48781321971268
+      },
+      "file": "results/ablations/engine-q8-f16-unfused-t6-c4096.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "mmap",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 117.73990972836968,
+        "min": 117.27058231381955,
+        "max": 118.38038877333072
+      },
+      "file": "results/ablations/engine-q8-f16-mmap-t6-c4096.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f32",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 121.27803674386452,
+        "min": 120.60814031526921,
+        "max": 121.69214509756043
+      },
+      "file": "results/ablations/engine-q8-f32-t6-c4096.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "scalar",
+      "tokens_per_second": {
+        "median": 44.722708890702904,
+        "min": 44.60591761841245,
+        "max": 44.78375227553943
+      },
+      "file": "results/ablations/engine-q8-f16-scalar-t6-c4096.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 117.21502149181374,
+        "min": 116.97068957233498,
+        "max": 117.49634988409682
+      },
+      "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q4",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 125.72599789922859,
+        "min": 125.46557235280798,
+        "max": 125.96746060519224
+      },
+      "file": "results/ablations/engine-q4h8-f16-t6-c4096.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q4",
+      "head_format": "q4",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 130.88881563659965,
+        "min": 130.80607387212524,
+        "max": 131.2066549589875
+      },
+      "file": "results/ablations/engine-q4-f16-t6-c4096.json"
+    }
+  ],
+  "ablation_effects": [
+    {
+      "field": "fused_projections",
+      "change": "fused_projections: False \u2192 True",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": false,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 197.2673539790058,
+          "min": 196.80767616851665,
+          "max": 197.4060207306426
+        },
+        "file": "results/ablations/engine-q8-f16-unfused-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "ratio": 1.006961597461154
+    },
+    {
+      "field": "weight_memory",
+      "change": "weight_memory: mmap \u2192 hugepage",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "mmap",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 202.42373322120747,
+          "min": 200.4575016502977,
+          "max": 202.42534920017445
+        },
+        "file": "results/ablations/engine-q8-f16-mmap-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "ratio": 0.9813110682657022
+    },
+    {
+      "field": "kv_dtype",
+      "change": "kv_dtype: f32 \u2192 f16",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f32",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 199.5150462588728,
+          "min": 199.44070842137393,
+          "max": 199.5188503165192
+        },
+        "file": "results/ablations/engine-q8-f32-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "ratio": 0.995617391341485
+    },
+    {
+      "field": "weight_format",
+      "change": "weight_format: q8 \u2192 q4",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 225.23473048595153,
+          "min": 225.03047440038557,
+          "max": 225.34491116051515
+        },
+        "file": "results/ablations/engine-q4h8-f16-t6-c128.json"
+      },
+      "ratio": 1.1338803543539182
+    },
+    {
+      "field": "head_format",
+      "change": "head_format: q8 \u2192 q4",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 225.23473048595153,
+          "min": 225.03047440038557,
+          "max": 225.34491116051515
+        },
+        "file": "results/ablations/engine-q4h8-f16-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q4",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 241.1234435538232,
+          "min": 240.184409987222,
+          "max": 241.84551343923425
+        },
+        "file": "results/ablations/engine-q4-f16-t6-c128.json"
+      },
+      "ratio": 1.070542908873739
+    },
+    {
+      "field": "kernel",
+      "change": "kernel: scalar \u2192 neon",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "scalar",
+        "tokens_per_second": {
+          "median": 121.11293980716412,
+          "min": 121.03999500346899,
+          "max": 121.26220801595034
+        },
+        "file": "results/ablations/engine-q8-f16-scalar-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "ratio": 1.6401273902351807
+    },
+    {
+      "field": "fused_projections",
+      "change": "fused_projections: False \u2192 True",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": false,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 116.36051197810745,
+          "min": 116.3128385289709,
+          "max": 116.48781321971268
+        },
+        "file": "results/ablations/engine-q8-f16-unfused-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+      },
+      "ratio": 1.0073436383114838
+    },
+    {
+      "field": "weight_memory",
+      "change": "weight_memory: mmap \u2192 hugepage",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "mmap",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.73990972836968,
+          "min": 117.27058231381955,
+          "max": 118.38038877333072
+        },
+        "file": "results/ablations/engine-q8-f16-mmap-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+      },
+      "ratio": 0.9955419684135407
+    },
+    {
+      "field": "kv_dtype",
+      "change": "kv_dtype: f32 \u2192 f16",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f32",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 121.27803674386452,
+          "min": 120.60814031526921,
+          "max": 121.69214509756043
+        },
+        "file": "results/ablations/engine-q8-f32-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+      },
+      "ratio": 0.9664983424770328
+    },
+    {
+      "field": "weight_format",
+      "change": "weight_format: q8 \u2192 q4",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 125.72599789922859,
+          "min": 125.46557235280798,
+          "max": 125.96746060519224
+        },
+        "file": "results/ablations/engine-q4h8-f16-t6-c4096.json"
+      },
+      "ratio": 1.0726099462261265
+    },
+    {
+      "field": "head_format",
+      "change": "head_format: q8 \u2192 q4",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 125.72599789922859,
+          "min": 125.46557235280798,
+          "max": 125.96746060519224
+        },
+        "file": "results/ablations/engine-q4h8-f16-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q4",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 130.88881563659965,
+          "min": 130.80607387212524,
+          "max": 131.2066549589875
+        },
+        "file": "results/ablations/engine-q4-f16-t6-c4096.json"
+      },
+      "ratio": 1.0410640426295057
+    },
+    {
+      "field": "kernel",
+      "change": "kernel: scalar \u2192 neon",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "scalar",
+        "tokens_per_second": {
+          "median": 44.722708890702904,
+          "min": 44.60591761841245,
+          "max": 44.78375227553943
+        },
+        "file": "results/ablations/engine-q8-f16-scalar-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+      },
+      "ratio": 2.6209284812839404
+    }
+  ]
+}
