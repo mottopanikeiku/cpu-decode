@@ -60,22 +60,27 @@
       }
     }
   },
-  "format": "safetensors I8 matrices, FP32 output-row scales/norms/QKV biases",
-  "quantization": "symmetric round-away-from-zero; scale=max(abs(row))/127, zeros use scale1",
+  "weight_format": "q8",
+  "head_format": "q8",
+  "format": "32-weight blocks with F16 scales (q8: int8; q4: 4-bit offset-8 levels, scale = signed extreme / -8); FP32 norms/biases; activations quantized per 32-element block at run time",
+  "storage": "safetensors: I8 [rows, cols] (q8) or U8 [rows, cols/2] (q4) matrices with NAME.scales F16 [rows, cols/32]; F32 vectors",
   "tied_head": true,
-  "activation_dtype": "float32",
   "command": [
     "build/cpu-decode",
     "quantize",
     "--model",
     "$MODEL",
     "--output",
-    "$INT8"
+    "$QUANT",
+    "--format",
+    "q8",
+    "--head-format",
+    "q8"
   ],
   "weights": {
     "path": "model.safetensors",
-    "bytes": 496122856,
-    "sha256": "ec842d79d32b753e0236e071566516028626e3aecd7c2156dace7e0e0c7d7a91"
+    "bytes": 525171736,
+    "sha256": "05bcc8fb71c7803a9cd3faad12783982dcdaca916305dbc4c33de4fa6ef78de1"
   },
   "config_sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45"
 }

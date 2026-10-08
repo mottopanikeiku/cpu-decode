@@ -1,12 +1,12 @@
 {
-  "label": "llama.cpp Q8_0",
+  "label": "llama.cpp Q4_0",
   "quality_reporting_only": true,
   "quality_thresholds": null,
   "independent_greedy_generation_checked": false,
   "comparison": "Full-vocabulary logits at every position on the exact oracle teacher-forced tokens; KL(reference || candidate) in nats",
   "scope": "Four fixed prompts only; prompt-only includes every prompt position, and the larger scope also includes the oracle's reference continuation inputs",
   "compared_path": {
-    "weight_quantization": "Q8_0",
+    "weight_quantization": "Q4_0",
     "kv_dtype": "float16",
     "flash_attention": "auto",
     "threads": 1,
@@ -20,12 +20,13 @@
     "pin_provenance": "Preparation manifest; reader binary revision is not independently reported by the reader interface",
     "artifact": {
       "path": "$GGUF",
-      "sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7",
-      "bytes": 531068416,
+      "sha256": "ba40202e6847c26ada7fc8862d5332462a6f412027d06e5d386da990d71422ef",
+      "bytes": 352155136,
       "tensor_types": {
         "counts": {
           "F32": 121,
-          "Q8_0": 169
+          "Q4_0": 168,
+          "Q8_0": 1
         },
         "token_embd.weight": "Q8_0"
       }
@@ -366,17 +367,17 @@
   "aggregate": {
     "prompt_only": {
       "positions": 60,
-      "top1_matches": 55,
-      "top1_agreement": 0.9166666666666666,
-      "mean_kl_reference_candidate_nats": 0.010161915283626696,
-      "max_kl_reference_candidate_nats": 0.17232837029845754
+      "top1_matches": 43,
+      "top1_agreement": 0.7166666666666667,
+      "mean_kl_reference_candidate_nats": 0.7137020362766526,
+      "max_kl_reference_candidate_nats": 6.967379604538066
     },
     "prompt_and_reference_continuation": {
       "positions": 88,
-      "top1_matches": 83,
-      "top1_agreement": 0.9431818181818182,
-      "mean_kl_reference_candidate_nats": 0.007500044425241977,
-      "max_kl_reference_candidate_nats": 0.17232837029845754
+      "top1_matches": 69,
+      "top1_agreement": 0.7840909090909091,
+      "mean_kl_reference_candidate_nats": 0.5144120737664489,
+      "max_kl_reference_candidate_nats": 6.967379604538066
     }
   },
   "prompts": [
@@ -417,115 +418,115 @@
         {
           "position": 0,
           "reference_top1": 2701,
-          "candidate_top1": 2701,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.04149966853032426,
-          "max_abs_error": 1.800525426864624,
-          "rmse": 0.3511243764279413
+          "candidate_top1": 253,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 6.967379604538066,
+          "max_abs_error": 14.346144676208496,
+          "rmse": 3.135184220944913
         },
         {
           "position": 1,
           "reference_top1": 315,
           "candidate_top1": 315,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.003898555481942549,
-          "max_abs_error": 0.8349020481109619,
-          "rmse": 0.16487040677388456
+          "kl_reference_candidate_nats": 0.21442267481713737,
+          "max_abs_error": 7.675699234008789,
+          "rmse": 1.4074761704752339
         },
         {
           "position": 2,
           "reference_top1": 279,
           "candidate_top1": 279,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.007412769997688794,
-          "max_abs_error": 0.8727989196777344,
-          "rmse": 0.18089842197737704
+          "kl_reference_candidate_nats": 0.5389408504294512,
+          "max_abs_error": 6.850562512874603,
+          "rmse": 1.4360812836378367
         },
         {
           "position": 3,
           "reference_top1": 374,
           "candidate_top1": 374,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.002577533307593464,
-          "max_abs_error": 0.843427836894989,
-          "rmse": 0.17719551058411617
+          "kl_reference_candidate_nats": 0.12747049683629383,
+          "max_abs_error": 5.7206020802259445,
+          "rmse": 1.343844661711997
         },
         {
           "position": 4,
           "reference_top1": 12095,
           "candidate_top1": 12095,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.003503954935927779,
-          "max_abs_error": 0.6427021026611328,
-          "rmse": 0.13009917348110753
+          "kl_reference_candidate_nats": 0.8942186061664397,
+          "max_abs_error": 5.577272653579712,
+          "rmse": 1.0121919901250722
         },
         {
           "position": 5,
           "reference_top1": 13,
           "candidate_top1": 13,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0027485047117223023,
-          "max_abs_error": 0.7878053188323975,
-          "rmse": 0.14531532552238663
+          "kl_reference_candidate_nats": 0.10218727602251503,
+          "max_abs_error": 4.553780555725098,
+          "rmse": 0.999517485102892
         },
         {
           "position": 6,
           "reference_top1": 1084,
           "candidate_top1": 1084,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.003531963648891064,
-          "max_abs_error": 0.5992474555969238,
-          "rmse": 0.12491554732604027
+          "kl_reference_candidate_nats": 0.15569162739111778,
+          "max_abs_error": 4.2172932624816895,
+          "rmse": 0.8943814096732754
         },
         {
           "position": 7,
           "reference_top1": 374,
           "candidate_top1": 374,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0003476002589230877,
-          "max_abs_error": 0.5201048851013184,
-          "rmse": 0.11072260304600447
+          "kl_reference_candidate_nats": 0.09617929675011433,
+          "max_abs_error": 3.685572028160095,
+          "rmse": 0.9471603231126413
         },
         {
           "position": 8,
           "reference_top1": 279,
           "candidate_top1": 279,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.002075444652491765,
-          "max_abs_error": 0.4218277931213379,
-          "rmse": 0.09285711552601876
+          "kl_reference_candidate_nats": 0.1301782495145225,
+          "max_abs_error": 3.463067054748535,
+          "rmse": 0.7927151134773127
         },
         {
           "position": 9,
           "reference_top1": 7772,
           "candidate_top1": 7772,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0024021357249331245,
-          "max_abs_error": 0.45645594596862793,
-          "rmse": 0.09462560779586376
+          "kl_reference_candidate_nats": 0.18938371974868384,
+          "max_abs_error": 3.774038553237915,
+          "rmse": 0.7853952631086241
         },
         {
           "position": 10,
           "reference_top1": 3283,
           "candidate_top1": 3283,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00033563889707678284,
-          "max_abs_error": 0.4595673084259033,
-          "rmse": 0.0941702904009925
+          "kl_reference_candidate_nats": 0.0192535998238828,
+          "max_abs_error": 4.531706809997559,
+          "rmse": 0.8153158149002195
         },
         {
           "position": 11,
           "reference_top1": 304,
           "candidate_top1": 304,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0004975054007096788,
-          "max_abs_error": 0.5563981533050537,
-          "rmse": 0.12406340482817867
+          "kl_reference_candidate_nats": 0.04728902828433423,
+          "max_abs_error": 4.157014727592468,
+          "rmse": 0.9454792241850396
         }
       ],
       "reader_settings": {
         "argmax": [
-          2701,
+          253,
           315,
           279,
           374,
@@ -539,9 +540,9 @@
           304
         ],
         "flash_attention": "auto",
-        "ftype": "MOSTLY_Q8_0",
+        "ftype": "MOSTLY_Q4_0",
         "kv_dtype": "float16",
-        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q4_0.gguf",
         "positions": [
           0,
           1,
@@ -577,8 +578,8 @@
         ]
       },
       "logits": {
-        "path": "$REFERENCE_DIR/factual-llama-q8_0.bin",
-        "sha256": "16f1be483e00a3ffc293ef3c46cec8b0436d8d2ac0b8a70c9292f4a6e2386901",
+        "path": "$REFERENCE_DIR/factual-llama-q4_0.bin",
+        "sha256": "ae90d7a60f98c978c03a591083f2030dc3a98ae7467a30bab1d77131f929fc52",
         "shape": [
           12,
           151936
@@ -586,8 +587,8 @@
         "dtype": "little-endian float32"
       },
       "reader_metadata": {
-        "path": "$REFERENCE_DIR/factual-llama-q8_0.json",
-        "sha256": "7cc86d5efd758e29b2d0f36d4e4fbd239a3fce5dd2506f382679fd5056e36ac4"
+        "path": "$REFERENCE_DIR/factual-llama-q4_0.json",
+        "sha256": "f8f1db2286fa387e10ecc2f91beab5885e36e340b66040e2c4d365207881a8f1"
       },
       "command": [
         "$LLAMA_LOGITS",
@@ -596,24 +597,24 @@
         "--tokens",
         "785,6722,315,9625,374,12095,13,1084,374,279,7772,3283",
         "--output",
-        "$REFERENCE_DIR/factual-llama-q8_0",
+        "$REFERENCE_DIR/factual-llama-q4_0",
         "--threads",
         "1"
       ],
       "aggregate": {
         "prompt_only": {
           "positions": 5,
-          "top1_matches": 5,
-          "top1_agreement": 1.0,
-          "mean_kl_reference_candidate_nats": 0.01177849645069537,
-          "max_kl_reference_candidate_nats": 0.04149966853032426
+          "top1_matches": 4,
+          "top1_agreement": 0.8,
+          "mean_kl_reference_candidate_nats": 1.7484864465574776,
+          "max_kl_reference_candidate_nats": 6.967379604538066
         },
         "prompt_and_reference_continuation": {
           "positions": 12,
-          "top1_matches": 12,
-          "top1_agreement": 1.0,
-          "mean_kl_reference_candidate_nats": 0.005902606295685387,
-          "max_kl_reference_candidate_nats": 0.04149966853032426
+          "top1_matches": 11,
+          "top1_agreement": 0.9166666666666666,
+          "mean_kl_reference_candidate_nats": 0.7902162525268799,
+          "max_kl_reference_candidate_nats": 6.967379604538066
         }
       }
     },
@@ -678,235 +679,235 @@
         {
           "position": 0,
           "reference_top1": 1887,
-          "candidate_top1": 1887,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.04240309748992513,
-          "max_abs_error": 1.5817152261734009,
-          "rmse": 0.31139286949033046
+          "candidate_top1": 253,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 4.931798775743557,
+          "max_abs_error": 16.38761281967163,
+          "rmse": 2.958528495693489
         },
         {
           "position": 1,
           "reference_top1": 1445,
           "candidate_top1": 1445,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.004011919575963841,
-          "max_abs_error": 0.6489039659500122,
-          "rmse": 0.13236413116574466
+          "kl_reference_candidate_nats": 0.2920023246128922,
+          "max_abs_error": 6.459233403205872,
+          "rmse": 1.1936554850774959
         },
         {
           "position": 2,
           "reference_top1": 982,
           "candidate_top1": 982,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.001013243594999995,
-          "max_abs_error": 0.6527330875396729,
-          "rmse": 0.14046076970249616
+          "kl_reference_candidate_nats": 0.08857328371152583,
+          "max_abs_error": 6.644379615783691,
+          "rmse": 1.2813923962639036
         },
         {
           "position": 3,
           "reference_top1": 262,
           "candidate_top1": 262,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00019490888531317185,
-          "max_abs_error": 0.5222694277763367,
-          "rmse": 0.10677315617979169
+          "kl_reference_candidate_nats": 0.006104566345567597,
+          "max_abs_error": 3.5667511224746704,
+          "rmse": 0.7761665668830516
         },
         {
           "position": 4,
           "reference_top1": 421,
           "candidate_top1": 421,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0024756751870328554,
-          "max_abs_error": 0.535696268081665,
-          "rmse": 0.1111514832319156
+          "kl_reference_candidate_nats": 0.1080215353066259,
+          "max_abs_error": 3.9044979214668274,
+          "rmse": 0.7920194483498346
         },
         {
           "position": 5,
           "reference_top1": 308,
           "candidate_top1": 308,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00011589112136840138,
-          "max_abs_error": 0.5778477191925049,
-          "rmse": 0.1120209337331732
+          "kl_reference_candidate_nats": 0.019161140017271525,
+          "max_abs_error": 3.6126476526260376,
+          "rmse": 0.9677717527850386
         },
         {
           "position": 6,
           "reference_top1": 2651,
-          "candidate_top1": 2651,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.001465399215733189,
-          "max_abs_error": 0.4374237060546875,
-          "rmse": 0.10509319895872087
+          "candidate_top1": 621,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.10098430630084029,
+          "max_abs_error": 3.936323881149292,
+          "rmse": 0.8231990569144141
         },
         {
           "position": 7,
           "reference_top1": 220,
           "candidate_top1": 220,
           "top1_match": true,
-          "kl_reference_candidate_nats": 1.0321706265326924e-05,
-          "max_abs_error": 0.5993227958679199,
-          "rmse": 0.1190559810390016
+          "kl_reference_candidate_nats": 0.023596537905243804,
+          "max_abs_error": 4.079710602760315,
+          "rmse": 0.8707129026716085
         },
         {
           "position": 8,
           "reference_top1": 15,
-          "candidate_top1": 15,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.0009970072570381714,
-          "max_abs_error": 0.7228853106498718,
-          "rmse": 0.13732819270403784
+          "candidate_top1": 17,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.34726035411872735,
+          "max_abs_error": 5.94756805896759,
+          "rmse": 1.285509977272202
         },
         {
           "position": 9,
           "reference_top1": 510,
           "candidate_top1": 510,
           "top1_match": true,
-          "kl_reference_candidate_nats": 4.754144876382926e-05,
-          "max_abs_error": 0.5366230010986328,
-          "rmse": 0.1076251602924188
+          "kl_reference_candidate_nats": 0.015921572137166308,
+          "max_abs_error": 3.3425755500793457,
+          "rmse": 0.7350397679259368
         },
         {
           "position": 10,
           "reference_top1": 286,
           "candidate_top1": 286,
           "top1_match": true,
-          "kl_reference_candidate_nats": 2.1740110177110675e-05,
-          "max_abs_error": 0.540285587310791,
-          "rmse": 0.10422392742672648
+          "kl_reference_candidate_nats": 0.0027514565244763484,
+          "max_abs_error": 3.512882739305496,
+          "rmse": 0.8050065553493436
         },
         {
           "position": 11,
           "reference_top1": 470,
           "candidate_top1": 470,
           "top1_match": true,
-          "kl_reference_candidate_nats": 2.7011120573094883e-05,
-          "max_abs_error": 0.5912388265132904,
-          "rmse": 0.13882971112110024
+          "kl_reference_candidate_nats": 0.006556741876857936,
+          "max_abs_error": 4.048816680908203,
+          "rmse": 0.797010789498611
         },
         {
           "position": 12,
           "reference_top1": 308,
-          "candidate_top1": 308,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.0005573429689146217,
-          "max_abs_error": 0.6491265296936035,
-          "rmse": 0.1130942530185098
+          "candidate_top1": 220,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.42735224235538527,
+          "max_abs_error": 5.108888387680054,
+          "rmse": 1.2118276793295242
         },
         {
           "position": 13,
           "reference_top1": 198,
           "candidate_top1": 198,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00020837512283507217,
-          "max_abs_error": 0.5322471857070923,
-          "rmse": 0.11740779937444074
+          "kl_reference_candidate_nats": 0.0400741984864722,
+          "max_abs_error": 4.833118438720703,
+          "rmse": 0.9742852932916483
         },
         {
           "position": 14,
           "reference_top1": 262,
           "candidate_top1": 262,
           "top1_match": true,
-          "kl_reference_candidate_nats": 3.831952896152305e-05,
-          "max_abs_error": 0.5458252429962158,
-          "rmse": 0.11887136910481118
+          "kl_reference_candidate_nats": 0.0001070537945780081,
+          "max_abs_error": 4.465352416038513,
+          "rmse": 0.8483866134670913
         },
         {
           "position": 15,
           "reference_top1": 770,
           "candidate_top1": 770,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.002472279745470863,
-          "max_abs_error": 0.6495270729064941,
-          "rmse": 0.12987380697071024
+          "kl_reference_candidate_nats": 0.06816144851666216,
+          "max_abs_error": 4.820385575294495,
+          "rmse": 1.0201131218915087
         },
         {
           "position": 16,
           "reference_top1": 75698,
           "candidate_top1": 75698,
           "top1_match": true,
-          "kl_reference_candidate_nats": 5.033474208136805e-05,
-          "max_abs_error": 0.5734238624572754,
-          "rmse": 0.11125293905836435
+          "kl_reference_candidate_nats": 0.005063745779097511,
+          "max_abs_error": 5.379745244979858,
+          "rmse": 1.1133777264894504
         },
         {
           "position": 17,
           "reference_top1": 1445,
           "candidate_top1": 1445,
           "top1_match": true,
-          "kl_reference_candidate_nats": 1.7320428015336895e-05,
-          "max_abs_error": 0.5879826545715332,
-          "rmse": 0.1372150517234154
+          "kl_reference_candidate_nats": 0.000956894322749214,
+          "max_abs_error": 5.424614906311035,
+          "rmse": 1.4326478074504174
         },
         {
           "position": 18,
           "reference_top1": 12,
           "candidate_top1": 12,
           "top1_match": true,
-          "kl_reference_candidate_nats": 6.634609352354861e-05,
-          "max_abs_error": 0.5466277897357941,
-          "rmse": 0.10545440161272006
+          "kl_reference_candidate_nats": 0.004651216824730806,
+          "max_abs_error": 5.038214206695557,
+          "rmse": 0.8867350468313011
         },
         {
           "position": 19,
           "reference_top1": 16,
           "candidate_top1": 16,
           "top1_match": true,
-          "kl_reference_candidate_nats": 1.584332029818869e-05,
-          "max_abs_error": 0.5987159013748169,
-          "rmse": 0.11671714767400393
+          "kl_reference_candidate_nats": 0.00017008028647859627,
+          "max_abs_error": 4.633908271789551,
+          "rmse": 0.9830659075158333
         },
         {
           "position": 20,
           "reference_top1": 8,
           "candidate_top1": 8,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00021037497568677916,
-          "max_abs_error": 0.6444351673126221,
-          "rmse": 0.13001154664866438
+          "kl_reference_candidate_nats": 0.0008035981484739958,
+          "max_abs_error": 6.084577679634094,
+          "rmse": 1.0607449606928274
         },
         {
           "position": 21,
           "reference_top1": 488,
           "candidate_top1": 488,
           "top1_match": true,
-          "kl_reference_candidate_nats": 1.2680455293926896e-05,
-          "max_abs_error": 0.48503386974334717,
-          "rmse": 0.10248223204425103
+          "kl_reference_candidate_nats": 0.0009300678408291739,
+          "max_abs_error": 5.265419960021973,
+          "rmse": 0.9647865198104982
         },
         {
           "position": 22,
           "reference_top1": 75698,
           "candidate_top1": 75698,
           "top1_match": true,
-          "kl_reference_candidate_nats": 4.6060715024125914e-06,
-          "max_abs_error": 0.5751914978027344,
-          "rmse": 0.10785075276144507
+          "kl_reference_candidate_nats": 0.0017088719897403138,
+          "max_abs_error": 4.92748236656189,
+          "rmse": 1.1520032415648132
         },
         {
           "position": 23,
           "reference_top1": 1445,
           "candidate_top1": 1445,
           "top1_match": true,
-          "kl_reference_candidate_nats": 8.161182859319213e-07,
-          "max_abs_error": 0.5431168079376221,
-          "rmse": 0.11541981960787538
+          "kl_reference_candidate_nats": 0.0015039663517652662,
+          "max_abs_error": 4.821027159690857,
+          "rmse": 1.1507618457910527
         }
       ],
       "reader_settings": {
         "argmax": [
-          1887,
+          253,
           1445,
           982,
           262,
           421,
           308,
-          2651,
+          621,
           220,
-          15,
+          17,
           510,
           286,
           470,
-          308,
+          220,
           198,
           262,
           770,
@@ -920,9 +921,9 @@
           1445
         ],
         "flash_attention": "auto",
-        "ftype": "MOSTLY_Q8_0",
+        "ftype": "MOSTLY_Q4_0",
         "kv_dtype": "float16",
-        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q4_0.gguf",
         "positions": [
           0,
           1,
@@ -982,8 +983,8 @@
         ]
       },
       "logits": {
-        "path": "$REFERENCE_DIR/code-llama-q8_0.bin",
-        "sha256": "f07c45b79d7e1aa2f87f604489fdd9385e4721c20240f1c5a731168bf1b55b35",
+        "path": "$REFERENCE_DIR/code-llama-q4_0.bin",
+        "sha256": "028c6dd156a2a5341dd470c8eb5dc57073e872a432d56ababd564deedcf31d6e",
         "shape": [
           24,
           151936
@@ -991,8 +992,8 @@
         "dtype": "little-endian float32"
       },
       "reader_metadata": {
-        "path": "$REFERENCE_DIR/code-llama-q8_0.json",
-        "sha256": "76b1e1b1ce6ad209f5a2b670b71d1163b8f7b9429e3581f5c41109652db753b0"
+        "path": "$REFERENCE_DIR/code-llama-q4_0.json",
+        "sha256": "5a0cb8d3159174028d65131493af9922235e179000dd96153765c678cd4754b6"
       },
       "command": [
         "$LLAMA_LOGITS",
@@ -1001,24 +1002,24 @@
         "--tokens",
         "750,75698,1445,982,262,421,308,366,220,17,510,286,470,308,198,262,470,75698,1445,12,16,8,488,75698",
         "--output",
-        "$REFERENCE_DIR/code-llama-q8_0",
+        "$REFERENCE_DIR/code-llama-q4_0",
         "--threads",
         "1"
       ],
       "aggregate": {
         "prompt_only": {
           "positions": 17,
-          "top1_matches": 17,
-          "top1_agreement": 1.0,
-          "mean_kl_reference_candidate_nats": 0.003300612283612798,
-          "max_kl_reference_candidate_nats": 0.04240309748992513
+          "top1_matches": 13,
+          "top1_agreement": 0.7647058823529411,
+          "mean_kl_reference_candidate_nats": 0.3813818402078204,
+          "max_kl_reference_candidate_nats": 4.931798775743557
         },
         "prompt_and_reference_continuation": {
           "positions": 24,
-          "top1_matches": 24,
-          "top1_agreement": 1.0,
-          "mean_kl_reference_candidate_nats": 0.0023515998451676535,
-          "max_kl_reference_candidate_nats": 0.04240309748992513
+          "top1_matches": 20,
+          "top1_agreement": 0.8333333333333334,
+          "mean_kl_reference_candidate_nats": 0.2705923324707381,
+          "max_kl_reference_candidate_nats": 4.931798775743557
         }
       }
     },
@@ -1069,164 +1070,164 @@
         {
           "position": 0,
           "reference_top1": 220,
-          "candidate_top1": 1550,
+          "candidate_top1": 253,
           "top1_match": false,
-          "kl_reference_candidate_nats": 0.05364325227430474,
-          "max_abs_error": 1.9746160507202148,
-          "rmse": 0.40523430825428064
+          "kl_reference_candidate_nats": 5.735615488879606,
+          "max_abs_error": 16.98414373397827,
+          "rmse": 3.363889749423613
         },
         {
           "position": 1,
           "reference_top1": 6290,
-          "candidate_top1": 6290,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.008667452744595313,
-          "max_abs_error": 1.0820398330688477,
-          "rmse": 0.16202865529127597
+          "candidate_top1": 65144,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.5342125134460899,
+          "max_abs_error": 4.995526075363159,
+          "rmse": 0.9601644344535852
         },
         {
           "position": 2,
           "reference_top1": 374,
           "candidate_top1": 374,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.004704853488630261,
-          "max_abs_error": 0.8490009307861328,
-          "rmse": 0.19392710388750206
+          "kl_reference_candidate_nats": 0.28891559338643896,
+          "max_abs_error": 5.8185272216796875,
+          "rmse": 1.1543780094255072
         },
         {
           "position": 3,
           "reference_top1": 264,
           "candidate_top1": 264,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.003029812257379455,
-          "max_abs_error": 0.7664141654968262,
-          "rmse": 0.16237137339908164
+          "kl_reference_candidate_nats": 0.10020871119055327,
+          "max_abs_error": 4.927668541669846,
+          "rmse": 0.9226359927642299
         },
         {
           "position": 4,
           "reference_top1": 821,
-          "candidate_top1": 5109,
-          "top1_match": false,
-          "kl_reference_candidate_nats": 0.033670815754581515,
-          "max_abs_error": 0.9757685661315918,
-          "rmse": 0.18880588288153502
+          "candidate_top1": 821,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 1.0403859137239624,
+          "max_abs_error": 5.5281195640563965,
+          "rmse": 1.138075771669838
         },
         {
           "position": 5,
           "reference_top1": 504,
           "candidate_top1": 504,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0036749371789298055,
-          "max_abs_error": 0.7669281959533691,
-          "rmse": 0.14518398792771903
+          "kl_reference_candidate_nats": 0.11973109157694135,
+          "max_abs_error": 5.160521030426025,
+          "rmse": 0.9600343403705959
         },
         {
           "position": 6,
           "reference_top1": 264,
           "candidate_top1": 264,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.001718025626666573,
-          "max_abs_error": 0.6680434942245483,
-          "rmse": 0.14081085148245273
+          "kl_reference_candidate_nats": 0.07587521503587989,
+          "max_abs_error": 3.274249792098999,
+          "rmse": 0.7568706017098932
         },
         {
           "position": 7,
           "reference_top1": 323,
           "candidate_top1": 323,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0028653820535697867,
-          "max_abs_error": 0.7743120193481445,
-          "rmse": 0.1555801219372703
+          "kl_reference_candidate_nats": 0.11844886585759123,
+          "max_abs_error": 4.7104456424713135,
+          "rmse": 0.8743852972057242
         },
         {
           "position": 8,
           "reference_top1": 576,
           "candidate_top1": 576,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0043232906672092,
-          "max_abs_error": 0.6563881635665894,
-          "rmse": 0.1402876030450101
+          "kl_reference_candidate_nats": 0.10359480442918612,
+          "max_abs_error": 3.0713361501693726,
+          "rmse": 0.6405626484012688
         },
         {
           "position": 9,
           "reference_top1": 11,
           "candidate_top1": 11,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0003559699354761241,
-          "max_abs_error": 0.509533666074276,
-          "rmse": 0.10423854821952568
+          "kl_reference_candidate_nats": 0.003491764077639562,
+          "max_abs_error": 2.7965723276138306,
+          "rmse": 0.5465339875604828
         },
         {
           "position": 10,
           "reference_top1": 279,
           "candidate_top1": 279,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.001548717219055868,
-          "max_abs_error": 0.5014128684997559,
-          "rmse": 0.09353509541808204
+          "kl_reference_candidate_nats": 0.054105295408959635,
+          "max_abs_error": 2.435976982116699,
+          "rmse": 0.5201665063657213
         },
         {
           "position": 11,
           "reference_top1": 13940,
           "candidate_top1": 13940,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.008154617564744072,
-          "max_abs_error": 0.48300933837890625,
-          "rmse": 0.09630019955415464
+          "kl_reference_candidate_nats": 0.14213970969049913,
+          "max_abs_error": 2.676464080810547,
+          "rmse": 0.5290710879501838
         },
         {
           "position": 12,
           "reference_top1": 646,
           "candidate_top1": 646,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0039923262429843185,
-          "max_abs_error": 0.4310293197631836,
-          "rmse": 0.09156772185902692
+          "kl_reference_candidate_nats": 0.10211094891682762,
+          "max_abs_error": 2.944901943206787,
+          "rmse": 0.6338040048149582
         },
         {
           "position": 13,
           "reference_top1": 1172,
-          "candidate_top1": 1172,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.0051086938561998845,
-          "max_abs_error": 0.4206699728965759,
-          "rmse": 0.08875836104133036
+          "candidate_top1": 387,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.14355109950973724,
+          "max_abs_error": 2.775432586669922,
+          "rmse": 0.6024865863391791
         },
         {
           "position": 14,
           "reference_top1": 1349,
           "candidate_top1": 1349,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.003727255133006575,
-          "max_abs_error": 0.4414224177598953,
-          "rmse": 0.09665509329496536
+          "kl_reference_candidate_nats": 0.09191871079804559,
+          "max_abs_error": 2.844121813774109,
+          "rmse": 0.5969136189892722
         },
         {
           "position": 15,
           "reference_top1": 279,
           "candidate_top1": 279,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0026827349715015793,
-          "max_abs_error": 0.4738950729370117,
-          "rmse": 0.0930007213245506
+          "kl_reference_candidate_nats": 0.06711660742658163,
+          "max_abs_error": 3.0485690236091614,
+          "rmse": 0.6357345872944756
         },
         {
           "position": 16,
           "reference_top1": 14324,
           "candidate_top1": 14324,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.003676700626214699,
-          "max_abs_error": 0.43313637375831604,
-          "rmse": 0.09056557812602771
+          "kl_reference_candidate_nats": 0.16769346134428664,
+          "max_abs_error": 3.0621793270111084,
+          "rmse": 0.6982786679231577
         }
       ],
       "reader_settings": {
         "argmax": [
-          1550,
-          6290,
+          253,
+          65144,
           374,
           264,
-          5109,
+          821,
           504,
           264,
           323,
@@ -1235,15 +1236,15 @@
           279,
           13940,
           646,
-          1172,
+          387,
           1349,
           279,
           14324
         ],
         "flash_attention": "auto",
-        "ftype": "MOSTLY_Q8_0",
+        "ftype": "MOSTLY_Q4_0",
         "kv_dtype": "float16",
-        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q4_0.gguf",
         "positions": [
           0,
           1,
@@ -1289,8 +1290,8 @@
         ]
       },
       "logits": {
-        "path": "$REFERENCE_DIR/plain-llama-q8_0.bin",
-        "sha256": "aaf02b40e773d953ee61620cf1569c638e68d0d6846579be2eed6678a8856c44",
+        "path": "$REFERENCE_DIR/plain-llama-q4_0.bin",
+        "sha256": "8780def12a7af1b93c10ca9d7a2665233cca278c5c086355dd64ff302d861851",
         "shape": [
           17,
           151936
@@ -1298,8 +1299,8 @@
         "dtype": "little-endian float32"
       },
       "reader_metadata": {
-        "path": "$REFERENCE_DIR/plain-llama-q8_0.json",
-        "sha256": "c45869205bb19145d60a28491db6edb6e5d72d9441b6ffe3755d56f1cd220ef7"
+        "path": "$REFERENCE_DIR/plain-llama-q4_0.json",
+        "sha256": "166812574fa17d784707239252faacb9d084894d1d54200235414901e9a101d4"
       },
       "command": [
         "$LLAMA_LOGITS",
@@ -1308,7 +1309,7 @@
         "--tokens",
         "32,2613,13940,15804,1614,14324,504,4938,13,15277,11,279,13940,646,1172,1349,279",
         "--output",
-        "$REFERENCE_DIR/plain-llama-q8_0",
+        "$REFERENCE_DIR/plain-llama-q4_0",
         "--threads",
         "1"
       ],
@@ -1317,15 +1318,15 @@
           "positions": 10,
           "top1_matches": 8,
           "top1_agreement": 0.8,
-          "mean_kl_reference_candidate_nats": 0.011665379198134278,
-          "max_kl_reference_candidate_nats": 0.05364325227430474
+          "mean_kl_reference_candidate_nats": 0.8120479961603889,
+          "max_kl_reference_candidate_nats": 5.735615488879606
         },
         "prompt_and_reference_continuation": {
           "positions": 17,
-          "top1_matches": 15,
-          "top1_agreement": 0.8823529411764706,
-          "mean_kl_reference_candidate_nats": 0.008561461035002927,
-          "max_kl_reference_candidate_nats": 0.05364325227430474
+          "top1_matches": 14,
+          "top1_agreement": 0.8235294117647058,
+          "mean_kl_reference_candidate_nats": 0.5228891643940486,
+          "max_kl_reference_candidate_nats": 5.735615488879606
         }
       }
     },
@@ -1412,341 +1413,341 @@
         {
           "position": 0,
           "reference_top1": 72030,
-          "candidate_top1": 72030,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.17232837029845754,
-          "max_abs_error": 2.360780954360962,
-          "rmse": 0.4774869099942796
+          "candidate_top1": 253,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 5.929665066052893,
+          "max_abs_error": 16.882737159729004,
+          "rmse": 3.10734892365833
         },
         {
           "position": 1,
           "reference_top1": 198,
           "candidate_top1": 198,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.012640495033085267,
-          "max_abs_error": 1.107743740081787,
-          "rmse": 0.23416107487570936
+          "kl_reference_candidate_nats": 0.7979173355453205,
+          "max_abs_error": 8.075727939605713,
+          "rmse": 1.4369173523303478
         },
         {
           "position": 2,
           "reference_top1": 2,
-          "candidate_top1": 2,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.007250750400993043,
-          "max_abs_error": 0.5957075357437134,
-          "rmse": 0.12309442931045246
+          "candidate_top1": 474,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.6719689835251205,
+          "max_abs_error": 4.846222549676895,
+          "rmse": 1.0507747234894544
         },
         {
           "position": 3,
           "reference_top1": 525,
           "candidate_top1": 525,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0008944087665778458,
-          "max_abs_error": 0.6219561100006104,
-          "rmse": 0.13238247071662673
+          "kl_reference_candidate_nats": 0.13434828866721138,
+          "max_abs_error": 5.944357991218567,
+          "rmse": 1.234258990697072
         },
         {
           "position": 4,
           "reference_top1": 2661,
           "candidate_top1": 2661,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00759374333064492,
-          "max_abs_error": 0.7531942129135132,
-          "rmse": 0.16711966031361664
+          "kl_reference_candidate_nats": 0.16758555606078165,
+          "max_abs_error": 4.384941816329956,
+          "rmse": 0.9172315396058357
         },
         {
           "position": 5,
           "reference_top1": 10950,
           "candidate_top1": 10950,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.008770401556562783,
-          "max_abs_error": 0.9584265947341919,
-          "rmse": 0.1947775518855474
+          "kl_reference_candidate_nats": 0.8055563438346935,
+          "max_abs_error": 6.317552924156189,
+          "rmse": 1.40763797391986
         },
         {
           "position": 6,
           "reference_top1": 17847,
           "candidate_top1": 17847,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.012613149448602914,
-          "max_abs_error": 1.3174371719360352,
-          "rmse": 0.2691111410890262
+          "kl_reference_candidate_nats": 0.3514648511305405,
+          "max_abs_error": 11.253968477249146,
+          "rmse": 2.1297362212833497
         },
         {
           "position": 7,
           "reference_top1": 382,
-          "candidate_top1": 382,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.019125121271132844,
-          "max_abs_error": 1.4259886741638184,
-          "rmse": 0.3111354758862048
+          "candidate_top1": 304,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 1.7944412688580276,
+          "max_abs_error": 10.54566240310669,
+          "rmse": 2.006972725919406
         },
         {
           "position": 8,
           "reference_top1": 5209,
-          "candidate_top1": 5209,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.0034076826294826366,
-          "max_abs_error": 0.705298125743866,
-          "rmse": 0.12546839301218737
+          "candidate_top1": 358,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.2998684800908377,
+          "max_abs_error": 5.3303632736206055,
+          "rmse": 1.1089560182220046
         },
         {
           "position": 9,
           "reference_top1": 279,
           "candidate_top1": 279,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0039029760293943423,
-          "max_abs_error": 1.4293262362480164,
-          "rmse": 0.2742840229467245
+          "kl_reference_candidate_nats": 0.3438622589720284,
+          "max_abs_error": 9.805315017700195,
+          "rmse": 1.9076259327521565
         },
         {
           "position": 10,
           "reference_top1": 304,
           "candidate_top1": 304,
           "top1_match": true,
-          "kl_reference_candidate_nats": 9.988377685702115e-05,
-          "max_abs_error": 1.3538997173309326,
-          "rmse": 0.2728464707174231
+          "kl_reference_candidate_nats": 0.582074130266655,
+          "max_abs_error": 11.03237634897232,
+          "rmse": 2.151929131512725
         },
         {
           "position": 11,
           "reference_top1": 7414,
-          "candidate_top1": 7414,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.030378368699346694,
-          "max_abs_error": 1.2925724983215332,
-          "rmse": 0.257062154257757
+          "candidate_top1": 758,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.9527103673978286,
+          "max_abs_error": 6.156450986862183,
+          "rmse": 1.3251318060720947
         },
         {
           "position": 12,
           "reference_top1": 46487,
-          "candidate_top1": 8948,
+          "candidate_top1": 15936,
           "top1_match": false,
-          "kl_reference_candidate_nats": 0.0347659969652376,
-          "max_abs_error": 1.549229621887207,
-          "rmse": 0.2998949933144303
+          "kl_reference_candidate_nats": 0.7711618180324237,
+          "max_abs_error": 9.109032034873962,
+          "rmse": 1.9663572839708634
         },
         {
           "position": 13,
           "reference_top1": 785,
-          "candidate_top1": 785,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.04139790664730093,
-          "max_abs_error": 1.586778163909912,
-          "rmse": 0.34182519285799784
+          "candidate_top1": 95456,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 1.9158323209551262,
+          "max_abs_error": 9.537681579589844,
+          "rmse": 1.8713478069128247
         },
         {
           "position": 14,
           "reference_top1": 198,
           "candidate_top1": 198,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.002099949864326789,
-          "max_abs_error": 1.2593870162963867,
-          "rmse": 0.26976102555997306
+          "kl_reference_candidate_nats": 0.10857946131611551,
+          "max_abs_error": 11.14579439163208,
+          "rmse": 2.2041340824293942
         },
         {
           "position": 15,
           "reference_top1": 25,
-          "candidate_top1": 25,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 5.6532871487923274e-06,
-          "max_abs_error": 2.1198089122772217,
-          "rmse": 0.3842204964759656
+          "candidate_top1": 7414,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 1.682730947205189,
+          "max_abs_error": 17.495625972747803,
+          "rmse": 2.7047782082473395
         },
         {
           "position": 16,
           "reference_top1": 40,
-          "candidate_top1": 3838,
-          "top1_match": false,
-          "kl_reference_candidate_nats": 0.00892121538949766,
-          "max_abs_error": 0.6846768856048584,
-          "rmse": 0.13665074420647083
+          "candidate_top1": 40,
+          "top1_match": true,
+          "kl_reference_candidate_nats": 0.9775918633622077,
+          "max_abs_error": 7.037189483642578,
+          "rmse": 1.544879659104716
         },
         {
           "position": 17,
           "reference_top1": 653,
-          "candidate_top1": 653,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.0007999768512192343,
-          "max_abs_error": 0.43079042434692383,
-          "rmse": 0.09884671308295429
+          "candidate_top1": 374,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.21922320877708226,
+          "max_abs_error": 3.943902015686035,
+          "rmse": 0.885059161920029
         },
         {
           "position": 18,
           "reference_top1": 432,
           "candidate_top1": 432,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0025180367039643104,
-          "max_abs_error": 0.47808408737182617,
-          "rmse": 0.10722140748399543
+          "kl_reference_candidate_nats": 0.42062166649689026,
+          "max_abs_error": 4.1376481503248215,
+          "rmse": 0.7177975248380152
         },
         {
           "position": 19,
           "reference_top1": 17788,
-          "candidate_top1": 1372,
+          "candidate_top1": 7286,
           "top1_match": false,
-          "kl_reference_candidate_nats": 0.0038890751533432228,
-          "max_abs_error": 0.5257611274719238,
-          "rmse": 0.09756461042779696
+          "kl_reference_candidate_nats": 0.21921480924932318,
+          "max_abs_error": 3.3335063457489014,
+          "rmse": 0.6755650414321963
         },
         {
           "position": 20,
           "reference_top1": 6303,
           "candidate_top1": 6303,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0005838855566554329,
-          "max_abs_error": 0.4723694324493408,
-          "rmse": 0.1017691416156358
+          "kl_reference_candidate_nats": 0.05917509865483025,
+          "max_abs_error": 3.745616912841797,
+          "rmse": 0.7815989244176421
         },
         {
           "position": 21,
           "reference_top1": 30,
           "candidate_top1": 30,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0008815009115800173,
-          "max_abs_error": 0.568819522857666,
-          "rmse": 0.13505316627023414
+          "kl_reference_candidate_nats": 0.17090290229458696,
+          "max_abs_error": 4.041034817695618,
+          "rmse": 0.8493585684676467
         },
         {
           "position": 22,
           "reference_top1": 151645,
           "candidate_top1": 151645,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0014763896668237315,
-          "max_abs_error": 0.7078139781951904,
-          "rmse": 0.14687416366632883
+          "kl_reference_candidate_nats": 0.07665897968149907,
+          "max_abs_error": 5.076712608337402,
+          "rmse": 1.0462459625171376
         },
         {
           "position": 23,
           "reference_top1": 198,
           "candidate_top1": 198,
           "top1_match": true,
-          "kl_reference_candidate_nats": 1.5741265771775484e-07,
-          "max_abs_error": 1.0241292715072632,
-          "rmse": 0.22086015161121833
+          "kl_reference_candidate_nats": 1.4554620870896216e-05,
+          "max_abs_error": 6.835698366165161,
+          "rmse": 1.4188612555775486
         },
         {
           "position": 24,
           "reference_top1": 151644,
           "candidate_top1": 151644,
           "top1_match": true,
-          "kl_reference_candidate_nats": 1.5202440363553523e-06,
-          "max_abs_error": 0.7796421051025391,
-          "rmse": 0.1557414914549632
+          "kl_reference_candidate_nats": 0.0008738714773503526,
+          "max_abs_error": 6.99594259262085,
+          "rmse": 1.2902686725867514
         },
         {
           "position": 25,
           "reference_top1": 872,
           "candidate_top1": 872,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00025322888976510766,
-          "max_abs_error": 2.0157032012939453,
-          "rmse": 0.2981389558645581
+          "kl_reference_candidate_nats": 0.004004633715501153,
+          "max_abs_error": 8.651646614074707,
+          "rmse": 1.8625688110889378
         },
         {
           "position": 26,
           "reference_top1": 198,
           "candidate_top1": 198,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0010618644019512531,
-          "max_abs_error": 1.111656665802002,
-          "rmse": 0.23409154837363882
+          "kl_reference_candidate_nats": 0.01186159571387527,
+          "max_abs_error": 5.621038436889648,
+          "rmse": 1.2388949152276334
         },
         {
           "position": 27,
           "reference_top1": 785,
           "candidate_top1": 785,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00039652477471847295,
-          "max_abs_error": 0.8632761240005493,
-          "rmse": 0.2013579909416773
+          "kl_reference_candidate_nats": 0.005808036720122641,
+          "max_abs_error": 3.81301212310791,
+          "rmse": 0.7465835620572294
         },
         {
           "position": 28,
           "reference_top1": 12884,
           "candidate_top1": 12884,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00023925492031908502,
-          "max_abs_error": 0.5433111190795898,
-          "rmse": 0.10552607975370479
+          "kl_reference_candidate_nats": 0.003641714394876308,
+          "max_abs_error": 3.727108955383301,
+          "rmse": 0.7456030974645586
         },
         {
           "position": 29,
           "reference_top1": 374,
           "candidate_top1": 374,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.00014532855135974634,
-          "max_abs_error": 0.5445759166032076,
-          "rmse": 0.13302587032229823
+          "kl_reference_candidate_nats": 0.09058224405629164,
+          "max_abs_error": 4.576115131378174,
+          "rmse": 0.8916590956041223
         },
         {
           "position": 30,
           "reference_top1": 6303,
-          "candidate_top1": 6303,
-          "top1_match": true,
-          "kl_reference_candidate_nats": 0.0030465132318348164,
-          "max_abs_error": 0.49823713302612305,
-          "rmse": 0.10019455066240351
+          "candidate_top1": 5990,
+          "top1_match": false,
+          "kl_reference_candidate_nats": 0.3832493425717094,
+          "max_abs_error": 4.3698296546936035,
+          "rmse": 0.9541561620366811
         },
         {
           "position": 31,
           "reference_top1": 1576,
           "candidate_top1": 1576,
           "top1_match": true,
-          "kl_reference_candidate_nats": 3.602770491949969e-05,
-          "max_abs_error": 0.6086115837097168,
-          "rmse": 0.17585727253191194
+          "kl_reference_candidate_nats": 0.004813250846419311,
+          "max_abs_error": 4.689778804779053,
+          "rmse": 0.9452452606914084
         },
         {
           "position": 32,
           "reference_top1": 432,
           "candidate_top1": 432,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0024788598019195624,
-          "max_abs_error": 0.5221118927001953,
-          "rmse": 0.1040701649709535
+          "kl_reference_candidate_nats": 0.2889198896700927,
+          "max_abs_error": 4.335702300071716,
+          "rmse": 0.90101513146967
         },
         {
           "position": 33,
           "reference_top1": 25963,
           "candidate_top1": 25963,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0011678279573047803,
-          "max_abs_error": 0.497556209564209,
-          "rmse": 0.10026556582666575
+          "kl_reference_candidate_nats": 0.059940893143449636,
+          "max_abs_error": 4.337516784667969,
+          "rmse": 0.9724084799102837
         },
         {
           "position": 34,
           "reference_top1": 39020,
           "candidate_top1": 39020,
           "top1_match": true,
-          "kl_reference_candidate_nats": 0.0020173538649738577,
-          "max_abs_error": 0.5307703018188477,
-          "rmse": 0.1032096617368973
+          "kl_reference_candidate_nats": 0.09546965377062797,
+          "max_abs_error": 5.035856366157532,
+          "rmse": 1.0640647755381616
         }
       ],
       "reader_settings": {
         "argmax": [
-          72030,
+          253,
           198,
-          2,
+          474,
           525,
           2661,
           10950,
           17847,
-          382,
-          5209,
+          304,
+          358,
           279,
           304,
-          7414,
-          8948,
-          785,
+          758,
+          15936,
+          95456,
           198,
-          25,
-          3838,
-          653,
+          7414,
+          40,
+          374,
           432,
-          1372,
+          7286,
           6303,
           30,
           151645,
@@ -1757,16 +1758,16 @@
           785,
           12884,
           374,
-          6303,
+          5990,
           1576,
           432,
           25963,
           39020
         ],
         "flash_attention": "auto",
-        "ftype": "MOSTLY_Q8_0",
+        "ftype": "MOSTLY_Q4_0",
         "kv_dtype": "float16",
-        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
+        "model": "qwen-7ae557604adf67be50417f59c2c2f167def9a775-q4_0.gguf",
         "positions": [
           0,
           1,
@@ -1848,8 +1849,8 @@
         ]
       },
       "logits": {
-        "path": "$REFERENCE_DIR/chat-llama-q8_0.bin",
-        "sha256": "b247acef66177448a7134586b2ee10277e42ae019d4031fe5609525d7ec065ac",
+        "path": "$REFERENCE_DIR/chat-llama-q4_0.bin",
+        "sha256": "31e29b5708875b8e4d607d67f2cc31e39e0746a7f53bfa06967d69a4236dd2c6",
         "shape": [
           35,
           151936
@@ -1857,8 +1858,8 @@
         "dtype": "little-endian float32"
       },
       "reader_metadata": {
-        "path": "$REFERENCE_DIR/chat-llama-q8_0.json",
-        "sha256": "d6857fde738bfe0837258b43aa0865e7632d08a2693dfe5742e2a85d8e314dde"
+        "path": "$REFERENCE_DIR/chat-llama-q4_0.json",
+        "sha256": "9a4aa7bc5e7a6f76ee40d889cbe678a28c8472f8a85f0d13bf8197c021692ce3"
       },
       "command": [
         "$LLAMA_LOGITS",
@@ -1867,24 +1868,24 @@
         "--tokens",
         "151644,8948,198,2610,525,264,10950,17847,13,21806,26753,13,151645,198,151644,872,198,10234,374,279,12884,6303,30,151645,198,151644,77091,198,785,12884,374,6303,1576,432,25963",
         "--output",
-        "$REFERENCE_DIR/chat-llama-q8_0",
+        "$REFERENCE_DIR/chat-llama-q4_0",
         "--threads",
         "1"
       ],
       "aggregate": {
         "prompt_only": {
           "positions": 28,
-          "top1_matches": 25,
-          "top1_agreement": 0.8928571428571429,
-          "mean_kl_reference_candidate_nats": 0.013502079784334447,
-          "max_kl_reference_candidate_nats": 0.17232837029845754
+          "top1_matches": 18,
+          "top1_agreement": 0.6428571428571429,
+          "mean_kl_reference_candidate_nats": 0.6955613820955333,
+          "max_kl_reference_candidate_nats": 5.929665066052893
         },
         "prompt_and_reference_continuation": {
           "positions": 35,
-          "top1_matches": 32,
-          "top1_agreement": 0.9142857142857143,
-          "mean_kl_reference_candidate_nats": 0.011062554285542738,
-          "max_kl_reference_candidate_nats": 0.17232837029845754
+          "top1_matches": 24,
+          "top1_agreement": 0.6857142857142857,
+          "mean_kl_reference_candidate_nats": 0.5829238767750972,
+          "max_kl_reference_candidate_nats": 5.929665066052893
         }
       }
     }

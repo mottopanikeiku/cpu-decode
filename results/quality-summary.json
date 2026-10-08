@@ -11,7 +11,8 @@
   },
   "fixed_prompts": 4,
   "unquantized": {
-    "max_abs_logit_error": 0.00043892860412597656,
+    "kv_dtype": "f32",
+    "max_abs_logit_error": 0.0003247261047363281,
     "positions": 88,
     "allclose": true,
     "greedy_tokens": 32,
@@ -19,22 +20,63 @@
     "all_greedy_sequences_identical": true
   },
   "quantized": {
-    "prompt_only": {
-      "positions": 60,
-      "top1_matches": 57,
-      "top1_agreement": 0.95,
-      "mean_kl_reference_candidate_nats": 0.028793317107566125,
-      "max_kl_reference_candidate_nats": 0.789691814931885
+    "q8": {
+      "kv_dtype": "f16",
+      "prompt_only": {
+        "positions": 60,
+        "top1_matches": 58,
+        "top1_agreement": 0.9666666666666667,
+        "mean_kl_reference_candidate_nats": 0.008975891039142503,
+        "max_kl_reference_candidate_nats": 0.17844710182969753
+      },
+      "prompt_and_reference_continuation": {
+        "positions": 88,
+        "top1_matches": 86,
+        "top1_agreement": 0.9772727272727273,
+        "mean_kl_reference_candidate_nats": 0.006770967428045069,
+        "max_kl_reference_candidate_nats": 0.17844710182969753
+      },
+      "greedy_sequences_matching": 4,
+      "quality_is_reporting_only": true
     },
-    "prompt_and_reference_continuation": {
-      "positions": 88,
-      "top1_matches": 85,
-      "top1_agreement": 0.9659090909090909,
-      "mean_kl_reference_candidate_nats": 0.02006472282412742,
-      "max_kl_reference_candidate_nats": 0.789691814931885
+    "q4": {
+      "kv_dtype": "f16",
+      "prompt_only": {
+        "positions": 60,
+        "top1_matches": 44,
+        "top1_agreement": 0.7333333333333333,
+        "mean_kl_reference_candidate_nats": 0.7282179092436122,
+        "max_kl_reference_candidate_nats": 7.046771613051455
+      },
+      "prompt_and_reference_continuation": {
+        "positions": 88,
+        "top1_matches": 68,
+        "top1_agreement": 0.7727272727272727,
+        "mean_kl_reference_candidate_nats": 0.5365002242706761,
+        "max_kl_reference_candidate_nats": 7.046771613051455
+      },
+      "greedy_sequences_matching": 2,
+      "quality_is_reporting_only": true
     },
-    "greedy_sequences_matching": 4,
-    "quality_is_reporting_only": true
+    "q4h8": {
+      "kv_dtype": "f16",
+      "prompt_only": {
+        "positions": 60,
+        "top1_matches": 41,
+        "top1_agreement": 0.6833333333333333,
+        "mean_kl_reference_candidate_nats": 0.710716231600447,
+        "max_kl_reference_candidate_nats": 6.959074686368147
+      },
+      "prompt_and_reference_continuation": {
+        "positions": 88,
+        "top1_matches": 67,
+        "top1_agreement": 0.7613636363636364,
+        "mean_kl_reference_candidate_nats": 0.5123994069932288,
+        "max_kl_reference_candidate_nats": 6.959074686368147
+      },
+      "greedy_sequences_matching": 2,
+      "quality_is_reporting_only": true
+    }
   },
   "source": "results/correctness.json"
 }

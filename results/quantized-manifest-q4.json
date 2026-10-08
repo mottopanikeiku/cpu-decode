@@ -1,7 +1,5 @@
 {
-  "llama_repository": "https://github.com/ggml-org/llama.cpp.git",
-  "llama_commit": "6c73b3e12dc501de35fe5f6979960d06921a2f6c",
-  "source_model": {
+  "source": {
     "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
     "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
     "stored_dtype": "bfloat16",
@@ -62,55 +60,27 @@
       }
     }
   },
-  "build": {
-    "type": "Release",
-    "native_cpu": true,
-    "gpu": false,
-    "jobs": 4
+  "weight_format": "q4",
+  "head_format": "q4",
+  "format": "32-weight blocks with F16 scales (q8: int8; q4: 4-bit offset-8 levels, scale = signed extreme / -8); FP32 norms/biases; activations quantized per 32-element block at run time",
+  "storage": "safetensors: I8 [rows, cols] (q8) or U8 [rows, cols/2] (q4) matrices with NAME.scales F16 [rows, cols/32]; F32 vectors",
+  "tied_head": true,
+  "command": [
+    "build/cpu-decode",
+    "quantize",
+    "--model",
+    "$MODEL",
+    "--output",
+    "$QUANT",
+    "--format",
+    "q4",
+    "--head-format",
+    "q4"
+  ],
+  "weights": {
+    "path": "model.safetensors",
+    "bytes": 278191040,
+    "sha256": "d706d7ca6ac51751c4eaea3c61122ade270dbca2f179e5849044a1f64b0fa287"
   },
-  "converter_python": "./.venv/bin/python",
-  "bench_binary": "$CACHE/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/build/bin/llama-bench",
-  "quantization": {
-    "Q8_0": "llama.cpp Q8_0: int8 weights in blocks of 32 with one F16 scale per block",
-    "Q4_0": "llama.cpp Q4_0 default mix: 4-bit weights in blocks of 32 with one F16 scale per block; see tensor_types for tensors llama-quantize keeps at another type"
-  },
-  "artifacts": {
-    "BF16": {
-      "path": "$CACHE/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-bf16.gguf",
-      "sha256": "794f9d6e09be1e0509d0c917e4aff89d837f3e16b852b59453894e61a9816ed2",
-      "bytes": 994157056,
-      "tensor_types": {
-        "counts": {
-          "BF16": 169,
-          "F32": 121
-        },
-        "token_embd.weight": "BF16"
-      }
-    },
-    "Q8_0": {
-      "path": "$CACHE/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-q8_0.gguf",
-      "sha256": "f454a16963a93bcac8891f84b2b113fcb4ae10343858679147152969b2d90ae7",
-      "bytes": 531068416,
-      "tensor_types": {
-        "counts": {
-          "F32": 121,
-          "Q8_0": 169
-        },
-        "token_embd.weight": "Q8_0"
-      }
-    },
-    "Q4_0": {
-      "path": "$CACHE/llama.cpp/6c73b3e12dc501de35fe5f6979960d06921a2f6c/qwen-7ae557604adf67be50417f59c2c2f167def9a775-q4_0.gguf",
-      "sha256": "ba40202e6847c26ada7fc8862d5332462a6f412027d06e5d386da990d71422ef",
-      "bytes": 352155136,
-      "tensor_types": {
-        "counts": {
-          "F32": 121,
-          "Q4_0": 168,
-          "Q8_0": 1
-        },
-        "token_embd.weight": "Q8_0"
-      }
-    }
-  }
+  "config_sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45"
 }
