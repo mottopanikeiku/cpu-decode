@@ -1,6 +1,7 @@
 // Public llama C API at commit 6c73b3e12dc501de35fe5f6979960d06921a2f6c.
 #include <llama.h>
 #include <nlohmann/json.hpp>
+#include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -44,6 +45,26 @@ std::vector<llama_token> parse_tokens(const std::string& text) {
     return result;
 }
 
+// Inclusive "A-B" or "A" ranges, increasing and inside [0, count), as in cpu-decode logits.
+std::vector<bool> parse_positions(const std::string& text, size_t count) {
+    std::vector<bool> wanted(count, false);
+    size_t begin = 0, next = 0;
+    for (;;) {
+        const size_t end = text.find(',', begin);
+        const std::string item = text.substr(begin, end == std::string::npos ? end : end - begin);
+        const size_t dash = item.find('-');
+        const size_t first = size_t(number(item.substr(0, dash)));
+        const size_t last = dash == std::string::npos ? first : size_t(number(item.substr(dash + 1)));
+        if (first < next || first > last || last >= count)
+            throw std::runtime_error("positions must be increasing ranges inside the token list");
+        std::fill(wanted.begin() + std::ptrdiff_t(first), wanted.begin() + std::ptrdiff_t(last) + 1, true);
+        next = last + 1;
+        if (end == std::string::npos) break;
+        begin = end + 1;
+    }
+    return wanted;
+}
+
 struct Backend {
     Backend() { llama_backend_init(); }
     ~Backend() { llama_backend_free(); }
@@ -53,8 +74,11 @@ struct Backend {
 
 void usage() {
     std::cout << "llama-logits --model GGUF --tokens ID,ID,... --output PREFIX --threads N\n"
-                 "CPU-only Q8_0, float16 K/V cache, flash attention AUTO.\n"
-                 "Writes PREFIX.bin little-endian float32 [positions,vocab] and PREFIX.json.\n";
+                 "             [--positions A-B,C-D,...] [--kv f16|f32]\n"
+                 "CPU-only Q8_0 or Q4_0 model, one token per decode. K/V cache f16 (default; flash\n"
+                 "attention AUTO) or f32 (flash attention disabled: llama.cpp's FA casts K/V to F16).\n"
+                 "Writes PREFIX.bin little-endian float32 [positions,vocab] for\n"
+                 "the listed inclusive positions (default: all) and PREFIX.json.\n";
 }
 }
 
@@ -64,7 +88,7 @@ int main(int argc, char** argv) {
             usage();
             return argc < 2 ? 1 : 0;
         }
-        const std::set<std::string> known{"--model", "--tokens", "--output", "--threads"};
+        const std::set<std::string> known{"--model", "--tokens", "--output", "--threads", "--positions", "--kv"};
         std::map<std::string, std::string> options;
         for (int i = 1; i < argc; i += 2) {
             const std::string key = argv[i];
@@ -82,6 +106,13 @@ int main(int argc, char** argv) {
         auto tokens = parse_tokens(required("--tokens"));
         const int32_t threads = number(required("--threads"));
         if (threads < 1 || threads > 1024) throw std::runtime_error("threads must be 1..1024");
+        const auto positions_option = options.find("--positions");
+        const std::vector<bool> wanted = positions_option == options.end() ?
+            std::vector<bool>(tokens.size(), true) : parse_positions(positions_option->second, tokens.size());
+        const auto kv_option = options.find("--kv");
+        const std::string kv = kv_option == options.end() ? "f16" : kv_option->second;
+        if (kv != "f16" && kv != "f32") throw std::runtime_error("--kv must be f16 or f32");
+        const ggml_type kv_type = kv == "f32" ? GGML_TYPE_F32 : GGML_TYPE_F16;
 
         Backend backend;
         auto model_params = llama_model_default_params();
@@ -93,8 +124,10 @@ int main(int argc, char** argv) {
         std::unique_ptr<llama_model, decltype(&llama_model_free)> model(
             llama_model_load_from_file(model_path.c_str(), model_params), &llama_model_free);
         if (!model) throw std::runtime_error("cannot load model: " + model_path);
-        if (llama_model_ftype(model.get()) != LLAMA_FTYPE_MOSTLY_Q8_0)
-            throw std::runtime_error("model must use Q8_0 weights");
+        const llama_ftype ftype = llama_model_ftype(model.get());
+        if (ftype != LLAMA_FTYPE_MOSTLY_Q8_0 && ftype != LLAMA_FTYPE_MOSTLY_Q4_0)
+            throw std::runtime_error("model must be a Q8_0 or Q4_0 file");
+        const std::string ftype_name = ftype == LLAMA_FTYPE_MOSTLY_Q8_0 ? "MOSTLY_Q8_0" : "MOSTLY_Q4_0";
         const auto* vocab = llama_model_get_vocab(model.get());
         if (!vocab) throw std::runtime_error("model has no vocabulary");
         const int32_t n_vocab = llama_vocab_n_tokens(vocab);
@@ -109,9 +142,11 @@ int main(int argc, char** argv) {
         context_params.n_seq_max = 1;
         context_params.n_threads = threads;
         context_params.n_threads_batch = threads;
-        context_params.type_k = GGML_TYPE_F16;
-        context_params.type_v = GGML_TYPE_F16;
-        context_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+        context_params.type_k = kv_type;
+        context_params.type_v = kv_type;
+        // llama.cpp's flash-attention graph casts an F32 K/V cache to F16, so a real
+        // F32 cache path needs ordinary attention; F16 keeps the default AUTO choice.
+        context_params.flash_attn_type = kv == "f32" ? LLAMA_FLASH_ATTN_TYPE_DISABLED : LLAMA_FLASH_ATTN_TYPE_AUTO;
         context_params.offload_kqv = false;
         context_params.op_offload = false;
         std::unique_ptr<llama_context, decltype(&llama_free)> context(
@@ -128,7 +163,7 @@ int main(int argc, char** argv) {
         // The common little-endian path writes llama's buffer directly, without copying.
         std::vector<uint32_t> swapped(little_endian ? 0 : size_t(n_vocab));
         std::vector<llama_token> argmax;
-        argmax.reserve(tokens.size());
+        std::vector<size_t> emitted;
         const auto parent = std::filesystem::path(prefix).parent_path();
         if (!parent.empty()) std::filesystem::create_directories(parent);
         std::ofstream binary(prefix + ".bin", std::ios::binary);
@@ -138,7 +173,7 @@ int main(int argc, char** argv) {
         int32_t n_seq_id = 1;
         llama_seq_id sequence = 0;
         llama_seq_id* sequence_ptr = &sequence;
-        int8_t output_logits = 1;
+        int8_t output_logits = 0;
         llama_batch batch{};
         batch.n_tokens = 1;
         batch.pos = &position;
@@ -148,10 +183,13 @@ int main(int argc, char** argv) {
         for (size_t i = 0; i < tokens.size(); ++i) {
             position = llama_pos(i);
             batch.token = &tokens[i];
+            // Unwanted positions skip llama's output projection and copy.
+            output_logits = wanted[i] ? 1 : 0;
             const int32_t status = llama_decode(context.get(), batch);
             if (status != 0)
                 throw std::runtime_error("llama_decode failed at position " + std::to_string(i) +
                                          " with status " + std::to_string(status));
+            if (!wanted[i]) continue;
             const float* logits = llama_get_logits_ith(context.get(), 0);
             if (!logits) throw std::runtime_error("missing logits at position " + std::to_string(i));
             llama_token best = 0;
@@ -167,6 +205,7 @@ int main(int argc, char** argv) {
                 }
             }
             argmax.push_back(best);
+            emitted.push_back(i);
             const auto* bytes = little_endian ? reinterpret_cast<const char*>(logits) :
                                                reinterpret_cast<const char*>(swapped.data());
             if (!binary.write(bytes, std::streamsize(row_bytes)))
@@ -175,12 +214,14 @@ int main(int argc, char** argv) {
         binary.close();
         if (!binary) throw std::runtime_error("cannot close logits output: " + prefix + ".bin");
         const Json metadata{
-            {"shape", {tokens.size(), size_t(n_vocab)}},
+            {"shape", {emitted.size(), size_t(n_vocab)}},
             {"tokens", tokens},
+            {"positions", emitted},
             {"argmax", argmax},
             {"threads", threads},
-            {"kv_dtype", "float16"},
-            {"flash_attention", "auto"},
+            {"kv_dtype", kv == "f32" ? "float32" : "float16"},
+            {"ftype", ftype_name},
+            {"flash_attention", kv == "f32" ? "disabled" : "auto"},
             {"model", std::filesystem::path(model_path).filename().string()}
         };
         std::ofstream json(prefix + ".json");

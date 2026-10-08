@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare real Q8_0 llama.cpp logits with the four stored FP32 oracle cases.
+"""Compare real Q8_0 or Q4_0 llama.cpp logits with the four stored FP32 oracle cases.
 
 Both paths consume the oracle's exact teacher-forced IDs, including its reference
 continuation. This does not check independent llama.cpp greedy generation.
@@ -29,10 +29,10 @@ def verify_inputs(args) -> tuple[dict, dict, dict]:
     source = manifest["source_model"]
     if (source["model_id"], source["revision"], source["stored_dtype"]) != (MODEL_ID, REVISION, "bfloat16"):
         raise ValueError("Artifact manifest does not name the pinned BF16 source model")
-    artifact = manifest["artifacts"]["Q8_0"]
+    artifact = manifest["artifacts"][args.artifact]
     actual_hash = file_hash(args.model)
     if actual_hash != artifact["sha256"] or args.model.stat().st_size != artifact["bytes"]:
-        raise ValueError("Supplied GGUF does not match the manifest Q8_0 artifact")
+        raise ValueError(f"Supplied GGUF does not match the manifest {args.artifact} artifact")
 
     oracle_path = args.reference_dir / "reference.json"
     oracle = json.loads(oracle_path.read_text())
@@ -67,7 +67,7 @@ def verify_inputs(args) -> tuple[dict, dict, dict]:
         if path.stat().st_size != shape[0] * shape[1] * 4 or file_hash(path) != case["sha256"]:
             raise ValueError(f"Stored oracle logit checksum/size mismatch for {case['id']}")
 
-    identity = {"path": str(args.model.resolve()), "sha256": actual_hash, "bytes": args.model.stat().st_size}
+    identity = {"path": str(args.model.resolve()), "sha256": actual_hash, "bytes": args.model.stat().st_size, "tensor_types": artifact["tensor_types"]}
     return manifest, oracle, identity
 
 
@@ -101,7 +101,7 @@ def run_comparison(args) -> dict:
     manifest, oracle, identity = verify_inputs(args)
     cases = []
     for case in oracle["prompts"]:
-        prefix = args.reference_dir.resolve() / f"{case['id']}-llama-q8_0"
+        prefix = args.reference_dir.resolve() / f"{case['id']}-llama-{args.label}"
         command = [
             str(args.reader.resolve()), "--model", str(args.model.resolve()),
             "--tokens", ",".join(map(str, case["tokens"])),
@@ -111,9 +111,11 @@ def run_comparison(args) -> dict:
         metadata_path = prefix.with_suffix(".json")
         candidate_path = prefix.with_suffix(".bin")
         metadata = json.loads(metadata_path.read_text())
-        if metadata["shape"] != case["shape"] or metadata["tokens"] != case["tokens"]:
+        if (metadata["shape"] != case["shape"] or metadata["tokens"] != case["tokens"]
+                or metadata["positions"] != list(range(len(case["tokens"])))):
             raise ValueError(f"llama.cpp logits metadata does not match oracle inputs for {case['id']}")
         if (metadata["threads"] != args.threads or metadata["kv_dtype"] != "float16"
+                or metadata["ftype"] != f"MOSTLY_{args.artifact}"
                 or metadata["flash_attention"] != "auto"
                 or metadata["model"] != args.model.name):
             raise ValueError("llama.cpp reader settings do not match the requested compared path")
@@ -145,13 +147,13 @@ def run_comparison(args) -> dict:
         cases.append(record)
 
     result = {
-        "label": "llama.cpp Q8_0",
+        "label": f"llama.cpp {args.artifact}",
         "quality_reporting_only": True,
         "quality_thresholds": None,
         "independent_greedy_generation_checked": False,
         "comparison": "Full-vocabulary logits at every position on the exact oracle teacher-forced tokens; KL(reference || candidate) in nats",
         "scope": "Four fixed prompts only; prompt-only includes every prompt position, and the larger scope also includes the oracle's reference continuation inputs",
-        "compared_path": {"weight_quantization": "Q8_0", "kv_dtype": "float16", "flash_attention": "auto", "threads": args.threads, "batch_size": 1, "fresh_context_per_prompt": True},
+        "compared_path": {"weight_quantization": args.artifact, "kv_dtype": "float16", "flash_attention": "auto", "threads": args.threads, "batch_size": 1, "fresh_context_per_prompt": True},
         "identity": {
             "llama_commit": manifest["llama_commit"],
             "model_id": MODEL_ID,
@@ -177,11 +179,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--reader", type=Path, default=Path("build/llama-logits"))
+    parser.add_argument("--artifact", choices=("Q8_0", "Q4_0"), default="Q8_0", help="Preparation-manifest artifact the GGUF must match")
+    parser.add_argument("--label", help="Raw-file label; defaults to the lower-case artifact name (q8_0)")
     parser.add_argument("--reference-dir", type=Path, default=Path("external/reference"))
     parser.add_argument("--artifact-manifest", type=Path, default=Path("results/llama-preparation.json"))
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--output", type=Path, default=Path("results/llama-quality.json"))
     args = parser.parse_args()
+    if args.label is None:
+        args.label = args.artifact.lower()
+    if not args.label or not all(c.isalnum() or c in "-_" for c in args.label):
+        parser.error("--label must be alphanumeric/-/_")
     result = run_comparison(args)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
