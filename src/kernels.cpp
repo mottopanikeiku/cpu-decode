@@ -211,7 +211,8 @@ void rope(float* x, size_t heads, size_t dim, const float* cos, const float* sin
 }
 
 Profile::Profile() {
-    for (const char* name : {"embedding", "rmsnorm", "qkv", "rope_kv", "attention", "attention_merge", "attention_output",
+    // Phases of one token; norms run inside qkv/mlp_gate_up/lm_head, RoPE and KV writes inside attention.
+    for (const char* name : {"embedding", "qkv", "attention", "attention_merge", "attention_output",
                              "mlp_gate_up", "silu", "mlp_down", "lm_head", "argmax", "timing_overhead_and_loop"})
         seconds.emplace(name, 0.0);
 }

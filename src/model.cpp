@@ -197,7 +197,7 @@ struct Projection {
 struct Layer {
     Projection qkv, o, gate_up, down;
     std::vector<float> input_norm, post_norm, qkv_bias;
-    AlignedVector<uint8_t> keys, values;  // [kv_heads, capacity, dim] in the KV dtype
+    AlignedVector<uint8_t> keys, values;  // KV layout of write_kv, in the KV dtype
 };
 size_t huge_page_kib() {
     std::ifstream smaps("/proc/self/smaps_rollup");
@@ -223,9 +223,16 @@ struct Engine::Impl {
     Matrix embedding;
     Projection head;
     std::vector<Layer> layers;
-    std::vector<float> final_norm, x, norm, qkv, attn, gate_up, hidden, logits, partials;
+    std::vector<float> final_norm, x, qkv, attn, gate_up, hidden, logits, partials;
     std::vector<float> inverse_frequency, rope_cos, rope_sin;
-    Activation act_norm, act_attn, act_hidden, act_head;
+    Activation act_attn, act_hidden;
+    // Per-thread copies: every thread normalizes and quantizes the residual itself
+    // (cheaper than a serial step plus a barrier) and prepares its own queries.
+    struct Local {
+        std::vector<float> norm, q, k, v;
+        Activation act;
+    };
+    std::vector<Local> locals;
     AlignedVector<float> scratch;
     size_t scratch_floats;
     uint64_t stored_bytes = 0, stored_scales = 0;
@@ -238,7 +245,7 @@ struct Engine::Impl {
         omp_set_dynamic(0);
         kv_width = options.kv == KvType::f16 ? 2 : 4;
         kv_dim = config.kv_heads * config.dim;
-        size_t cache = product(product(product(options.capacity, kv_dim), config.layers), 2 * kv_width);
+        size_t cache = product(product(product(kv_rows(options.capacity), kv_dim), config.layers), 2 * kv_width);
         if (cache > 768ull * 1024 * 1024) throw std::runtime_error("KV cache exceeds 768MiB safety limit");
         if (store.tensors.count("lm_head.weight")) throw std::runtime_error("tied model must not store duplicate lm_head.weight");
         embedding = matrix("model.embed_tokens.weight", config.vocab, config.hidden);
@@ -263,7 +270,7 @@ struct Engine::Impl {
                     if (m.format != format) throw std::runtime_error("projection matrices must share one weight format");
             layer.input_norm = vector(base + "input_layernorm.weight", config.hidden);
             layer.post_norm = vector(base + "post_attention_layernorm.weight", config.hidden);
-            layer.keys.assign(product(options.capacity, kv_dim) * kv_width, 0);
+            layer.keys.assign(product(kv_rows(options.capacity), kv_dim) * kv_width, 0);
             layer.values.assign(layer.keys.size(), 0);
             layers.push_back(std::move(layer));
         }
@@ -271,16 +278,22 @@ struct Engine::Impl {
         if (format != Format::bf16 && config.dim % block_size)
             throw std::runtime_error("quantized models require head_dim to be a multiple of 32");
         final_norm = vector("model.norm.weight", config.hidden);
-        x.resize(config.hidden); norm.resize(config.hidden); attn.resize(config.hidden);
+        x.resize(config.hidden); attn.resize(config.hidden);
         qkv.resize(config.hidden + 2 * kv_dim); gate_up.resize(2 * config.intermediate); hidden.resize(config.intermediate);
         logits.resize(config.vocab);
-        for (Activation* a : {&act_norm, &act_attn, &act_head}) a->resize(config.hidden);
+        act_attn.resize(config.hidden);
+        locals.resize(size_t(options.threads));
+        for (Local& local : locals) {
+            local.norm.resize(config.hidden); local.q.resize(config.hidden);
+            local.k.resize(config.dim); local.v.resize(config.dim);
+            local.act.resize(config.hidden);
+        }
         act_hidden.resize(config.intermediate);
         inverse_frequency.resize(config.dim / 2); rope_cos.resize(config.dim / 2); rope_sin.resize(config.dim / 2);
         for (size_t j = 0; j < inverse_frequency.size(); ++j)
             inverse_frequency[j] = 1.0f / std::pow(config.theta, float(2 * j) / float(config.dim));
         auto plan = plan_attention(options.capacity, config.heads, config.kv_heads, config.dim, options.threads);
-        partials.resize(plan.items * plan.group * plan.partial_stride);
+        partials.resize(attention_partial_floats(config.heads, config.kv_heads, config.dim, options.threads));
         scratch_floats = (attention_scratch_floats(plan.group, config.dim) + 15) / 16 * 16;
         scratch.assign(size_t(options.threads) * scratch_floats, 0.0f);
         for (const auto& item : store.tensors) {
@@ -339,10 +352,12 @@ struct Engine::Impl {
         const size_t dim = config.dim, hidden_blocks = config.hidden / block_size;
         const float query_scale = 1.0f / std::sqrt(float(dim));
         const Kernel kernel = options.kernel;
-        // One parallel region per token: every phase is a static split followed by a barrier.
+        // One parallel region per token: every phase is a static split followed by a
+        // barrier. Seven barriers per layer: qkv, attention, merge, o, gate/up, silu, down.
         #pragma omp parallel num_threads(options.threads)
         {
             const size_t tid = size_t(omp_get_thread_num()), team = size_t(omp_get_num_threads());
+            Local& my = locals[tid];
             auto end_phase = [&](const char* name) {
                 #pragma omp barrier
                 if (p && tid == 0) mark(name);
@@ -370,40 +385,33 @@ struct Engine::Impl {
                     end_phase(name);
                 }
             };
-            auto normalize = [&](const std::vector<float>& weight, Activation& a, bool quantize) {
-                if (tid == 0) {
-                    rmsnorm(x.data(), weight.data(), norm.data(), config.hidden, config.epsilon);
-                    if (quantize) quantize_activation(norm.data(), a, 0, hidden_blocks);
-                }
-                end_phase("rmsnorm");
+            // Redundant per thread: reads the completed residual, writes only thread-local buffers.
+            auto normalize = [&](const std::vector<float>& weight, bool quantize) {
+                rmsnorm(x.data(), weight.data(), my.norm.data(), config.hidden, config.epsilon);
+                if (quantize) quantize_activation(my.norm.data(), my.act, 0, hidden_blocks);
             };
+            const size_t group = plan.group, q_rows = config.hidden, k_rows = q_rows + kv_dim;
             for (Layer& l : layers) {
-                normalize(l.input_norm, act_norm, quantized);
-                project(l.qkv, norm.data(), act_norm, qkv.data(), false, "qkv");
-                if (tid == 0) {
-                    for (size_t j = 0; j < qkv.size(); ++j) qkv[j] += l.qkv_bias[j];
-                    float* q = qkv.data();
-                    float* k = q + config.hidden;
-                    const float* v = k + kv_dim;
-                    rope(q, config.heads, dim, rope_cos.data(), rope_sin.data());
-                    rope(k, config.kv_heads, dim, rope_cos.data(), rope_sin.data());
-                    for (size_t j = 0; j < config.hidden; ++j) q[j] *= query_scale;
-                    for (size_t h = 0; h < config.kv_heads; ++h) {
-                        size_t row = (h * options.capacity + pos) * dim;
-                        if (options.kv == KvType::f16) {
-                            uint16_t* keys = reinterpret_cast<uint16_t*>(l.keys.data()) + row;
-                            uint16_t* values = reinterpret_cast<uint16_t*>(l.values.data()) + row;
-                            for (size_t j = 0; j < dim; ++j) { keys[j] = float_half(k[h * dim + j]); values[j] = float_half(v[h * dim + j]); }
-                        } else {
-                            std::memcpy(reinterpret_cast<float*>(l.keys.data()) + row, k + h * dim, dim * 4);
-                            std::memcpy(reinterpret_cast<float*>(l.values.data()) + row, v + h * dim, dim * 4);
+                normalize(l.input_norm, quantized);
+                project(l.qkv, my.norm.data(), my.act, qkv.data(), false, "qkv");
+                for (size_t item = tid; item < plan.items; item += team) {
+                    const size_t kv_head = item / plan.chunks;
+                    // This group's queries with bias, RoPE and the 1/sqrt(dim) scale.
+                    for (size_t j = kv_head * group * dim; j < (kv_head + 1) * group * dim; ++j) my.q[j] = qkv[j] + l.qkv_bias[j];
+                    rope(my.q.data() + kv_head * group * dim, group, dim, rope_cos.data(), rope_sin.data());
+                    for (size_t j = kv_head * group * dim; j < (kv_head + 1) * group * dim; ++j) my.q[j] *= query_scale;
+                    // The last chunk holds the new position; only it reads that row, so it writes it.
+                    if (item % plan.chunks == plan.chunks - 1) {
+                        for (size_t j = 0; j < dim; ++j) {
+                            my.k[j] = qkv[q_rows + kv_head * dim + j] + l.qkv_bias[q_rows + kv_head * dim + j];
+                            my.v[j] = qkv[k_rows + kv_head * dim + j] + l.qkv_bias[k_rows + kv_head * dim + j];
                         }
+                        rope(my.k.data(), 1, dim, rope_cos.data(), rope_sin.data());
+                        write_kv(l.keys.data(), l.values.data(), options.kv, options.capacity, dim, kv_head, pos, my.k.data(), my.v.data());
                     }
-                }
-                end_phase("rope_kv");
-                for (size_t item = tid; item < plan.items; item += team)
-                    attention_item(plan, item, qkv.data(), l.keys.data(), l.values.data(), options.kv, options.capacity, dim,
+                    attention_item(plan, item, my.q.data(), l.keys.data(), l.values.data(), options.kv, options.capacity, dim,
                                    scratch.data() + tid * scratch_floats, partials.data(), kernel);
+                }
                 end_phase("attention");
                 for (size_t h = tid; h < config.heads; h += team) {
                     attention_merge(plan, h, partials.data(), dim, attn.data() + h * dim);
@@ -411,8 +419,8 @@ struct Engine::Impl {
                 }
                 end_phase("attention_merge");
                 project(l.o, attn.data(), act_attn, x.data(), true, "attention_output");
-                normalize(l.post_norm, act_norm, quantized);
-                project(l.gate_up, norm.data(), act_norm, gate_up.data(), false, "mlp_gate_up");
+                normalize(l.post_norm, quantized);
+                project(l.gate_up, my.norm.data(), my.act, gate_up.data(), false, "mlp_gate_up");
                 {
                     size_t begin, end;
                     split((config.intermediate + block_size - 1) / block_size, begin, end);
@@ -428,8 +436,8 @@ struct Engine::Impl {
                 project(l.down, hidden.data(), act_hidden, x.data(), true, "mlp_down");
             }
             if (want_head) {
-                normalize(final_norm, act_head, head_format != Format::bf16);
-                project(head, norm.data(), act_head, logits.data(), false, "lm_head");
+                normalize(final_norm, head_format != Format::bf16);
+                project(head, my.norm.data(), my.act, logits.data(), false, "lm_head");
             }
         }
         if (p) {

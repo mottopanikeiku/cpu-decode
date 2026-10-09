@@ -83,13 +83,22 @@ void rmsnorm(const float* x, const float* weight, float* out, size_t n, float ep
 // Split-half rotation with precomputed cos/sin of length dim / 2.
 void rope(float* x, size_t heads, size_t dim, const float* cos, const float* sin);
 
-// Grouped-query flash decoding. The cache for each KV head is a contiguous
-// [capacity, dim] block; a work item is one KV head and one time chunk, and
-// scores every query head of its group against each K/V row once.
+// KV cache, per layer and KV head, for kv_rows(capacity) positions in the KV dtype:
+// keys in tiles of kv_tile positions stored dimension-major ([tile][dim][kv_tile]),
+// values row-major ([position][dim]). write_kv is the only writer of this layout.
+constexpr size_t kv_tile = 16;
+size_t kv_rows(size_t capacity);
+void write_kv(void* keys, void* values, KvType kv, size_t capacity, size_t dim, size_t head,
+              size_t position, const float* k, const float* v);
+
+// Grouped-query flash decoding. A work item is one KV head and one time chunk
+// (whole tiles), and scores every query head of its group against each K/V row once.
 struct AttentionPlan {
     size_t length = 0, chunks = 0, chunk = 0, items = 0, group = 0, partial_stride = 0;
 };
 AttentionPlan plan_attention(size_t length, size_t heads, size_t kv_heads, size_t dim, int threads);
+// Partial buffer size sufficient for every length at this thread count.
+size_t attention_partial_floats(size_t heads, size_t kv_heads, size_t dim, int threads);
 size_t attention_scratch_floats(size_t group, size_t dim);
 // q is pre-scaled by 1/sqrt(dim). Writes item's partial (max, sum, output) per head.
 void attention_item(const AttentionPlan& plan, size_t item, const float* q, const void* keys,

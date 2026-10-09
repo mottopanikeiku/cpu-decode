@@ -146,20 +146,20 @@ void matvec_tests() {
 }
 
 void attention_tests() {
-    for (size_t dim : {32, 64}) for (size_t length : {1, 15, 17, 150}) for (auto kv : {decode::KvType::f32, decode::KvType::f16}) {
-        const size_t heads = 6, kv_heads = 2, group = heads / kv_heads, capacity = 160;
+    // Group sizes 3 and 7 (Qwen2.5-0.5B), a head size that only the scalar/NEON paths take (40),
+    // lengths around tile boundaries, and finite stale rows past the length that must be ignored.
+    for (auto [heads, kv_heads] : {std::pair<size_t, size_t>{6, 2}, {14, 2}})
+    for (size_t dim : {32, 40, 64}) for (size_t length : {1, 15, 16, 17, 150}) for (auto kv : {decode::KvType::f32, decode::KvType::f16}) {
+        const size_t group = heads / kv_heads, capacity = 155, rows = decode::kv_rows(capacity), width = kv == decode::KvType::f16 ? 2 : 4;
         std::vector<float> q(heads * dim), keys(kv_heads * capacity * dim), values(keys.size()), out(heads * dim);
         for (size_t j = 0; j < q.size(); ++j) q[j] = std::sin(float(j) * 1.1f) * 0.5f;
         for (size_t j = 0; j < keys.size(); ++j) { keys[j] = std::sin(float(j) * 0.37f) * 2; values[j] = std::cos(float(j) * 0.11f) * 3 - 1; }
-        std::vector<uint16_t> keys16(keys.size()), values16(values.size());
-        for (size_t j = 0; j < keys.size(); ++j) {
-            keys16[j] = decode::float_half(keys[j]); values16[j] = decode::float_half(values[j]);
-            if (kv == decode::KvType::f16) { keys[j] = decode::half_float(keys16[j]); values[j] = decode::half_float(values16[j]); }
-        }
-        const void* k = kv == decode::KvType::f16 ? static_cast<const void*>(keys16.data()) : keys.data();
-        const void* v = kv == decode::KvType::f16 ? static_cast<const void*>(values16.data()) : values.data();
+        if (kv == decode::KvType::f16) for (size_t j = 0; j < keys.size(); ++j) { keys[j] = half_round(keys[j]); values[j] = half_round(values[j]); }
+        std::vector<uint8_t> key_cache(kv_heads * rows * dim * width), value_cache(key_cache.size());
+        for (size_t g = 0; g < kv_heads; ++g) for (size_t t = 0; t < capacity; ++t)
+            decode::write_kv(key_cache.data(), value_cache.data(), kv, capacity, dim, g, t, &keys[(g * capacity + t) * dim], &values[(g * capacity + t) * dim]);
         for (auto kernel : kernels()) for (int threads : {1, 2, 3}) {
-            decode::attention(q.data(), k, v, kv, out.data(), length, capacity, heads, kv_heads, dim, kernel, threads);
+            decode::attention(q.data(), key_cache.data(), value_cache.data(), kv, out.data(), length, capacity, heads, kv_heads, dim, kernel, threads);
             for (size_t h = 0; h < heads; ++h) {
                 size_t g = h / group;
                 std::vector<double> p(length);
@@ -173,11 +173,13 @@ void attention_tests() {
                 for (size_t j = 0; j < dim; ++j) {
                     double expected = 0;
                     for (size_t t = 0; t < length; ++t) expected += p[t] / sum * values[(g * capacity + t) * dim + j];
-                    near(out[h * dim + j], expected, 2e-5, "grouped flash attention " + decode::kernel_name(kernel));
+                    near(out[h * dim + j], expected, 2e-5, "grouped flash attention " + decode::kernel_name(kernel) + " group " + std::to_string(group) +
+                         " dim " + std::to_string(dim) + " length " + std::to_string(length) + " " + decode::kv_name(kv));
                 }
             }
         }
     }
+    fails([&] { float k[4]{}; uint8_t cache[16 * 4 * 4]; decode::write_kv(cache, cache, decode::KvType::f32, 16, 4, 0, 16, k, k); }, "KV write past capacity", "capacity");
     auto plan = decode::plan_attention(4096, 14, 2, 64, 6);
     require(plan.chunks == 6 && plan.items == 12 && plan.group == 7, "attention plan gives every thread work");
     require(decode::plan_attention(100, 14, 2, 64, 6).chunks == 2, "short contexts keep chunks of at least 64 rows");

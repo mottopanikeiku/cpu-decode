@@ -8,47 +8,61 @@
 #include <omp.h>
 
 // Flash decoding for one new query token. Work item = (KV head, time chunk).
-// Rows are processed in tiles of 16: the K tile is scored against every query
-// head of the group while it is hot, then an online softmax (running max m and
-// sum l) folds the V tile into each head's output. Partials are merged per head.
+// Keys are cached in tiles of 16 positions stored dimension-major, so one
+// vector holds one dimension across 16 positions: scoring a tile against all
+// query heads of a KV group is broadcast-FMA work with no horizontal sums.
+// An online softmax (running max m and sum l) then folds the row-major V tile
+// into every head's output at once, so each V row is loaded once per group.
+// Partial (m, l, output) states of the time chunks are merged per head.
 namespace decode {
 namespace {
-constexpr size_t tile = 16;
+constexpr size_t tile = kv_tile;
 constexpr float negative_infinity = -std::numeric_limits<float>::infinity();
 
-// Pointer to cached rows [t, t + n) of one KV head as FP32: the cache itself
-// for f32, otherwise a converted copy in `buffer`.
-template<class Convert>
-const float* rows_f32(const void* cache, KvType kv, size_t offset, size_t count, float* buffer, Convert convert) {
-    if (kv == KvType::f32) return static_cast<const float*>(cache) + offset;
-    convert(static_cast<const uint16_t*>(cache) + offset, count, buffer);
-    return buffer;
+inline float load_kv(const void* base, KvType kv, size_t index) {
+    return kv == KvType::f32 ? static_cast<const float*>(base)[index] : half_float(static_cast<const uint16_t*>(base)[index]);
 }
 
-void convert_scalar(const uint16_t* h, size_t n, float* out) { for (size_t j = 0; j < n; ++j) out[j] = half_float(h[j]); }
-float dot_scalar(const float* a, const float* b, size_t n) {
+// Online-softmax update of one head's (max, sum) for a tile whose first n scores
+// are valid. Scores become probabilities (zero past n); returns the output rescale.
+float softmax_tile(float* state, float* scores, size_t n) {
+    float maximum = state[0];
+    for (size_t i = 0; i < n; ++i) maximum = std::max(maximum, scores[i]);
+    const float alpha = std::exp(state[0] - maximum);
     float sum = 0;
-    for (size_t j = 0; j < n; ++j) sum += a[j] * b[j];
-    return sum;
-}
-#ifdef DECODE_NEON
-void convert_neon(const uint16_t* h, size_t n, float* out) {
-    size_t j = 0;
-    for (; j + 4 <= n; j += 4) vst1q_f32(out + j, vcvt_f32_f16(vreinterpret_f16_u16(vld1_u16(h + j))));
-    for (; j < n; ++j) out[j] = half_float(h[j]);
-}
-float dot_neon(const float* a, const float* b, size_t n) {
-    float32x4_t s0 = vdupq_n_f32(0), s1 = s0;
-    size_t j = 0;
-    for (; j + 8 <= n; j += 8) {
-        s0 = vfmaq_f32(s0, vld1q_f32(a + j), vld1q_f32(b + j));
-        s1 = vfmaq_f32(s1, vld1q_f32(a + j + 4), vld1q_f32(b + j + 4));
+    for (size_t i = 0; i < tile; ++i) {
+        scores[i] = i < n ? std::exp(scores[i] - maximum) : 0.0f;
+        sum += scores[i];
     }
-    float sum = vaddvq_f32(vaddq_f32(s0, s1));
-    for (; j < n; ++j) sum += a[j] * b[j];
-    return sum;
+    state[0] = maximum;
+    state[1] = state[1] * alpha + sum;
+    return alpha;
 }
-// exp(x) for x <= 0, same reduction and polynomial as the AVX-512 version.
+
+void attend_scalar(const float* q, const void* keys, const void* values, KvType kv, size_t begin, size_t end,
+                   size_t group, size_t dim, float* scores, float* out, size_t stride) {
+    for (size_t t = begin; t < end; t += tile) {
+        const size_t n = std::min(tile, end - t);
+        for (size_t h = 0; h < group; ++h) {
+            float* s = scores + h * tile;
+            for (size_t i = 0; i < n; ++i) {
+                float sum = 0;
+                for (size_t d = 0; d < dim; ++d) sum += q[h * dim + d] * load_kv(keys, kv, t * dim + d * tile + i);
+                s[i] = sum;
+            }
+            float* state = out + h * stride;
+            float* o = state + 2;
+            const float alpha = softmax_tile(state, s, n);
+            for (size_t j = 0; j < dim; ++j) o[j] *= alpha;
+            for (size_t i = 0; i < n; ++i)
+                for (size_t j = 0; j < dim; ++j) o[j] += s[i] * load_kv(values, kv, (t + i) * dim + j);
+        }
+    }
+}
+
+#ifdef DECODE_NEON
+// exp(x) for x <= 0: Cody-Waite reduction to r in [-ln2/2, ln2/2], degree-6
+// Taylor polynomial (relative error below 2e-7), then scale by 2^n.
 inline float32x4_t exp_nonpositive_neon(float32x4_t x) {
     x = vmaxq_f32(x, vdupq_n_f32(-87.0f));
     float32x4_t n = vrndnq_f32(vmulq_f32(x, vdupq_n_f32(1.44269504088896341f)));
@@ -64,98 +78,95 @@ inline float32x4_t exp_nonpositive_neon(float32x4_t x) {
     int32x4_t scale = vshlq_n_s32(vaddq_s32(vcvtq_s32_f32(n), vdupq_n_s32(127)), 23);
     return vmulq_f32(p, vreinterpretq_f32_s32(scale));
 }
-// Requires dim % 32 == 0. Output chunks of 32 floats (8 independent FMA chains)
-// stay in registers across a tile's rows.
-void attend_neon(const float* q, const void* keys, const void* values, KvType kv, size_t begin, size_t end,
-                 size_t group, size_t dim, float* scratch, float* out, size_t stride) {
-    float* key_buffer = scratch;
-    float* value_buffer = key_buffer + tile * dim;
-    float* probabilities = value_buffer + tile * dim;
+// Eight consecutive cache elements as FP32.
+template<bool Half> inline void load8(const void* base, size_t index, float32x4_t& a, float32x4_t& b) {
+    if constexpr (Half) {
+        const float16x8_t h = vreinterpretq_f16_u16(vld1q_u16(static_cast<const uint16_t*>(base) + index));
+        a = vcvt_f32_f16(vget_low_f16(h));
+        b = vcvt_high_f32_f16(h);
+    } else {
+        const float* p = static_cast<const float*>(base) + index;
+        a = vld1q_f32(p);
+        b = vld1q_f32(p + 4);
+    }
+}
+// acc[h] += (x0, x1) * lane J of w[h] for every head of the group.
+template<int J, size_t G> inline void fma_lane(float32x4_t (&acc)[G][2], const float32x4_t (&w)[G], float32x4_t x0, float32x4_t x1) {
+    for (size_t h = 0; h < G; ++h) {
+        acc[h][0] = vfmaq_laneq_f32(acc[h][0], x0, w[h], J);
+        acc[h][1] = vfmaq_laneq_f32(acc[h][1], x1, w[h], J);
+    }
+}
+// Requires dim % 8 == 0.
+template<size_t G, bool Half>
+void attend_neon(const float* q, const void* keys, const void* values, size_t begin, size_t end, size_t dim,
+                 float* scores, float* out, size_t stride) {
+    float alpha[G];
     for (size_t t = begin; t < end; t += tile) {
         const size_t n = std::min(tile, end - t);
-        const float* k = rows_f32(keys, kv, t * dim, n * dim, key_buffer, convert_neon);
-        const float* v = rows_f32(values, kv, t * dim, n * dim, value_buffer, convert_neon);
-        for (size_t h = 0; h < group; ++h) {
+        // Scores: positions [8 * half, 8 * half + 8) of the tile for all G heads.
+        for (size_t half = 0; half < 2; ++half) {
+            float32x4_t acc[G][2];
+            for (size_t h = 0; h < G; ++h) acc[h][0] = acc[h][1] = vdupq_n_f32(0);
+            const size_t base = t * dim + half * 8;
+            for (size_t d = 0; d < dim; d += 4) {
+                float32x4_t qv[G], k0, k1;
+                for (size_t h = 0; h < G; ++h) qv[h] = vld1q_f32(q + h * dim + d);
+                load8<Half>(keys, base + d * tile, k0, k1); fma_lane<0>(acc, qv, k0, k1);
+                load8<Half>(keys, base + (d + 1) * tile, k0, k1); fma_lane<1>(acc, qv, k0, k1);
+                load8<Half>(keys, base + (d + 2) * tile, k0, k1); fma_lane<2>(acc, qv, k0, k1);
+                load8<Half>(keys, base + (d + 3) * tile, k0, k1); fma_lane<3>(acc, qv, k0, k1);
+            }
+            for (size_t h = 0; h < G; ++h) {
+                vst1q_f32(scores + h * tile + half * 8, acc[h][0]);
+                vst1q_f32(scores + h * tile + half * 8 + 4, acc[h][1]);
+            }
+        }
+        for (size_t h = 0; h < G; ++h) {
+            float* s = scores + h * tile;
             float* state = out + h * stride;
-            float* o = state + 2;
-            const float* qh = q + h * dim;
-            float tile_max = negative_infinity;
-            for (size_t i = 0; i < n; ++i) {
-                const float* kr = k + i * dim;
-                float32x4_t a0 = vdupq_n_f32(0), a1 = a0, a2 = a0, a3 = a0;
-                for (size_t c = 0; c < dim; c += 16) {
-                    a0 = vfmaq_f32(a0, vld1q_f32(qh + c), vld1q_f32(kr + c));
-                    a1 = vfmaq_f32(a1, vld1q_f32(qh + c + 4), vld1q_f32(kr + c + 4));
-                    a2 = vfmaq_f32(a2, vld1q_f32(qh + c + 8), vld1q_f32(kr + c + 8));
-                    a3 = vfmaq_f32(a3, vld1q_f32(qh + c + 12), vld1q_f32(kr + c + 12));
-                }
-                probabilities[i] = vaddvq_f32(vaddq_f32(vaddq_f32(a0, a1), vaddq_f32(a2, a3)));
-                tile_max = std::max(tile_max, probabilities[i]);
-            }
-            for (size_t i = n; i < tile; ++i) probabilities[i] = negative_infinity;
-            const float maximum = std::max(state[0], tile_max);
-            const float alpha = std::exp(state[0] - maximum);
-            float32x4_t total = vdupq_n_f32(0);
-            for (size_t i = 0; i < tile; i += 4) {
-                float32x4_t p = exp_nonpositive_neon(vsubq_f32(vld1q_f32(probabilities + i), vdupq_n_f32(maximum)));
-                if (i + 4 > n) {  // zero the rows past the end of the chunk
-                    const uint32_t lanes[4] = {i < n, i + 1 < n, i + 2 < n, i + 3 < n};
-                    p = vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(p), vcgtq_u32(vld1q_u32(lanes), vdupq_n_u32(0))));
-                }
-                vst1q_f32(probabilities + i, p);
-                total = vaddq_f32(total, p);
-            }
+            for (size_t i = n; i < tile; ++i) s[i] = negative_infinity;
+            const float32x4_t s0 = vld1q_f32(s), s1 = vld1q_f32(s + 4), s2 = vld1q_f32(s + 8), s3 = vld1q_f32(s + 12);
+            const float maximum = std::max(state[0], vmaxvq_f32(vmaxq_f32(vmaxq_f32(s0, s1), vmaxq_f32(s2, s3))));
+            alpha[h] = std::exp(state[0] - maximum);
+            const float32x4_t m = vdupq_n_f32(maximum);
+            vst1q_f32(s, exp_nonpositive_neon(vsubq_f32(s0, m)));
+            vst1q_f32(s + 4, exp_nonpositive_neon(vsubq_f32(s1, m)));
+            vst1q_f32(s + 8, exp_nonpositive_neon(vsubq_f32(s2, m)));
+            vst1q_f32(s + 12, exp_nonpositive_neon(vsubq_f32(s3, m)));
+            for (size_t i = n; i < tile; ++i) s[i] = 0.0f;
+            const float sum = vaddvq_f32(vaddq_f32(vaddq_f32(vld1q_f32(s), vld1q_f32(s + 4)), vaddq_f32(vld1q_f32(s + 8), vld1q_f32(s + 12))));
             state[0] = maximum;
-            state[1] = state[1] * alpha + vaddvq_f32(total);
-            for (size_t c = 0; c < dim; c += 32) {
-                float32x4_t acc[8];
-                for (size_t j = 0; j < 8; ++j) acc[j] = vmulq_n_f32(vld1q_f32(o + c + 4 * j), alpha);
-                for (size_t i = 0; i < n; ++i) {
-                    const float* vr = v + i * dim + c;
-                    for (size_t j = 0; j < 8; ++j) acc[j] = vfmaq_n_f32(acc[j], vld1q_f32(vr + 4 * j), probabilities[i]);
-                }
-                for (size_t j = 0; j < 8; ++j) vst1q_f32(o + c + 4 * j, acc[j]);
+            state[1] = state[1] * alpha[h] + sum;
+        }
+        // Rows past n have zero probability; their (finite) cache contents do not matter.
+        for (size_t c = 0; c < dim; c += 8) {
+            float32x4_t acc[G][2];
+            for (size_t h = 0; h < G; ++h) {
+                const float* o = out + h * stride + 2 + c;
+                acc[h][0] = vmulq_n_f32(vld1q_f32(o), alpha[h]);
+                acc[h][1] = vmulq_n_f32(vld1q_f32(o + 4), alpha[h]);
+            }
+            for (size_t i = 0; i < tile; i += 4) {
+                float32x4_t p[G], v0, v1;
+                for (size_t h = 0; h < G; ++h) p[h] = vld1q_f32(scores + h * tile + i);
+                load8<Half>(values, (t + i) * dim + c, v0, v1); fma_lane<0>(acc, p, v0, v1);
+                load8<Half>(values, (t + i + 1) * dim + c, v0, v1); fma_lane<1>(acc, p, v0, v1);
+                load8<Half>(values, (t + i + 2) * dim + c, v0, v1); fma_lane<2>(acc, p, v0, v1);
+                load8<Half>(values, (t + i + 3) * dim + c, v0, v1); fma_lane<3>(acc, p, v0, v1);
+            }
+            for (size_t h = 0; h < G; ++h) {
+                float* o = out + h * stride + 2 + c;
+                vst1q_f32(o, acc[h][0]);
+                vst1q_f32(o + 4, acc[h][1]);
             }
         }
     }
 }
 #endif
 
-// Portable tile loop; `convert` and `dot` are the ISA-specific pieces.
-template<class Convert, class DotFn>
-void attend_generic(const float* q, const void* keys, const void* values, KvType kv, size_t begin, size_t end,
-                    size_t group, size_t dim, float* scratch, float* out, size_t stride, Convert convert, DotFn dot) {
-    float* key_buffer = scratch;
-    float* value_buffer = key_buffer + tile * dim;
-    float* scores = value_buffer + tile * dim;
-    for (size_t t = begin; t < end; t += tile) {
-        const size_t n = std::min(tile, end - t);
-        const float* k = rows_f32(keys, kv, t * dim, n * dim, key_buffer, convert);
-        const float* v = rows_f32(values, kv, t * dim, n * dim, value_buffer, convert);
-        for (size_t h = 0; h < group; ++h) {
-            float* state = out + h * stride;  // [max, sum, output...]
-            float* o = state + 2;
-            float tile_max = negative_infinity;
-            for (size_t i = 0; i < n; ++i) {
-                scores[i] = dot(q + h * dim, k + i * dim, dim);
-                tile_max = std::max(tile_max, scores[i]);
-            }
-            const float maximum = std::max(state[0], tile_max);
-            const float alpha = std::exp(state[0] - maximum);
-            float sum = 0;
-            for (size_t i = 0; i < n; ++i) { scores[i] = std::exp(scores[i] - maximum); sum += scores[i]; }
-            state[0] = maximum;
-            state[1] = state[1] * alpha + sum;
-            for (size_t j = 0; j < dim; ++j) o[j] *= alpha;
-            for (size_t i = 0; i < n; ++i)
-                for (size_t j = 0; j < dim; ++j) o[j] += scores[i] * v[i * dim + j];
-        }
-    }
-}
-
 #ifdef DECODE_X86
-// exp(x) for x <= 0: Cody-Waite reduction to r in [-ln2/2, ln2/2], degree-6
-// Taylor polynomial (relative error below 2e-7), then scale by 2^n.
+// Same reduction and polynomial as the NEON version.
 DECODE_AVX512 inline __m512 exp_nonpositive(__m512 x) {
     x = _mm512_max_ps(x, _mm512_set1_ps(-87.0f));
     __m512 n = _mm512_roundscale_ps(_mm512_mul_ps(x, _mm512_set1_ps(1.44269504088896341f)), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
@@ -170,66 +181,103 @@ DECODE_AVX512 inline __m512 exp_nonpositive(__m512 x) {
     p = _mm512_fmadd_ps(p, r, _mm512_set1_ps(1.0f));
     return _mm512_scalef_ps(p, n);
 }
-DECODE_AVX512 void convert_avx512(const uint16_t* h, size_t n, float* out) {
-    size_t j = 0;
-    for (; j + 16 <= n; j += 16)
-        _mm512_storeu_ps(out + j, _mm512_cvtph_ps(_mm256_loadu_si256(reinterpret_cast<const __m256i*>(h + j))));
-    for (; j < n; ++j) out[j] = half_float(h[j]);
+// Sixteen consecutive cache elements as FP32.
+template<bool Half> DECODE_AVX512 inline __m512 load16(const void* base, size_t index) {
+    if constexpr (Half) return _mm512_cvtph_ps(_mm256_loadu_si256(reinterpret_cast<const __m256i*>(static_cast<const uint16_t*>(base) + index)));
+    else return _mm512_loadu_ps(static_cast<const float*>(base) + index);
 }
-// Requires dim % 64 == 0. One score vector holds a whole tile (16 rows); the output
-// is updated 64 floats at a time so four independent FMA chains run per head.
-DECODE_AVX512 void attend_avx512(const float* q, const void* keys, const void* values, KvType kv, size_t begin, size_t end,
-                                 size_t group, size_t dim, float* scratch, float* out, size_t stride) {
-    float* key_buffer = scratch;
-    float* value_buffer = key_buffer + tile * dim;
-    float* probabilities = value_buffer + tile * dim;
+// Requires dim % 32 == 0. One vector holds a whole tile's scores for one head.
+template<size_t G, bool Half>
+DECODE_AVX512 void attend_avx512(const float* q, const void* keys, const void* values, size_t begin, size_t end, size_t dim,
+                                 float* scores, float* out, size_t stride) {
+    float alpha[G];
     for (size_t t = begin; t < end; t += tile) {
         const size_t n = std::min(tile, end - t);
         const __mmask16 valid = __mmask16((1u << n) - 1u);
-        const float* k = rows_f32(keys, kv, t * dim, n * dim, key_buffer, convert_avx512);
-        const float* v = rows_f32(values, kv, t * dim, n * dim, value_buffer, convert_avx512);
-        for (size_t h = 0; h < group; ++h) {
+        __m512 acc[G];
+        for (size_t h = 0; h < G; ++h) acc[h] = _mm512_setzero_ps();
+        for (size_t d = 0; d < dim; ++d) {
+            const __m512 k = load16<Half>(keys, t * dim + d * tile);
+            for (size_t h = 0; h < G; ++h) acc[h] = _mm512_fmadd_ps(_mm512_set1_ps(q[h * dim + d]), k, acc[h]);
+        }
+        for (size_t h = 0; h < G; ++h) {
             float* state = out + h * stride;
-            float* o = state + 2;
-            const float* qh = q + h * dim;
-            alignas(64) float raw[tile];
-            for (size_t i = 0; i < n; ++i) {
-                const float* kr = k + i * dim;
-                __m512 acc = _mm512_setzero_ps();
-                for (size_t c = 0; c < dim; c += 64) {
-                    __m512 a = _mm512_fmadd_ps(_mm512_loadu_ps(qh + c), _mm512_loadu_ps(kr + c), _mm512_mul_ps(_mm512_loadu_ps(qh + c + 16), _mm512_loadu_ps(kr + c + 16)));
-                    __m512 b = _mm512_fmadd_ps(_mm512_loadu_ps(qh + c + 32), _mm512_loadu_ps(kr + c + 32), _mm512_mul_ps(_mm512_loadu_ps(qh + c + 48), _mm512_loadu_ps(kr + c + 48)));
-                    acc = _mm512_add_ps(acc, _mm512_add_ps(a, b));
-                }
-                raw[i] = detail::sum512(acc);
-            }
-            const __m512 scores = _mm512_mask_loadu_ps(_mm512_set1_ps(negative_infinity), valid, raw);
-            const float maximum = std::max(state[0], _mm512_reduce_max_ps(scores));
-            const float alpha = std::exp(state[0] - maximum);
-            const __m512 p = _mm512_maskz_mov_ps(valid, exp_nonpositive(_mm512_sub_ps(scores, _mm512_set1_ps(maximum))));
-            _mm512_store_ps(probabilities, p);
+            const __m512 s = _mm512_mask_mov_ps(_mm512_set1_ps(negative_infinity), valid, acc[h]);
+            const float maximum = std::max(state[0], _mm512_reduce_max_ps(s));
+            alpha[h] = std::exp(state[0] - maximum);
+            const __m512 p = _mm512_maskz_mov_ps(valid, exp_nonpositive(_mm512_sub_ps(s, _mm512_set1_ps(maximum))));
+            _mm512_storeu_ps(scores + h * tile, p);
             state[0] = maximum;
-            state[1] = state[1] * alpha + detail::sum512(p);
-            const __m512 scale = _mm512_set1_ps(alpha);
-            for (size_t c = 0; c < dim; c += 64) {
-                __m512 a0 = _mm512_mul_ps(_mm512_loadu_ps(o + c), scale), a1 = _mm512_mul_ps(_mm512_loadu_ps(o + c + 16), scale);
-                __m512 a2 = _mm512_mul_ps(_mm512_loadu_ps(o + c + 32), scale), a3 = _mm512_mul_ps(_mm512_loadu_ps(o + c + 48), scale);
-                for (size_t i = 0; i < n; ++i) {
-                    const __m512 w = _mm512_set1_ps(probabilities[i]);
-                    const float* vr = v + i * dim + c;
-                    a0 = _mm512_fmadd_ps(w, _mm512_loadu_ps(vr), a0);
-                    a1 = _mm512_fmadd_ps(w, _mm512_loadu_ps(vr + 16), a1);
-                    a2 = _mm512_fmadd_ps(w, _mm512_loadu_ps(vr + 32), a2);
-                    a3 = _mm512_fmadd_ps(w, _mm512_loadu_ps(vr + 48), a3);
+            state[1] = state[1] * alpha[h] + detail::sum512(p);
+        }
+        for (size_t c = 0; c < dim; c += 32) {
+            __m512 o[G][2];
+            for (size_t h = 0; h < G; ++h) {
+                const __m512 a = _mm512_set1_ps(alpha[h]);
+                o[h][0] = _mm512_mul_ps(_mm512_loadu_ps(out + h * stride + 2 + c), a);
+                o[h][1] = _mm512_mul_ps(_mm512_loadu_ps(out + h * stride + 2 + c + 16), a);
+            }
+            for (size_t i = 0; i < tile; ++i) {
+                const __m512 v0 = load16<Half>(values, (t + i) * dim + c), v1 = load16<Half>(values, (t + i) * dim + c + 16);
+                for (size_t h = 0; h < G; ++h) {
+                    const __m512 w = _mm512_set1_ps(scores[h * tile + i]);
+                    o[h][0] = _mm512_fmadd_ps(w, v0, o[h][0]);
+                    o[h][1] = _mm512_fmadd_ps(w, v1, o[h][1]);
                 }
-                _mm512_storeu_ps(o + c, a0); _mm512_storeu_ps(o + c + 16, a1);
-                _mm512_storeu_ps(o + c + 32, a2); _mm512_storeu_ps(o + c + 48, a3);
+            }
+            for (size_t h = 0; h < G; ++h) {
+                _mm512_storeu_ps(out + h * stride + 2 + c, o[h][0]);
+                _mm512_storeu_ps(out + h * stride + 2 + c + 16, o[h][1]);
             }
         }
     }
 }
 #endif
+
+// Instantiates a SIMD kernel for groups of 1-8 query heads per KV head; false if none applies.
+#define DECODE_GROUP_CASES(KERNEL, ...)                                                        \
+    switch (group) {                                                                         \
+    case 1: half ? KERNEL<1, true>(__VA_ARGS__) : KERNEL<1, false>(__VA_ARGS__); return true; \
+    case 2: half ? KERNEL<2, true>(__VA_ARGS__) : KERNEL<2, false>(__VA_ARGS__); return true; \
+    case 3: half ? KERNEL<3, true>(__VA_ARGS__) : KERNEL<3, false>(__VA_ARGS__); return true; \
+    case 4: half ? KERNEL<4, true>(__VA_ARGS__) : KERNEL<4, false>(__VA_ARGS__); return true; \
+    case 5: half ? KERNEL<5, true>(__VA_ARGS__) : KERNEL<5, false>(__VA_ARGS__); return true; \
+    case 6: half ? KERNEL<6, true>(__VA_ARGS__) : KERNEL<6, false>(__VA_ARGS__); return true; \
+    case 7: half ? KERNEL<7, true>(__VA_ARGS__) : KERNEL<7, false>(__VA_ARGS__); return true; \
+    case 8: half ? KERNEL<8, true>(__VA_ARGS__) : KERNEL<8, false>(__VA_ARGS__); return true; \
+    default: return false;                                                                   \
+    }
+bool attend_simd(Kernel kernel, size_t group, bool half, const float* q, const void* keys, const void* values,
+                 size_t begin, size_t end, size_t dim, float* scores, float* out, size_t stride) {
+#ifdef DECODE_X86
+    if (kernel == Kernel::avx512 && dim % 32 == 0) { DECODE_GROUP_CASES(attend_avx512, q, keys, values, begin, end, dim, scores, out, stride) }
+#endif
+#ifdef DECODE_NEON
+    if (kernel == Kernel::neon && dim % 8 == 0) { DECODE_GROUP_CASES(attend_neon, q, keys, values, begin, end, dim, scores, out, stride) }
+#endif
+    (void)kernel; (void)group; (void)half; (void)q; (void)keys; (void)values; (void)begin; (void)end; (void)dim; (void)scores; (void)out; (void)stride;
+    return false;
+}
+#undef DECODE_GROUP_CASES
 } // namespace
+
+size_t kv_rows(size_t capacity) { return (capacity + tile - 1) / tile * tile; }
+
+void write_kv(void* keys, void* values, KvType kv, size_t capacity, size_t dim, size_t head, size_t position,
+              const float* k, const float* v) {
+    if (position >= capacity) throw std::runtime_error("KV position outside cache capacity");
+    const size_t base = head * kv_rows(capacity) * dim;
+    const size_t key = base + (position / tile) * tile * dim + position % tile, row = base + position * dim;
+    if (kv == KvType::f16) {
+        uint16_t* kh = static_cast<uint16_t*>(keys);
+        uint16_t* vh = static_cast<uint16_t*>(values);
+        for (size_t d = 0; d < dim; ++d) { kh[key + d * tile] = float_half(k[d]); vh[row + d] = float_half(v[d]); }
+    } else {
+        float* kf = static_cast<float*>(keys);
+        for (size_t d = 0; d < dim; ++d) kf[key + d * tile] = k[d];
+        std::memcpy(static_cast<float*>(values) + row, v, dim * sizeof(float));
+    }
+}
 
 AttentionPlan plan_attention(size_t length, size_t heads, size_t kv_heads, size_t dim, int threads) {
     if (!length || !kv_heads || !heads || heads % kv_heads || !dim || threads < 1)
@@ -237,20 +285,24 @@ AttentionPlan plan_attention(size_t length, size_t heads, size_t kv_heads, size_
     AttentionPlan plan;
     plan.length = length;
     plan.group = heads / kv_heads;
-    // Enough chunks for every thread, but at least 64 rows per chunk.
-    plan.chunks = threads == 1 ? 1 : std::max<size_t>(1, std::min<size_t>(size_t(threads), (length + 63) / 64));
-    plan.chunk = (length + plan.chunks - 1) / plan.chunks;
+    // Enough chunks for every thread, at least 64 rows each, whole tiles only.
+    const size_t wanted = threads == 1 ? 1 : std::max<size_t>(1, std::min<size_t>(size_t(threads), (length + 63) / 64));
+    plan.chunk = ((length + wanted - 1) / wanted + tile - 1) / tile * tile;
+    plan.chunks = (length + plan.chunk - 1) / plan.chunk;
     plan.items = kv_heads * plan.chunks;
     plan.partial_stride = dim + 2;
     return plan;
 }
-size_t attention_scratch_floats(size_t, size_t dim) { return 2 * tile * dim + tile + 16; }
+size_t attention_partial_floats(size_t heads, size_t kv_heads, size_t dim, int threads) {
+    return kv_heads * size_t(threads) * (heads / kv_heads) * (dim + 2);
+}
+size_t attention_scratch_floats(size_t group, size_t) { return group * tile + 16; }
 
 void attention_item(const AttentionPlan& plan, size_t item, const float* q, const void* keys, const void* values,
                     KvType kv, size_t capacity, size_t dim, float* scratch, float* partials, Kernel kernel) {
     const size_t head = item / plan.chunks, chunk = item % plan.chunks;
     const size_t begin = std::min(plan.length, chunk * plan.chunk), end = std::min(plan.length, begin + plan.chunk);
-    const size_t width = kv == KvType::f16 ? 2 : 4, offset = head * capacity * dim * width;
+    const size_t width = kv == KvType::f16 ? 2 : 4, offset = head * kv_rows(capacity) * dim * width;
     const void* k = static_cast<const char*>(keys) + offset;
     const void* v = static_cast<const char*>(values) + offset;
     const float* qg = q + head * plan.group * dim;
@@ -260,22 +312,10 @@ void attention_item(const AttentionPlan& plan, size_t item, const float* q, cons
         state[0] = negative_infinity;
         std::fill(state + 1, state + plan.partial_stride, 0.0f);
     }
-#ifdef DECODE_X86
-    if (kernel == Kernel::avx512 && dim % 64 == 0) {
-        attend_avx512(qg, k, v, kv, begin, end, plan.group, dim, scratch, out, plan.partial_stride);
-        return;
-    }
-#endif
-#ifdef DECODE_NEON
-    if (kernel == Kernel::neon) {
-        if (dim % 32 == 0) attend_neon(qg, k, v, kv, begin, end, plan.group, dim, scratch, out, plan.partial_stride);
-        else attend_generic(qg, k, v, kv, begin, end, plan.group, dim, scratch, out, plan.partial_stride, convert_neon, dot_neon);
-        return;
-    }
-#endif
-    (void)kernel;
-    attend_generic(qg, k, v, kv, begin, end, plan.group, dim, scratch, out, plan.partial_stride, convert_scalar, dot_scalar);
+    if (!attend_simd(kernel, plan.group, kv == KvType::f16, qg, k, v, begin, end, dim, scratch, out, plan.partial_stride))
+        attend_scalar(qg, k, v, kv, begin, end, plan.group, dim, scratch, out, plan.partial_stride);
 }
+
 void attention_merge(const AttentionPlan& plan, size_t head, const float* partials, size_t dim, float* out) {
     const size_t kv = head / plan.group, g = head % plan.group;
     auto state = [&](size_t chunk) { return partials + ((kv * plan.chunks + chunk) * plan.group + g) * plan.partial_stride; };
@@ -293,11 +333,12 @@ void attention_merge(const AttentionPlan& plan, size_t head, const float* partia
     const float inverse = 1.0f / total;
     for (size_t j = 0; j < dim; ++j) out[j] *= inverse;
 }
+
 void attention(const float* q, const void* keys, const void* values, KvType kv, float* out,
                size_t length, size_t capacity, size_t heads, size_t kv_heads, size_t dim, Kernel kernel, int threads) {
     if (length > capacity) throw std::runtime_error("attention length exceeds cache capacity");
     const AttentionPlan plan = plan_attention(length, heads, kv_heads, dim, threads);
-    std::vector<float> partials(plan.items * plan.group * plan.partial_stride);
+    std::vector<float> partials(attention_partial_floats(heads, kv_heads, dim, threads));
     const size_t scratch_floats = (attention_scratch_floats(plan.group, dim) + 15) / 16 * 16;
     AlignedVector<float> scratch(size_t(threads) * scratch_floats);
     #pragma omp parallel num_threads(threads) if(threads > 1)
