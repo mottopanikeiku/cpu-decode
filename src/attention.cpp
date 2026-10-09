@@ -97,10 +97,12 @@ template<int J, size_t G> inline void fma_lane(float32x4_t (&acc)[G][2], const f
         acc[h][1] = vfmaq_laneq_f32(acc[h][1], x1, w[h], J);
     }
 }
-// Requires dim % 8 == 0.
-template<size_t G, bool Half>
-void attend_neon(const float* q, const void* keys, const void* values, size_t begin, size_t end, size_t dim,
+// Requires dim % 8 == 0. D > 0 fixes the head size at compile time: with the loops fully
+// unrolled the accumulators stay in place instead of rotating through extra moves.
+template<size_t G, bool Half, size_t D = 0>
+void attend_neon(const float* q, const void* keys, const void* values, size_t begin, size_t end, size_t runtime_dim,
                  float* scores, float* out, size_t stride) {
+    const size_t dim = D ? D : runtime_dim;
     float alpha[G];
     for (size_t t = begin; t < end; t += tile) {
         const size_t n = std::min(tile, end - t);
@@ -109,6 +111,7 @@ void attend_neon(const float* q, const void* keys, const void* values, size_t be
             float32x4_t acc[G][2];
             for (size_t h = 0; h < G; ++h) acc[h][0] = acc[h][1] = vdupq_n_f32(0);
             const size_t base = t * dim + half * 8;
+            #pragma GCC unroll 16
             for (size_t d = 0; d < dim; d += 4) {
                 float32x4_t qv[G], k0, k1;
                 for (size_t h = 0; h < G; ++h) qv[h] = vld1q_f32(q + h * dim + d);
@@ -147,6 +150,7 @@ void attend_neon(const float* q, const void* keys, const void* values, size_t be
                 acc[h][0] = vmulq_n_f32(vld1q_f32(o), alpha[h]);
                 acc[h][1] = vmulq_n_f32(vld1q_f32(o + 4), alpha[h]);
             }
+            #pragma GCC unroll 4
             for (size_t i = 0; i < tile; i += 4) {
                 float32x4_t p[G], v0, v1;
                 for (size_t h = 0; h < G; ++h) p[h] = vld1q_f32(scores + h * tile + i);
@@ -162,6 +166,12 @@ void attend_neon(const float* q, const void* keys, const void* values, size_t be
             }
         }
     }
+}
+// Head size of every Qwen2.5 model up to 7B.
+template<size_t G, bool Half>
+void attend_neon64(const float* q, const void* keys, const void* values, size_t begin, size_t end, size_t dim,
+                   float* scores, float* out, size_t stride) {
+    attend_neon<G, Half, 64>(q, keys, values, begin, end, dim, scores, out, stride);
 }
 #endif
 
@@ -253,6 +263,7 @@ bool attend_simd(Kernel kernel, size_t group, bool half, const float* q, const v
     if (kernel == Kernel::avx512 && dim % 32 == 0) { DECODE_GROUP_CASES(attend_avx512, q, keys, values, begin, end, dim, scores, out, stride) }
 #endif
 #ifdef DECODE_NEON
+    if (kernel == Kernel::neon && dim == 64) { DECODE_GROUP_CASES(attend_neon64, q, keys, values, begin, end, dim, scores, out, stride) }
     if (kernel == Kernel::neon && dim % 8 == 0) { DECODE_GROUP_CASES(attend_neon, q, keys, values, begin, end, dim, scores, out, stride) }
 #endif
     (void)kernel; (void)group; (void)half; (void)q; (void)keys; (void)values; (void)begin; (void)end; (void)dim; (void)scores; (void)out; (void)stride;
