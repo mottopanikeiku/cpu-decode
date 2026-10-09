@@ -301,12 +301,14 @@ Dot select(Format format, Kernel kernel) {
     return format == Format::bf16 ? bf16_scalar : format == Format::q8 ? q8_scalar : q4_scalar;
 }
 using Rows4 = void (*)(const Matrix&, size_t row, const Activation&, float* out);
-Rows4 select_rows4(Format format, Kernel kernel) {
+Rows4 select_rows4(const Matrix& m, Kernel kernel) {
 #ifdef DECODE_NEON
-    if (kernel == Kernel::neon && format == Format::q8) return q8_neon_rows<4>;
-    if (kernel == Kernel::neon && format == Format::q4) return q4_neon_rows<4>;
+    // q8 rows longer than 2048 weights stream well one at a time (the prefetch two
+    // groups ahead would reach past L1); q4 is compute-bound and always gains.
+    if (kernel == Kernel::neon && m.format == Format::q8 && m.cols <= 2048) return q8_neon_rows<4>;
+    if (kernel == Kernel::neon && m.format == Format::q4) return q4_neon_rows<4>;
 #endif
-    (void)format; (void)kernel;
+    (void)m; (void)kernel;
     return nullptr;
 }
 } // namespace
@@ -315,7 +317,7 @@ void matvec_rows(const Matrix& m, const float* x, const Activation& a, float* y,
                  size_t begin, size_t end, Kernel kernel, bool accumulate) {
     const Dot dot = select(m.format, kernel);
     size_t r = begin;
-    if (const Rows4 rows4 = select_rows4(m.format, kernel))
+    if (const Rows4 rows4 = select_rows4(m, kernel))
         for (; r + 4 <= end; r += 4) {
             float out[4];
             rows4(m, r, a, out);
