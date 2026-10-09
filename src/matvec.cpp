@@ -198,6 +198,95 @@ DECODE_NEON_DOT float q4_neon(const Matrix& m, size_t row, const float*, const A
     }
     return vaddvq_f32(vaddq_f32(acc0, acc1));
 }
+// Four rows at once: every activation load and block scale conversion is shared
+// by four weight rows, and four independent accumulator chains stay in flight.
+template<int J, size_t R> DECODE_NEON_DOT inline void q8_block(float32x4_t (&acc)[R], const int8_t* const (&w)[R], const int8_t* q,
+                                                               size_t b, const float32x4_t (&scale)[R]) {
+    const int8x16_t x0 = vld1q_s8(q + b * 32), x1 = vld1q_s8(q + b * 32 + 16);
+    for (size_t r = 0; r < R; ++r) {
+        const int32x4_t sum = vdotq_s32(vdotq_s32(vdupq_n_s32(0), vld1q_s8(w[r] + b * 32), x0), vld1q_s8(w[r] + b * 32 + 16), x1);
+        acc[r] = vfmaq_laneq_f32(acc[r], vcvtq_f32_s32(sum), scale[r], J);
+    }
+}
+template<size_t R> DECODE_NEON_DOT void q8_neon_rows(const Matrix& m, size_t row, const Activation& a, float* out) {
+    const size_t blocks = m.cols / block_size;
+    const int8_t* w[R];
+    const uint16_t* s[R];
+    float32x4_t acc[R], scale[R];
+    for (size_t r = 0; r < R; ++r) {
+        w[r] = static_cast<const int8_t*>(m.data) + (row + r) * m.cols;
+        s[r] = m.scales + (row + r) * blocks;
+        acc[r] = vdupq_n_f32(0);
+    }
+    const int8_t* q = a.q.data();
+    size_t b = 0;
+    for (; b + 4 <= blocks; b += 4) {
+        // Four interleaved row streams defeat the hardware prefetcher; fetch the same
+        // 128 bytes two row groups ahead (rows are contiguous) by hand.
+        for (size_t r = 0; r < R; ++r) {
+            __builtin_prefetch(w[r] + 2 * R * m.cols + b * 32);
+            __builtin_prefetch(w[r] + 2 * R * m.cols + b * 32 + 64);
+        }
+        const float32x4_t d = vld1q_f32(a.d.data() + b);
+        for (size_t r = 0; r < R; ++r) scale[r] = vmulq_f32(vcvt_f32_f16(vreinterpret_f16_u16(vld1_u16(s[r] + b))), d);
+        q8_block<0>(acc, w, q, b, scale);
+        q8_block<1>(acc, w, q, b + 1, scale);
+        q8_block<2>(acc, w, q, b + 2, scale);
+        q8_block<3>(acc, w, q, b + 3, scale);
+    }
+    for (; b < blocks; ++b)
+        for (size_t r = 0; r < R; ++r) {
+            const int32x4_t sum = vdotq_s32(vdotq_s32(vdupq_n_s32(0), vld1q_s8(w[r] + b * 32), vld1q_s8(q + b * 32)),
+                                            vld1q_s8(w[r] + b * 32 + 16), vld1q_s8(q + b * 32 + 16));
+            acc[r] = vfmaq_n_f32(acc[r], vcvtq_f32_s32(sum), half_float(s[r][b]) * a.d[b]);
+        }
+    for (size_t r = 0; r < R; ++r) out[r] = vaddvq_f32(acc[r]);
+}
+// One 64-weight group (blocks 2g, 2g + 1) for R rows. Levels stay unsigned 0..15;
+// the -8 offset enters through the activation bias (-8 * block sum) as the dot's start.
+template<int J, size_t R> DECODE_NEON_DOT inline void q4_group(float32x4_t (&acc)[R], const uint8_t* const (&w)[R], const int8_t* q,
+                                                               const int32_t* bias, size_t g, const float32x4_t (&scale)[R]) {
+    const int8_t* x = q + g * 64;
+    const int8x16_t x0 = vld1q_s8(x), x1 = vld1q_s8(x + 16), x2 = vld1q_s8(x + 32), x3 = vld1q_s8(x + 48);
+    const int32x4_t low_start = vshrq_n_s32(vld1q_s32(bias + g * 16), 4), high_start = vshrq_n_s32(vld1q_s32(bias + g * 16 + 8), 4);
+    const uint8x16_t nibble = vdupq_n_u8(15);
+    for (size_t r = 0; r < R; ++r) {
+        const uint8x16_t v0 = vld1q_u8(w[r] + g * 32), v1 = vld1q_u8(w[r] + g * 32 + 16);
+        const int32x4_t low = vdotq_s32(vdotq_s32(low_start, vreinterpretq_s8_u8(vandq_u8(v0, nibble)), x0),
+                                        vreinterpretq_s8_u8(vandq_u8(v1, nibble)), x1);
+        const int32x4_t high = vdotq_s32(vdotq_s32(high_start, vreinterpretq_s8_u8(vshrq_n_u8(v0, 4)), x2),
+                                         vreinterpretq_s8_u8(vshrq_n_u8(v1, 4)), x3);
+        acc[r] = vfmaq_laneq_f32(acc[r], vcvtq_f32_s32(low), scale[r], 2 * J);
+        acc[r] = vfmaq_laneq_f32(acc[r], vcvtq_f32_s32(high), scale[r], 2 * J + 1);
+    }
+}
+template<size_t R> DECODE_NEON_DOT void q4_neon_rows(const Matrix& m, size_t row, const Activation& a, float* out) {
+    const size_t blocks = m.cols / block_size;
+    const uint8_t* w[R];
+    const uint16_t* s[R];
+    float32x4_t acc[R], scale[R];
+    for (size_t r = 0; r < R; ++r) {
+        w[r] = static_cast<const uint8_t*>(m.data) + (row + r) * m.cols / 2;
+        s[r] = m.scales + (row + r) * blocks;
+        acc[r] = vdupq_n_f32(0);
+    }
+    size_t g = 0;
+    for (; 2 * g + 4 <= blocks; g += 2) {
+        for (size_t r = 0; r < R; ++r) __builtin_prefetch(w[r] + R * m.cols + g * 32);  // two row groups ahead
+        const float32x4_t d = vld1q_f32(a.d.data() + 2 * g);
+        for (size_t r = 0; r < R; ++r) scale[r] = vmulq_f32(vcvt_f32_f16(vreinterpret_f16_u16(vld1_u16(s[r] + 2 * g))), d);
+        q4_group<0>(acc, w, a.q.data(), a.bias.data(), g, scale);
+        q4_group<1>(acc, w, a.q.data(), a.bias.data(), g + 1, scale);
+    }
+    for (; 2 * g < blocks; ++g) {  // one trailing group: its scales in lanes 0 and 1
+        for (size_t r = 0; r < R; ++r) {
+            const float lanes[4] = {half_float(s[r][2 * g]) * a.d[2 * g], half_float(s[r][2 * g + 1]) * a.d[2 * g + 1], 0.0f, 0.0f};
+            scale[r] = vld1q_f32(lanes);
+        }
+        q4_group<0>(acc, w, a.q.data(), a.bias.data(), g, scale);
+    }
+    for (size_t r = 0; r < R; ++r) out[r] = vaddvq_f32(acc[r]);
+}
 #endif
 
 Dot select(Format format, Kernel kernel) {
@@ -211,15 +300,30 @@ Dot select(Format format, Kernel kernel) {
     if (kernel != Kernel::scalar) throw std::runtime_error("kernel not compiled for this architecture");
     return format == Format::bf16 ? bf16_scalar : format == Format::q8 ? q8_scalar : q4_scalar;
 }
+using Rows4 = void (*)(const Matrix&, size_t row, const Activation&, float* out);
+Rows4 select_rows4(Format format, Kernel kernel) {
+#ifdef DECODE_NEON
+    if (kernel == Kernel::neon && format == Format::q8) return q8_neon_rows<4>;
+    if (kernel == Kernel::neon && format == Format::q4) return q4_neon_rows<4>;
+#endif
+    (void)format; (void)kernel;
+    return nullptr;
+}
 } // namespace
 
 void matvec_rows(const Matrix& m, const float* x, const Activation& a, float* y,
                  size_t begin, size_t end, Kernel kernel, bool accumulate) {
     const Dot dot = select(m.format, kernel);
-    if (accumulate) for (size_t r = begin; r < end; ++r) y[r] += dot(m, r, x, a);
-    else for (size_t r = begin; r < end; ++r) y[r] = dot(m, r, x, a);
+    size_t r = begin;
+    if (const Rows4 rows4 = select_rows4(m.format, kernel))
+        for (; r + 4 <= end; r += 4) {
+            float out[4];
+            rows4(m, r, a, out);
+            for (size_t i = 0; i < 4; ++i) y[r + i] = accumulate ? y[r + i] + out[i] : out[i];
+        }
+    if (accumulate) for (; r < end; ++r) y[r] += dot(m, r, x, a);
+    else for (; r < end; ++r) y[r] = dot(m, r, x, a);
 }
-
 void matvec(const Matrix& m, const float* x, float* y, Kernel kernel, int threads) {
     if (!m.data || !m.rows || !m.cols || threads < 1 || (m.format != Format::bf16 && (!m.scales || m.cols % (2 * block_size))))
         throw std::runtime_error("invalid matvec arguments");
