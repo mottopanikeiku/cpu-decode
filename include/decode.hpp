@@ -82,6 +82,8 @@ void matvec(const Matrix& m, const float* x, float* y, Kernel kernel, int thread
 void rmsnorm(const float* x, const float* weight, float* out, size_t n, float epsilon);
 // Split-half rotation with precomputed cos/sin of length dim / 2.
 void rope(float* x, size_t heads, size_t dim, const float* cos, const float* sin);
+// out = silu(gate) * up, elementwise.
+void silu_multiply(const float* gate, const float* up, float* out, size_t n, Kernel kernel);
 
 // KV cache, per layer and KV head, for kv_rows(capacity) positions in the KV dtype:
 // keys in tiles of kv_tile positions stored dimension-major ([tile][dim][kv_tile]),

@@ -61,23 +61,6 @@ void attend_scalar(const float* q, const void* keys, const void* values, KvType 
 }
 
 #ifdef DECODE_NEON
-// exp(x) for x <= 0: Cody-Waite reduction to r in [-ln2/2, ln2/2], degree-6
-// Taylor polynomial (relative error below 2e-7), then scale by 2^n.
-inline float32x4_t exp_nonpositive_neon(float32x4_t x) {
-    x = vmaxq_f32(x, vdupq_n_f32(-87.0f));
-    float32x4_t n = vrndnq_f32(vmulq_f32(x, vdupq_n_f32(1.44269504088896341f)));
-    float32x4_t r = vfmsq_f32(x, n, vdupq_n_f32(0.693359375f));
-    r = vfmsq_f32(r, n, vdupq_n_f32(-2.12194440e-4f));
-    float32x4_t p = vdupq_n_f32(1.0f / 720);
-    p = vfmaq_f32(vdupq_n_f32(1.0f / 120), p, r);
-    p = vfmaq_f32(vdupq_n_f32(1.0f / 24), p, r);
-    p = vfmaq_f32(vdupq_n_f32(1.0f / 6), p, r);
-    p = vfmaq_f32(vdupq_n_f32(0.5f), p, r);
-    p = vfmaq_f32(vdupq_n_f32(1.0f), p, r);
-    p = vfmaq_f32(vdupq_n_f32(1.0f), p, r);
-    int32x4_t scale = vshlq_n_s32(vaddq_s32(vcvtq_s32_f32(n), vdupq_n_s32(127)), 23);
-    return vmulq_f32(p, vreinterpretq_f32_s32(scale));
-}
 // Eight consecutive cache elements as FP32.
 template<bool Half> inline void load8(const void* base, size_t index, float32x4_t& a, float32x4_t& b) {
     if constexpr (Half) {
@@ -133,10 +116,10 @@ void attend_neon(const float* q, const void* keys, const void* values, size_t be
             const float maximum = std::max(state[0], vmaxvq_f32(vmaxq_f32(vmaxq_f32(s0, s1), vmaxq_f32(s2, s3))));
             alpha[h] = std::exp(state[0] - maximum);
             const float32x4_t m = vdupq_n_f32(maximum);
-            vst1q_f32(s, exp_nonpositive_neon(vsubq_f32(s0, m)));
-            vst1q_f32(s + 4, exp_nonpositive_neon(vsubq_f32(s1, m)));
-            vst1q_f32(s + 8, exp_nonpositive_neon(vsubq_f32(s2, m)));
-            vst1q_f32(s + 12, exp_nonpositive_neon(vsubq_f32(s3, m)));
+            vst1q_f32(s, detail::exp_neon(vsubq_f32(s0, m)));
+            vst1q_f32(s + 4, detail::exp_neon(vsubq_f32(s1, m)));
+            vst1q_f32(s + 8, detail::exp_neon(vsubq_f32(s2, m)));
+            vst1q_f32(s + 12, detail::exp_neon(vsubq_f32(s3, m)));
             for (size_t i = n; i < tile; ++i) s[i] = 0.0f;
             const float sum = vaddvq_f32(vaddq_f32(vaddq_f32(vld1q_f32(s), vld1q_f32(s + 4)), vaddq_f32(vld1q_f32(s + 8), vld1q_f32(s + 12))));
             state[0] = maximum;

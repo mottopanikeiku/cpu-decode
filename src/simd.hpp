@@ -39,4 +39,23 @@ DECODE_AVX512 inline float sum512(__m512 v) {
     return _mm_cvtss_f32(q);
 }
 #endif
+#ifdef DECODE_NEON
+// exp(x) for x in [-87, 88] (clamped outside): Cody-Waite reduction to r in
+// [-ln2/2, ln2/2], degree-6 Taylor polynomial (relative error below 2e-7), times 2^n.
+inline float32x4_t exp_neon(float32x4_t x) {
+    x = vminq_f32(vmaxq_f32(x, vdupq_n_f32(-87.0f)), vdupq_n_f32(88.0f));
+    float32x4_t n = vrndnq_f32(vmulq_f32(x, vdupq_n_f32(1.44269504088896341f)));
+    float32x4_t r = vfmsq_f32(x, n, vdupq_n_f32(0.693359375f));
+    r = vfmsq_f32(r, n, vdupq_n_f32(-2.12194440e-4f));
+    float32x4_t p = vdupq_n_f32(1.0f / 720);
+    p = vfmaq_f32(vdupq_n_f32(1.0f / 120), p, r);
+    p = vfmaq_f32(vdupq_n_f32(1.0f / 24), p, r);
+    p = vfmaq_f32(vdupq_n_f32(1.0f / 6), p, r);
+    p = vfmaq_f32(vdupq_n_f32(0.5f), p, r);
+    p = vfmaq_f32(vdupq_n_f32(1.0f), p, r);
+    p = vfmaq_f32(vdupq_n_f32(1.0f), p, r);
+    int32x4_t scale = vshlq_n_s32(vaddq_s32(vcvtq_s32_f32(n), vdupq_n_s32(127)), 23);
+    return vmulq_f32(p, vreinterpretq_f32_s32(scale));
+}
+#endif
 }

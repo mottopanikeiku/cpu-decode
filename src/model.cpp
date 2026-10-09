@@ -426,11 +426,9 @@ struct Engine::Impl {
                     split((config.intermediate + block_size - 1) / block_size, begin, end);
                     const float* g = gate_up.data();
                     const float* u = g + config.intermediate;
-                    for (size_t b = begin; b < end; ++b) {
-                        for (size_t j = b * block_size; j < std::min(config.intermediate, (b + 1) * block_size); ++j)
-                            hidden[j] = (g[j] / (1.0f + std::exp(-g[j]))) * u[j];
-                        if (quantized) quantize_activation(hidden.data(), act_hidden, b, b + 1);
-                    }
+                    const size_t first = std::min(config.intermediate, begin * block_size), last = std::min(config.intermediate, end * block_size);
+                    silu_multiply(g + first, u + first, hidden.data() + first, last - first, kernel);
+                    if (quantized) quantize_activation(hidden.data(), act_hidden, begin, end);
                 }
                 end_phase("silu");
                 project(l.down, hidden.data(), act_hidden, x.data(), true, "mlp_down");

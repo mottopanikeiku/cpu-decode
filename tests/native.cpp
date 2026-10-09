@@ -99,6 +99,8 @@ void quantizer_tests() {
         for (size_t j = 0; j < 32; ++j) {
             sum += a.q[b * 32 + j];
             near(a.q[b * 32 + j] * a.d[b], x[b * 32 + j], a.d[b] * 0.5 + 1e-9, "activation error bound");
+            const float inverse = a.d[b] ? 1.0f / a.d[b] : 0.0f;  // every path rounds x * (1/d) to nearest even
+            require(a.q[b * 32 + j] == int8_t(std::nearbyint(x[b * 32 + j] * inverse)), "activation rounding is round-to-nearest-even");
         }
         require(a.bias[(b / 2) * 16 + (b % 2) * 8] == -128 * sum, "activation pair bias");
     }
@@ -202,6 +204,17 @@ void elementwise_tests() {
     for (size_t h = 0; h < 2; ++h) for (size_t j = 0; j < 2; ++j) {
         near(rotated[4 * h + j], original[4 * h + j] * cosines[j] - original[4 * h + j + 2] * sines[j], 1e-6, "split-half RoPE first");
         near(rotated[4 * h + j + 2], original[4 * h + j] * sines[j] + original[4 * h + j + 2] * cosines[j], 1e-6, "split-half RoPE second");
+    }
+    // SiLU across the range the exp approximation clamps (|g| > 87) and ties to the scalar formula.
+    std::vector<float> gate, up, silu;
+    for (float g = -120.0f; g <= 120.0f; g += 0.37f) { gate.push_back(g); up.push_back(1.5f - g * 0.01f); }
+    silu.resize(gate.size());
+    for (auto kernel : kernels()) {
+        decode::silu_multiply(gate.data(), up.data(), silu.data(), gate.size(), kernel);
+        for (size_t j = 0; j < gate.size(); ++j) {
+            const double expected = gate[j] / (1.0 + std::exp(-double(gate[j]))) * up[j];
+            near(silu[j], expected, 2e-6 * std::abs(expected) + 1e-30, "SiLU " + decode::kernel_name(kernel));
+        }
     }
 }
 

@@ -179,18 +179,45 @@ void dequantize_row(const Matrix& m, size_t row, float* out) {
 void quantize_activation(const float* x, Activation& a, size_t first, size_t last) {
     for (size_t b = first; b < last; ++b) {
         const float* v = x + b * block_size;
+        int8_t* q = a.q.data() + b * block_size;
+        int32_t sum = 0;
+#ifdef DECODE_NEON
+        // Same operations as the scalar path (max |v|, v * (127 / max), round to nearest even).
+        float32x4_t lanes[8], m = vdupq_n_f32(0);
+        for (size_t i = 0; i < 8; ++i) { lanes[i] = vld1q_f32(v + 4 * i); m = vmaxq_f32(m, vabsq_f32(lanes[i])); }
+        const float d = vmaxvq_f32(m) / 127.0f, inverse = d ? 1.0f / d : 0.0f;
+        int32x4_t total = vdupq_n_s32(0);
+        for (size_t i = 0; i < 8; i += 2) {
+            const int32x4_t lo = vcvtnq_s32_f32(vmulq_n_f32(lanes[i], inverse)), hi = vcvtnq_s32_f32(vmulq_n_f32(lanes[i + 1], inverse));
+            total = vaddq_s32(total, vaddq_s32(lo, hi));
+            vst1_s8(q + 4 * i, vmovn_s16(vcombine_s16(vmovn_s32(lo), vmovn_s32(hi))));
+        }
+        sum = vaddvq_s32(total);
+#else
         float maximum = 0;
         for (size_t j = 0; j < block_size; ++j) maximum = std::max(maximum, std::abs(v[j]));
-        float d = maximum / 127.0f, inverse = d ? 1.0f / d : 0.0f;
-        int32_t sum = 0;
+        const float d = maximum / 127.0f, inverse = d ? 1.0f / d : 0.0f;
         for (size_t j = 0; j < block_size; ++j) {
-            int8_t q = int8_t(std::nearbyint(v[j] * inverse));
-            a.q[b * block_size + j] = q;
-            sum += q;
+            q[j] = int8_t(std::nearbyint(v[j] * inverse));
+            sum += q[j];
         }
+#endif
         a.d[b] = d;
         a.bias[(b / 2) * 16 + (b % 2) * 8] = -128 * sum;
     }
+}
+void silu_multiply(const float* gate, const float* up, float* out, size_t n, Kernel kernel) {
+    size_t j = 0;
+#ifdef DECODE_NEON
+    if (kernel == Kernel::neon)
+        for (; j + 4 <= n; j += 4) {
+            const float32x4_t g = vld1q_f32(gate + j);
+            const float32x4_t sigmoid_denominator = vaddq_f32(vdupq_n_f32(1.0f), detail::exp_neon(vnegq_f32(g)));
+            vst1q_f32(out + j, vmulq_f32(vdivq_f32(g, sigmoid_denominator), vld1q_f32(up + j)));
+        }
+#endif
+    (void)kernel;
+    for (; j < n; ++j) out[j] = (gate[j] / (1.0f + std::exp(-gate[j]))) * up[j];
 }
 
 void rmsnorm(const float* x, const float* weight, float* out, size_t n, float epsilon) {
