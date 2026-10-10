@@ -384,8 +384,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 1.0,
-          "max_kl_reference_candidate_nats": 2.611097301496696e-10,
-          "mean_kl_reference_candidate_nats": 3.7455247490720105e-11,
+          "max_kl_reference_candidate_nats": 2.531985088152318e-10,
+          "mean_kl_reference_candidate_nats": 3.656229708577138e-11,
           "passed": true,
           "positions": [
             {
@@ -393,9 +393,9 @@
               "reference_top1": 2701,
               "candidate_top1": 2701,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.611097301496696e-10,
-              "max_abs_error": 0.00017452239990234375,
-              "rmse": 3.713021236845551e-05,
+              "kl_reference_candidate_nats": 2.531985088152318e-10,
+              "max_abs_error": 0.00017309188842773438,
+              "rmse": 3.7195389160662285e-05,
               "allclose": true
             },
             {
@@ -403,9 +403,9 @@
               "reference_top1": 315,
               "candidate_top1": 315,
               "top1_match": true,
-              "kl_reference_candidate_nats": 9.131808850821908e-12,
-              "max_abs_error": 7.319450378417969e-05,
-              "rmse": 1.2808719347404763e-05,
+              "kl_reference_candidate_nats": 1.5490848706387726e-11,
+              "max_abs_error": 7.295608520507812e-05,
+              "rmse": 1.403513176133686e-05,
               "allclose": true
             },
             {
@@ -413,9 +413,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.696702463157418e-11,
-              "max_abs_error": 4.76837158203125e-05,
-              "rmse": 9.776975789411711e-06,
+              "kl_reference_candidate_nats": 3.8419941100218973e-11,
+              "max_abs_error": 5.340576171875e-05,
+              "rmse": 9.698410288671331e-06,
               "allclose": true
             },
             {
@@ -423,9 +423,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.268876367236567e-11,
-              "max_abs_error": 7.867813110351562e-05,
-              "rmse": 1.296927482561683e-05,
+              "kl_reference_candidate_nats": 9.869225510630844e-12,
+              "max_abs_error": 7.152557373046875e-05,
+              "rmse": 1.206999176048209e-05,
               "allclose": true
             },
             {
@@ -433,9 +433,9 @@
               "reference_top1": 12095,
               "candidate_top1": 12095,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.863502129972418e-11,
-              "max_abs_error": 7.43865966796875e-05,
-              "rmse": 1.1640510023188158e-05,
+              "kl_reference_candidate_nats": 3.423146091950605e-11,
+              "max_abs_error": 6.961822509765625e-05,
+              "rmse": 1.1545975411910158e-05,
               "allclose": true
             },
             {
@@ -443,9 +443,9 @@
               "reference_top1": 13,
               "candidate_top1": 13,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.5243714704726658e-11,
-              "max_abs_error": 7.43865966796875e-05,
-              "rmse": 1.194868533832815e-05,
+              "kl_reference_candidate_nats": 1.1823329872653904e-11,
+              "max_abs_error": 6.628036499023438e-05,
+              "rmse": 1.1850387557974123e-05,
               "allclose": true
             },
             {
@@ -453,9 +453,9 @@
               "reference_top1": 1084,
               "candidate_top1": 1084,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.3061499175995365e-11,
-              "max_abs_error": 5.7697296142578125e-05,
-              "rmse": 8.604894098404203e-06,
+              "kl_reference_candidate_nats": 1.3148951156397025e-11,
+              "max_abs_error": 4.7206878662109375e-05,
+              "rmse": 9.00449766232132e-06,
               "allclose": true
             },
             {
@@ -463,9 +463,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.128922542109052e-12,
-              "max_abs_error": 3.8623809814453125e-05,
-              "rmse": 6.727210460531848e-06,
+              "kl_reference_candidate_nats": 2.50399143494002e-12,
+              "max_abs_error": 4.506111145019531e-05,
+              "rmse": 7.769854047523852e-06,
               "allclose": true
             },
             {
@@ -473,9 +473,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 7.478722279921262e-12,
-              "max_abs_error": 3.528594970703125e-05,
-              "rmse": 7.036519818499268e-06,
+              "kl_reference_candidate_nats": 9.189952841518878e-12,
+              "max_abs_error": 3.62396240234375e-05,
+              "rmse": 7.044440215946399e-06,
               "allclose": true
             },
             {
@@ -483,9 +483,9 @@
               "reference_top1": 7772,
               "candidate_top1": 7772,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.2548617788462712e-11,
-              "max_abs_error": 2.86102294921875e-05,
-              "rmse": 5.583823811593722e-06,
+              "kl_reference_candidate_nats": 1.2493995399385896e-11,
+              "max_abs_error": 4.291534423828125e-05,
+              "rmse": 7.1791424330697435e-06,
               "allclose": true
             },
             {
@@ -493,9 +493,9 @@
               "reference_top1": 3283,
               "candidate_top1": 3283,
               "top1_match": true,
-              "kl_reference_candidate_nats": 5.27199396095984e-12,
-              "max_abs_error": 5.245208740234375e-05,
-              "rmse": 7.510347575049778e-06,
+              "kl_reference_candidate_nats": 4.904013940084731e-12,
+              "max_abs_error": 4.482269287109375e-05,
+              "rmse": 7.220266098800178e-06,
               "allclose": true
             },
             {
@@ -503,9 +503,9 @@
               "reference_top1": 304,
               "candidate_top1": 304,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.4197150832310774e-11,
-              "max_abs_error": 6.246566772460938e-05,
-              "rmse": 1.1613831451711494e-05,
+              "kl_reference_candidate_nats": 3.3473345332300735e-11,
+              "max_abs_error": 6.318092346191406e-05,
+              "rmse": 1.1449265955640997e-05,
               "allclose": true
             }
           ],
@@ -698,8 +698,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 1.0,
-          "max_kl_reference_candidate_nats": 9.543265697314213e-10,
-          "mean_kl_reference_candidate_nats": 4.403094280811054e-11,
+          "max_kl_reference_candidate_nats": 1.0748637498543204e-09,
+          "mean_kl_reference_candidate_nats": 5.0426946962223355e-11,
           "passed": true,
           "positions": [
             {
@@ -707,9 +707,9 @@
               "reference_top1": 1887,
               "candidate_top1": 1887,
               "top1_match": true,
-              "kl_reference_candidate_nats": 9.543265697314213e-10,
-              "max_abs_error": 0.0002841949462890625,
-              "rmse": 6.155736259126565e-05,
+              "kl_reference_candidate_nats": 1.0748637498543204e-09,
+              "max_abs_error": 0.00030231475830078125,
+              "rmse": 6.640226200035935e-05,
               "allclose": true
             },
             {
@@ -717,9 +717,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.042154649923788e-11,
-              "max_abs_error": 7.295608520507812e-05,
-              "rmse": 1.534437673165771e-05,
+              "kl_reference_candidate_nats": 4.9729314657096766e-11,
+              "max_abs_error": 8.106231689453125e-05,
+              "rmse": 1.6343888644655118e-05,
               "allclose": true
             },
             {
@@ -727,9 +727,9 @@
               "reference_top1": 982,
               "candidate_top1": 982,
               "top1_match": true,
-              "kl_reference_candidate_nats": 7.085200293171362e-12,
-              "max_abs_error": 7.343292236328125e-05,
-              "rmse": 1.3058557953029081e-05,
+              "kl_reference_candidate_nats": 6.585023331277825e-12,
+              "max_abs_error": 8.678436279296875e-05,
+              "rmse": 1.4303248360903949e-05,
               "allclose": true
             },
             {
@@ -737,9 +737,9 @@
               "reference_top1": 262,
               "candidate_top1": 262,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.5704505549685643e-12,
-              "max_abs_error": 6.341934204101562e-05,
-              "rmse": 1.1655180031247054e-05,
+              "kl_reference_candidate_nats": 3.3892962581146095e-12,
+              "max_abs_error": 6.747245788574219e-05,
+              "rmse": 1.1858532108931265e-05,
               "allclose": true
             },
             {
@@ -747,9 +747,9 @@
               "reference_top1": 421,
               "candidate_top1": 421,
               "top1_match": true,
-              "kl_reference_candidate_nats": 9.790769468960533e-12,
-              "max_abs_error": 4.1484832763671875e-05,
-              "rmse": 8.509535614657977e-06,
+              "kl_reference_candidate_nats": 8.62666330623575e-12,
+              "max_abs_error": 4.5299530029296875e-05,
+              "rmse": 8.23815833066659e-06,
               "allclose": true
             },
             {
@@ -757,9 +757,9 @@
               "reference_top1": 308,
               "candidate_top1": 308,
               "top1_match": true,
-              "kl_reference_candidate_nats": 7.960971122005252e-13,
-              "max_abs_error": 5.626678466796875e-05,
-              "rmse": 1.0444574621719143e-05,
+              "kl_reference_candidate_nats": 5.761907456602933e-13,
+              "max_abs_error": 5.650520324707031e-05,
+              "rmse": 1.0718880394401414e-05,
               "allclose": true
             },
             {
@@ -767,9 +767,9 @@
               "reference_top1": 2651,
               "candidate_top1": 2651,
               "top1_match": true,
-              "kl_reference_candidate_nats": 8.545620543833274e-12,
-              "max_abs_error": 3.695487976074219e-05,
-              "rmse": 8.00440196087274e-06,
+              "kl_reference_candidate_nats": 4.016439461803015e-12,
+              "max_abs_error": 4.0650367736816406e-05,
+              "rmse": 8.181421599406474e-06,
               "allclose": true
             },
             {
@@ -777,9 +777,9 @@
               "reference_top1": 220,
               "candidate_top1": 220,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.0669036764910584e-13,
-              "max_abs_error": 4.792213439941406e-05,
-              "rmse": 9.78295850699996e-06,
+              "kl_reference_candidate_nats": 1.2685352313314305e-13,
+              "max_abs_error": 4.839897155761719e-05,
+              "rmse": 9.809641660040421e-06,
               "allclose": true
             },
             {
@@ -787,9 +787,9 @@
               "reference_top1": 15,
               "candidate_top1": 15,
               "top1_match": true,
-              "kl_reference_candidate_nats": 5.42915254801574e-12,
-              "max_abs_error": 4.3392181396484375e-05,
-              "rmse": 9.202565670675827e-06,
+              "kl_reference_candidate_nats": 4.099172330388426e-11,
+              "max_abs_error": 4.57763671875e-05,
+              "rmse": 9.58474953484251e-06,
               "allclose": true
             },
             {
@@ -797,9 +797,9 @@
               "reference_top1": 510,
               "candidate_top1": 510,
               "top1_match": true,
-              "kl_reference_candidate_nats": 8.773372804461018e-12,
-              "max_abs_error": 7.05718994140625e-05,
-              "rmse": 1.471366578835572e-05,
+              "kl_reference_candidate_nats": 3.657433442391147e-12,
+              "max_abs_error": 7.486343383789062e-05,
+              "rmse": 1.524902165797844e-05,
               "allclose": true
             },
             {
@@ -807,9 +807,9 @@
               "reference_top1": 286,
               "candidate_top1": 286,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.514925193374152e-13,
-              "max_abs_error": 4.5299530029296875e-05,
-              "rmse": 8.641047608660848e-06,
+              "kl_reference_candidate_nats": 1.6471014303636638e-13,
+              "max_abs_error": 4.673004150390625e-05,
+              "rmse": 8.886691775773136e-06,
               "allclose": true
             },
             {
@@ -817,9 +817,9 @@
               "reference_top1": 470,
               "candidate_top1": 470,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.8373334922442885e-14,
-              "max_abs_error": 4.673004150390625e-05,
-              "rmse": 9.078545939891581e-06,
+              "kl_reference_candidate_nats": 5.743244500080501e-14,
+              "max_abs_error": 4.887580871582031e-05,
+              "rmse": 9.749663349383423e-06,
               "allclose": true
             },
             {
@@ -827,9 +827,9 @@
               "reference_top1": 308,
               "candidate_top1": 308,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.603746945420594e-13,
-              "max_abs_error": 6.222724914550781e-05,
-              "rmse": 1.2831530141958412e-05,
+              "kl_reference_candidate_nats": 5.160752499506693e-13,
+              "max_abs_error": 6.508827209472656e-05,
+              "rmse": 1.5529162995283838e-05,
               "allclose": true
             },
             {
@@ -837,9 +837,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 7.214528030328677e-13,
-              "max_abs_error": 6.476044654846191e-05,
-              "rmse": 1.330580677964647e-05,
+              "kl_reference_candidate_nats": 1.4392253090341684e-12,
+              "max_abs_error": 6.771087646484375e-05,
+              "rmse": 1.4216232189013805e-05,
               "allclose": true
             },
             {
@@ -847,9 +847,9 @@
               "reference_top1": 262,
               "candidate_top1": 262,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.463455610384372e-14,
-              "max_abs_error": 8.273124694824219e-05,
-              "rmse": 1.3702826327240249e-05,
+              "kl_reference_candidate_nats": 1.4020318712116943e-13,
+              "max_abs_error": 7.748603820800781e-05,
+              "rmse": 1.485836797860633e-05,
               "allclose": true
             },
             {
@@ -857,9 +857,9 @@
               "reference_top1": 770,
               "candidate_top1": 770,
               "top1_match": true,
-              "kl_reference_candidate_nats": 8.125461618368986e-12,
-              "max_abs_error": 3.24249267578125e-05,
-              "rmse": 6.75039931462589e-06,
+              "kl_reference_candidate_nats": 8.579329772423484e-12,
+              "max_abs_error": 3.2782554626464844e-05,
+              "rmse": 6.414915472486228e-06,
               "allclose": true
             },
             {
@@ -867,9 +867,9 @@
               "reference_top1": 75698,
               "candidate_top1": 75698,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.260364161276833e-12,
-              "max_abs_error": 6.437301635742188e-05,
-              "rmse": 1.2649411930998506e-05,
+              "kl_reference_candidate_nats": 8.20631471913014e-13,
+              "max_abs_error": 5.4836273193359375e-05,
+              "rmse": 1.159700540659204e-05,
               "allclose": true
             },
             {
@@ -877,9 +877,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.0476353243491184e-13,
-              "max_abs_error": 4.553794860839844e-05,
-              "rmse": 9.963758047453809e-06,
+              "kl_reference_candidate_nats": 1.9052920750240854e-13,
+              "max_abs_error": 4.7206878662109375e-05,
+              "rmse": 1.04385349195207e-05,
               "allclose": true
             },
             {
@@ -887,9 +887,9 @@
               "reference_top1": 12,
               "candidate_top1": 12,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.778787946684126e-12,
-              "max_abs_error": 3.337860107421875e-05,
-              "rmse": 6.640485120812061e-06,
+              "kl_reference_candidate_nats": 3.772287264890791e-12,
+              "max_abs_error": 3.123283386230469e-05,
+              "rmse": 6.228840981336384e-06,
               "allclose": true
             },
             {
@@ -897,9 +897,9 @@
               "reference_top1": 16,
               "candidate_top1": 16,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.6036817728846937e-12,
-              "max_abs_error": 4.1961669921875e-05,
-              "rmse": 9.08724919866218e-06,
+              "kl_reference_candidate_nats": 1.1793097500550657e-12,
+              "max_abs_error": 4.7326087951660156e-05,
+              "rmse": 9.902315236733492e-06,
               "allclose": true
             },
             {
@@ -907,9 +907,9 @@
               "reference_top1": 8,
               "candidate_top1": 8,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.4709911907726282e-12,
-              "max_abs_error": 5.698204040527344e-05,
-              "rmse": 1.1392336120549683e-05,
+              "kl_reference_candidate_nats": 7.655971385516174e-13,
+              "max_abs_error": 5.793571472167969e-05,
+              "rmse": 1.1853738786166309e-05,
               "allclose": true
             },
             {
@@ -917,9 +917,9 @@
               "reference_top1": 488,
               "candidate_top1": 488,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.085835153470421e-14,
-              "max_abs_error": 5.507469177246094e-05,
-              "rmse": 1.1120644325940123e-05,
+              "kl_reference_candidate_nats": 1.758075259458249e-14,
+              "max_abs_error": 5.054473876953125e-05,
+              "rmse": 1.0393272192182492e-05,
               "allclose": true
             },
             {
@@ -927,9 +927,9 @@
               "reference_top1": 75698,
               "candidate_top1": 75698,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.042350218602901e-14,
-              "max_abs_error": 6.204843521118164e-05,
-              "rmse": 1.1650353850467252e-05,
+              "kl_reference_candidate_nats": 1.2791680137520382e-14,
+              "max_abs_error": 5.8650970458984375e-05,
+              "rmse": 1.113148167867507e-05,
               "allclose": true
             },
             {
@@ -937,9 +937,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.5497486652183744e-14,
-              "max_abs_error": 7.021427154541016e-05,
-              "rmse": 1.2512983446541684e-05,
+              "kl_reference_candidate_nats": 2.833583723162016e-14,
+              "max_abs_error": 6.92605972290039e-05,
+              "rmse": 1.2924401907002462e-05,
               "allclose": true
             }
           ],
@@ -1166,8 +1166,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 1.0,
-          "max_kl_reference_candidate_nats": 1.4504846966112896e-10,
-          "mean_kl_reference_candidate_nats": 2.6581287089444726e-11,
+          "max_kl_reference_candidate_nats": 1.415542417813451e-10,
+          "mean_kl_reference_candidate_nats": 2.5774676596023213e-11,
           "passed": true,
           "positions": [
             {
@@ -1175,9 +1175,9 @@
               "reference_top1": 220,
               "candidate_top1": 220,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.4504846966112896e-10,
-              "max_abs_error": 0.00012087821960449219,
-              "rmse": 2.6362279736260387e-05,
+              "kl_reference_candidate_nats": 1.415542417813451e-10,
+              "max_abs_error": 0.00012063980102539062,
+              "rmse": 2.6584372591657412e-05,
               "allclose": true
             },
             {
@@ -1185,9 +1185,9 @@
               "reference_top1": 6290,
               "candidate_top1": 6290,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.5409547535292197e-11,
-              "max_abs_error": 5.507469177246094e-05,
-              "rmse": 9.767497156080899e-06,
+              "kl_reference_candidate_nats": 4.54713599767795e-11,
+              "max_abs_error": 6.365776062011719e-05,
+              "rmse": 1.0862978436495694e-05,
               "allclose": true
             },
             {
@@ -1195,9 +1195,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.9411998882720724e-11,
-              "max_abs_error": 5.263090133666992e-05,
-              "rmse": 1.00092507521874e-05,
+              "kl_reference_candidate_nats": 3.5973562717632387e-11,
+              "max_abs_error": 4.792213439941406e-05,
+              "rmse": 9.861255928319111e-06,
               "allclose": true
             },
             {
@@ -1205,9 +1205,9 @@
               "reference_top1": 264,
               "candidate_top1": 264,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.716388640244317e-11,
-              "max_abs_error": 4.3392181396484375e-05,
-              "rmse": 9.404071614846476e-06,
+              "kl_reference_candidate_nats": 9.87979464404804e-12,
+              "max_abs_error": 4.363059997558594e-05,
+              "rmse": 8.973709664092499e-06,
               "allclose": true
             },
             {
@@ -1215,9 +1215,9 @@
               "reference_top1": 821,
               "candidate_top1": 821,
               "top1_match": true,
-              "kl_reference_candidate_nats": 9.02480505094572e-11,
-              "max_abs_error": 6.604194641113281e-05,
-              "rmse": 1.4140573518873026e-05,
+              "kl_reference_candidate_nats": 6.062239043880633e-11,
+              "max_abs_error": 5.9604644775390625e-05,
+              "rmse": 1.2951988470783414e-05,
               "allclose": true
             },
             {
@@ -1225,9 +1225,9 @@
               "reference_top1": 504,
               "candidate_top1": 504,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.0732969782586142e-11,
-              "max_abs_error": 4.673004150390625e-05,
-              "rmse": 1.0464713601564341e-05,
+              "kl_reference_candidate_nats": 1.0483120431498344e-11,
+              "max_abs_error": 4.4345855712890625e-05,
+              "rmse": 9.873224414771595e-06,
               "allclose": true
             },
             {
@@ -1235,9 +1235,9 @@
               "reference_top1": 264,
               "candidate_top1": 264,
               "top1_match": true,
-              "kl_reference_candidate_nats": 9.038964003931484e-12,
-              "max_abs_error": 3.0517578125e-05,
-              "rmse": 6.356196269549841e-06,
+              "kl_reference_candidate_nats": 6.1614364321397634e-12,
+              "max_abs_error": 3.0040740966796875e-05,
+              "rmse": 6.684571491991655e-06,
               "allclose": true
             },
             {
@@ -1245,9 +1245,9 @@
               "reference_top1": 323,
               "candidate_top1": 323,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.842457178046151e-11,
-              "max_abs_error": 4.673004150390625e-05,
-              "rmse": 9.802263030955088e-06,
+              "kl_reference_candidate_nats": 2.0747043878254917e-11,
+              "max_abs_error": 6.210803985595703e-05,
+              "rmse": 1.3016489201145066e-05,
               "allclose": true
             },
             {
@@ -1255,9 +1255,9 @@
               "reference_top1": 576,
               "candidate_top1": 576,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.015360037562677e-11,
-              "max_abs_error": 3.7670135498046875e-05,
-              "rmse": 8.121354037754346e-06,
+              "kl_reference_candidate_nats": 1.5498341841702586e-11,
+              "max_abs_error": 3.910064697265625e-05,
+              "rmse": 8.508243690072741e-06,
               "allclose": true
             },
             {
@@ -1265,9 +1265,9 @@
               "reference_top1": 11,
               "candidate_top1": 11,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.944383808150801e-13,
-              "max_abs_error": 3.266334533691406e-05,
-              "rmse": 5.725686268572976e-06,
+              "kl_reference_candidate_nats": 5.489243128873093e-13,
+              "max_abs_error": 3.24249267578125e-05,
+              "rmse": 6.12543929628219e-06,
               "allclose": true
             },
             {
@@ -1275,9 +1275,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 8.589018125660478e-12,
-              "max_abs_error": 2.6941299438476562e-05,
-              "rmse": 6.123519478469125e-06,
+              "kl_reference_candidate_nats": 8.90229822910283e-12,
+              "max_abs_error": 2.86102294921875e-05,
+              "rmse": 6.081273506837055e-06,
               "allclose": true
             },
             {
@@ -1285,9 +1285,9 @@
               "reference_top1": 13940,
               "candidate_top1": 13940,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.7369996463083144e-11,
-              "max_abs_error": 3.4809112548828125e-05,
-              "rmse": 6.663865139725649e-06,
+              "kl_reference_candidate_nats": 1.3493459566572898e-11,
+              "max_abs_error": 2.6702880859375e-05,
+              "rmse": 5.6079657316157275e-06,
               "allclose": true
             },
             {
@@ -1295,9 +1295,9 @@
               "reference_top1": 646,
               "candidate_top1": 646,
               "top1_match": true,
-              "kl_reference_candidate_nats": 7.408135864930802e-12,
-              "max_abs_error": 2.384185791015625e-05,
-              "rmse": 5.3959829126261195e-06,
+              "kl_reference_candidate_nats": 9.386185633308057e-12,
+              "max_abs_error": 2.574920654296875e-05,
+              "rmse": 5.404868163881983e-06,
               "allclose": true
             },
             {
@@ -1305,9 +1305,9 @@
               "reference_top1": 1172,
               "candidate_top1": 1172,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.094210865430145e-11,
-              "max_abs_error": 3.814697265625e-05,
-              "rmse": 9.117927020260056e-06,
+              "kl_reference_candidate_nats": 2.6587714669930806e-11,
+              "max_abs_error": 3.147125244140625e-05,
+              "rmse": 7.376265455074795e-06,
               "allclose": true
             },
             {
@@ -1315,9 +1315,9 @@
               "reference_top1": 1349,
               "candidate_top1": 1349,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.3594993395363674e-11,
-              "max_abs_error": 2.4318695068359375e-05,
-              "rmse": 5.159535694081905e-06,
+              "kl_reference_candidate_nats": 1.6877778716885792e-11,
+              "max_abs_error": 3.147125244140625e-05,
+              "rmse": 5.944467911743371e-06,
               "allclose": true
             },
             {
@@ -1325,9 +1325,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 9.377001738741607e-12,
-              "max_abs_error": 2.47955322265625e-05,
-              "rmse": 5.394273232003739e-06,
+              "kl_reference_candidate_nats": 9.133669321592329e-12,
+              "max_abs_error": 2.86102294921875e-05,
+              "rmse": 5.992235006807163e-06,
               "allclose": true
             },
             {
@@ -1335,9 +1335,9 @@
               "reference_top1": 14324,
               "candidate_top1": 14324,
               "top1_match": true,
-              "kl_reference_candidate_nats": 8.67412896401597e-12,
-              "max_abs_error": 3.0040740966796875e-05,
-              "rmse": 5.725144771353618e-06,
+              "kl_reference_candidate_nats": 6.848179539907658e-12,
+              "max_abs_error": 4.0531158447265625e-05,
+              "rmse": 5.456024495562918e-06,
               "allclose": true
             }
           ],
@@ -1572,8 +1572,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 1.0,
-          "max_kl_reference_candidate_nats": 1.266516887464343e-09,
-          "mean_kl_reference_candidate_nats": 7.97505334188435e-11,
+          "max_kl_reference_candidate_nats": 1.4032081747010644e-09,
+          "mean_kl_reference_candidate_nats": 8.914800208874109e-11,
           "passed": true,
           "positions": [
             {
@@ -1581,9 +1581,9 @@
               "reference_top1": 72030,
               "candidate_top1": 72030,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.266516887464343e-09,
-              "max_abs_error": 0.0003247261047363281,
-              "rmse": 7.063054907013093e-05,
+              "kl_reference_candidate_nats": 1.4032081747010644e-09,
+              "max_abs_error": 0.00033974647521972656,
+              "rmse": 7.419365911689394e-05,
               "allclose": true
             },
             {
@@ -1591,9 +1591,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.1222188543448517e-10,
-              "max_abs_error": 9.441375732421875e-05,
-              "rmse": 1.7949416494996454e-05,
+              "kl_reference_candidate_nats": 9.663311993916019e-11,
+              "max_abs_error": 9.34600830078125e-05,
+              "rmse": 1.7273847698734926e-05,
               "allclose": true
             },
             {
@@ -1601,9 +1601,9 @@
               "reference_top1": 2,
               "candidate_top1": 2,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.564490275075291e-11,
-              "max_abs_error": 5.435943603515625e-05,
-              "rmse": 9.281562451516161e-06,
+              "kl_reference_candidate_nats": 4.224386792805497e-11,
+              "max_abs_error": 5.698204040527344e-05,
+              "rmse": 8.618735234838594e-06,
               "allclose": true
             },
             {
@@ -1611,9 +1611,9 @@
               "reference_top1": 525,
               "candidate_top1": 525,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.1812437270305939e-11,
-              "max_abs_error": 8.094310760498047e-05,
-              "rmse": 1.7585216241382377e-05,
+              "kl_reference_candidate_nats": 2.737851298440209e-11,
+              "max_abs_error": 9.632110595703125e-05,
+              "rmse": 1.8182029374374887e-05,
               "allclose": true
             },
             {
@@ -1621,9 +1621,9 @@
               "reference_top1": 2661,
               "candidate_top1": 2661,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.2025671360982548e-11,
+              "kl_reference_candidate_nats": 2.9872750854800245e-11,
               "max_abs_error": 5.245208740234375e-05,
-              "rmse": 1.0153917470480028e-05,
+              "rmse": 1.1513832852770924e-05,
               "allclose": true
             },
             {
@@ -1631,9 +1631,9 @@
               "reference_top1": 10950,
               "candidate_top1": 10950,
               "top1_match": true,
-              "kl_reference_candidate_nats": 5.370213660029466e-11,
-              "max_abs_error": 6.365776062011719e-05,
-              "rmse": 1.2907716895281569e-05,
+              "kl_reference_candidate_nats": 1.348835428417272e-11,
+              "max_abs_error": 7.200241088867188e-05,
+              "rmse": 1.334487766076521e-05,
               "allclose": true
             },
             {
@@ -1641,9 +1641,9 @@
               "reference_top1": 17847,
               "candidate_top1": 17847,
               "top1_match": true,
-              "kl_reference_candidate_nats": 6.139201087482662e-11,
-              "max_abs_error": 9.918212890625e-05,
-              "rmse": 1.7883047784253528e-05,
+              "kl_reference_candidate_nats": 4.785892560387157e-11,
+              "max_abs_error": 0.0001087188720703125,
+              "rmse": 2.0410664995884865e-05,
               "allclose": true
             },
             {
@@ -1651,9 +1651,9 @@
               "reference_top1": 382,
               "candidate_top1": 382,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.512287244033808e-10,
-              "max_abs_error": 8.7738037109375e-05,
-              "rmse": 1.6885736286026365e-05,
+              "kl_reference_candidate_nats": 2.720974599457578e-10,
+              "max_abs_error": 0.0001220703125,
+              "rmse": 2.4516932903525335e-05,
               "allclose": true
             },
             {
@@ -1661,9 +1661,9 @@
               "reference_top1": 5209,
               "candidate_top1": 5209,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.1734374582595704e-11,
-              "max_abs_error": 6.031990051269531e-05,
-              "rmse": 9.001605756616421e-06,
+              "kl_reference_candidate_nats": 2.079884698213102e-11,
+              "max_abs_error": 4.756450653076172e-05,
+              "rmse": 9.465325382311127e-06,
               "allclose": true
             },
             {
@@ -1671,9 +1671,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.497617816183896e-11,
-              "max_abs_error": 0.00011873245239257812,
-              "rmse": 2.3420478490249094e-05,
+              "kl_reference_candidate_nats": 9.156031978937895e-12,
+              "max_abs_error": 0.00010883808135986328,
+              "rmse": 2.1678572653405145e-05,
               "allclose": true
             },
             {
@@ -1681,9 +1681,9 @@
               "reference_top1": 304,
               "candidate_top1": 304,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.404326524727885e-13,
-              "max_abs_error": 0.00011157989501953125,
-              "rmse": 2.30190731270078e-05,
+              "kl_reference_candidate_nats": 8.45093812158415e-14,
+              "max_abs_error": 0.00013828277587890625,
+              "rmse": 2.917126670895288e-05,
               "allclose": true
             },
             {
@@ -1691,9 +1691,9 @@
               "reference_top1": 7414,
               "candidate_top1": 7414,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.1973025907108073e-10,
-              "max_abs_error": 9.34600830078125e-05,
-              "rmse": 1.8922119957046893e-05,
+              "kl_reference_candidate_nats": 4.0320767103487e-10,
+              "max_abs_error": 0.00015854835510253906,
+              "rmse": 3.682607246342877e-05,
               "allclose": true
             },
             {
@@ -1701,9 +1701,9 @@
               "reference_top1": 46487,
               "candidate_top1": 46487,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.6656830442902656e-10,
-              "max_abs_error": 0.00016486644744873047,
-              "rmse": 3.332953675305946e-05,
+              "kl_reference_candidate_nats": 2.349281859405455e-10,
+              "max_abs_error": 0.00016689300537109375,
+              "rmse": 3.3981871565510456e-05,
               "allclose": true
             },
             {
@@ -1711,9 +1711,9 @@
               "reference_top1": 785,
               "candidate_top1": 785,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.8031139177398315e-10,
-              "max_abs_error": 0.00015211105346679688,
-              "rmse": 2.3526444020980504e-05,
+              "kl_reference_candidate_nats": 2.2266704058481386e-10,
+              "max_abs_error": 0.00020456314086914062,
+              "rmse": 3.0211477959840816e-05,
               "allclose": true
             },
             {
@@ -1721,9 +1721,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.5817286107191855e-10,
-              "max_abs_error": 0.0001506805419921875,
-              "rmse": 2.9303683640664454e-05,
+              "kl_reference_candidate_nats": 4.702515506260105e-11,
+              "max_abs_error": 0.00015211105346679688,
+              "rmse": 3.1571828336933984e-05,
               "allclose": true
             },
             {
@@ -1731,9 +1731,9 @@
               "reference_top1": 25,
               "candidate_top1": 25,
               "top1_match": true,
-              "kl_reference_candidate_nats": 8.082580106726309e-14,
-              "max_abs_error": 0.00011396408081054688,
-              "rmse": 2.2729788478572796e-05,
+              "kl_reference_candidate_nats": 5.026194732911796e-14,
+              "max_abs_error": 0.0001666545867919922,
+              "rmse": 3.296612593129608e-05,
               "allclose": true
             },
             {
@@ -1741,9 +1741,9 @@
               "reference_top1": 40,
               "candidate_top1": 40,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.699923468871244e-11,
-              "max_abs_error": 5.0067901611328125e-05,
-              "rmse": 9.537704485070947e-06,
+              "kl_reference_candidate_nats": 1.1665301286893076e-10,
+              "max_abs_error": 7.343292236328125e-05,
+              "rmse": 1.251321717113347e-05,
               "allclose": true
             },
             {
@@ -1751,9 +1751,9 @@
               "reference_top1": 653,
               "candidate_top1": 653,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.4903713597970936e-12,
-              "max_abs_error": 2.5987625122070312e-05,
-              "rmse": 5.6060775825921825e-06,
+              "kl_reference_candidate_nats": 1.1094568728989115e-11,
+              "max_abs_error": 3.5762786865234375e-05,
+              "rmse": 7.5793683674645424e-06,
               "allclose": true
             },
             {
@@ -1761,9 +1761,9 @@
               "reference_top1": 432,
               "candidate_top1": 432,
               "top1_match": true,
-              "kl_reference_candidate_nats": 5.427727022301242e-12,
-              "max_abs_error": 2.2411346435546875e-05,
-              "rmse": 4.660261172806224e-06,
+              "kl_reference_candidate_nats": 1.7180837755657327e-11,
+              "max_abs_error": 3.3855438232421875e-05,
+              "rmse": 6.6654477157717945e-06,
               "allclose": true
             },
             {
@@ -1771,9 +1771,9 @@
               "reference_top1": 17788,
               "candidate_top1": 17788,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.046160598588886e-11,
-              "max_abs_error": 2.8133392333984375e-05,
-              "rmse": 6.528154925630291e-06,
+              "kl_reference_candidate_nats": 1.5036251448654255e-11,
+              "max_abs_error": 3.337860107421875e-05,
+              "rmse": 8.757544358240314e-06,
               "allclose": true
             },
             {
@@ -1781,9 +1781,9 @@
               "reference_top1": 6303,
               "candidate_top1": 6303,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.0138282593083336e-11,
-              "max_abs_error": 4.00543212890625e-05,
-              "rmse": 1.1503898252673736e-05,
+              "kl_reference_candidate_nats": 1.4526302060841097e-11,
+              "max_abs_error": 4.1961669921875e-05,
+              "rmse": 1.2604045262904273e-05,
               "allclose": true
             },
             {
@@ -1791,9 +1791,9 @@
               "reference_top1": 30,
               "candidate_top1": 30,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.2072656339370374e-11,
-              "max_abs_error": 4.0531158447265625e-05,
-              "rmse": 1.0335001394387534e-05,
+              "kl_reference_candidate_nats": 2.4812526049308198e-11,
+              "max_abs_error": 4.76837158203125e-05,
+              "rmse": 1.2316697519679191e-05,
               "allclose": true
             },
             {
@@ -1801,9 +1801,9 @@
               "reference_top1": 151645,
               "candidate_top1": 151645,
               "top1_match": true,
-              "kl_reference_candidate_nats": 6.710876030684973e-12,
-              "max_abs_error": 5.91278076171875e-05,
-              "rmse": 1.1634108753756625e-05,
+              "kl_reference_candidate_nats": 7.325151563094996e-12,
+              "max_abs_error": 6.818771362304688e-05,
+              "rmse": 1.244517942516134e-05,
               "allclose": true
             },
             {
@@ -1811,9 +1811,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 6.537956550611411e-16,
-              "max_abs_error": 9.679794311523438e-05,
-              "rmse": 1.82239551818739e-05,
+              "kl_reference_candidate_nats": 1.7039095920458695e-15,
+              "max_abs_error": 0.00013017654418945312,
+              "rmse": 2.2074726523884957e-05,
               "allclose": true
             },
             {
@@ -1821,9 +1821,9 @@
               "reference_top1": 151644,
               "candidate_top1": 151644,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.1723344307356055e-14,
-              "max_abs_error": 8.96453857421875e-05,
-              "rmse": 1.575700446859511e-05,
+              "kl_reference_candidate_nats": 3.98584244669456e-14,
+              "max_abs_error": 0.00010204315185546875,
+              "rmse": 1.9267501363973463e-05,
               "allclose": true
             },
             {
@@ -1831,9 +1831,9 @@
               "reference_top1": 872,
               "candidate_top1": 872,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.986738500903842e-13,
-              "max_abs_error": 0.00010323524475097656,
-              "rmse": 1.6865668506487453e-05,
+              "kl_reference_candidate_nats": 1.7770953205380217e-12,
+              "max_abs_error": 0.00013256072998046875,
+              "rmse": 2.169356448901216e-05,
               "allclose": true
             },
             {
@@ -1841,9 +1841,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 8.226357103684373e-14,
-              "max_abs_error": 5.7220458984375e-05,
-              "rmse": 1.0569058890152623e-05,
+              "kl_reference_candidate_nats": 6.518752648112296e-12,
+              "max_abs_error": 9.942054748535156e-05,
+              "rmse": 2.0264713008133317e-05,
               "allclose": true
             },
             {
@@ -1851,9 +1851,9 @@
               "reference_top1": 785,
               "candidate_top1": 785,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.5252530082092634e-13,
-              "max_abs_error": 3.695487976074219e-05,
-              "rmse": 6.838104513146799e-06,
+              "kl_reference_candidate_nats": 6.190364916609884e-13,
+              "max_abs_error": 3.719329833984375e-05,
+              "rmse": 7.2492411260180065e-06,
               "allclose": true
             },
             {
@@ -1861,9 +1861,9 @@
               "reference_top1": 12884,
               "candidate_top1": 12884,
               "top1_match": true,
-              "kl_reference_candidate_nats": 5.138578197009646e-13,
-              "max_abs_error": 2.765655517578125e-05,
-              "rmse": 5.134203264080141e-06,
+              "kl_reference_candidate_nats": 1.0195635268824104e-12,
+              "max_abs_error": 2.6941299438476562e-05,
+              "rmse": 5.941681690381268e-06,
               "allclose": true
             },
             {
@@ -1871,9 +1871,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.433063878978012e-12,
-              "max_abs_error": 2.5510787963867188e-05,
-              "rmse": 4.950201605801086e-06,
+              "kl_reference_candidate_nats": 6.542318910045878e-12,
+              "max_abs_error": 3.1948089599609375e-05,
+              "rmse": 6.624489170061034e-06,
               "allclose": true
             },
             {
@@ -1881,9 +1881,9 @@
               "reference_top1": 6303,
               "candidate_top1": 6303,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.5836285812385778e-12,
-              "max_abs_error": 2.574920654296875e-05,
-              "rmse": 5.538078044416936e-06,
+              "kl_reference_candidate_nats": 6.715940199834699e-12,
+              "max_abs_error": 2.6702880859375e-05,
+              "rmse": 5.985912536089617e-06,
               "allclose": true
             },
             {
@@ -1891,9 +1891,9 @@
               "reference_top1": 1576,
               "candidate_top1": 1576,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.696329449679833e-13,
-              "max_abs_error": 3.4332275390625e-05,
-              "rmse": 7.151709888303719e-06,
+              "kl_reference_candidate_nats": 9.45913177982404e-13,
+              "max_abs_error": 3.4809112548828125e-05,
+              "rmse": 6.966854634092659e-06,
               "allclose": true
             },
             {
@@ -1901,9 +1901,9 @@
               "reference_top1": 432,
               "candidate_top1": 432,
               "top1_match": true,
-              "kl_reference_candidate_nats": 6.2895904664554395e-12,
-              "max_abs_error": 3.147125244140625e-05,
-              "rmse": 5.909459280412129e-06,
+              "kl_reference_candidate_nats": 7.382628458390482e-12,
+              "max_abs_error": 3.170967102050781e-05,
+              "rmse": 6.702883949470328e-06,
               "allclose": true
             },
             {
@@ -1911,9 +1911,9 @@
               "reference_top1": 25963,
               "candidate_top1": 25963,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.0740325478558078e-12,
-              "max_abs_error": 2.47955322265625e-05,
-              "rmse": 4.529718543107376e-06,
+              "kl_reference_candidate_nats": 8.21787932878043e-12,
+              "max_abs_error": 3.0040740966796875e-05,
+              "rmse": 6.3794187684992435e-06,
               "allclose": true
             },
             {
@@ -1921,9 +1921,9 @@
               "reference_top1": 39020,
               "candidate_top1": 39020,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.77898583522162e-12,
-              "max_abs_error": 2.6702880859375e-05,
-              "rmse": 6.102758759099824e-06,
+              "kl_reference_candidate_nats": 3.0718630804475716e-12,
+              "max_abs_error": 3.719329833984375e-05,
+              "rmse": 7.766939553372166e-06,
               "allclose": true
             }
           ],
@@ -2193,8 +2193,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 1.0,
-          "max_kl_reference_candidate_nats": 0.042697049215716425,
-          "mean_kl_reference_candidate_nats": 0.0057234009873252745,
+          "max_kl_reference_candidate_nats": 0.04269691041212062,
+          "mean_kl_reference_candidate_nats": 0.006171621529949312,
           "passed": true,
           "positions": [
             {
@@ -2202,9 +2202,9 @@
               "reference_top1": 2701,
               "candidate_top1": 2701,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.042697049215716425,
-              "max_abs_error": 1.8262348175048828,
-              "rmse": 0.3598035808680319,
+              "kl_reference_candidate_nats": 0.04269691041212062,
+              "max_abs_error": 1.8262336254119873,
+              "rmse": 0.35980378356538606,
               "allclose": false
             },
             {
@@ -2212,9 +2212,9 @@
               "reference_top1": 315,
               "candidate_top1": 315,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.003029349961819025,
-              "max_abs_error": 0.8290061950683594,
-              "rmse": 0.1775523085151635,
+              "kl_reference_candidate_nats": 0.002614285264912824,
+              "max_abs_error": 0.7343606948852539,
+              "rmse": 0.1639823336170912,
               "allclose": false
             },
             {
@@ -2222,9 +2222,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.004762656259486473,
-              "max_abs_error": 0.7171707153320312,
-              "rmse": 0.1393623038701007,
+              "kl_reference_candidate_nats": 0.00579561814006976,
+              "max_abs_error": 0.7989740371704102,
+              "rmse": 0.16819292658615184,
               "allclose": false
             },
             {
@@ -2232,9 +2232,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0007738286791481289,
-              "max_abs_error": 0.7302672863006592,
-              "rmse": 0.1527838823735473,
+              "kl_reference_candidate_nats": 0.0020238299043228445,
+              "max_abs_error": 0.8600798845291138,
+              "rmse": 0.1720365069143064,
               "allclose": false
             },
             {
@@ -2242,9 +2242,9 @@
               "reference_top1": 12095,
               "candidate_top1": 12095,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.004441505733669905,
-              "max_abs_error": 0.6225156784057617,
-              "rmse": 0.1264272250726107,
+              "kl_reference_candidate_nats": 0.0034074344163118097,
+              "max_abs_error": 0.6391377449035645,
+              "rmse": 0.11951351712666371,
               "allclose": false
             },
             {
@@ -2252,9 +2252,9 @@
               "reference_top1": 13,
               "candidate_top1": 13,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.002367889160847302,
-              "max_abs_error": 0.7082211971282959,
-              "rmse": 0.1392620065730944,
+              "kl_reference_candidate_nats": 0.006702664481866283,
+              "max_abs_error": 0.6755746603012085,
+              "rmse": 0.13725756333333636,
               "allclose": false
             },
             {
@@ -2262,9 +2262,9 @@
               "reference_top1": 1084,
               "candidate_top1": 1084,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.004842595326703744,
-              "max_abs_error": 0.6052737236022949,
-              "rmse": 0.11932910716848266,
+              "kl_reference_candidate_nats": 0.0021199504933021238,
+              "max_abs_error": 0.6981797218322754,
+              "rmse": 0.1419676244600082,
               "allclose": false
             },
             {
@@ -2272,9 +2272,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0005692791638486942,
-              "max_abs_error": 0.42983269691467285,
-              "rmse": 0.09329898060980825,
+              "kl_reference_candidate_nats": 0.0007066501170193999,
+              "max_abs_error": 0.4729490280151367,
+              "rmse": 0.10523204059691955,
               "allclose": false
             },
             {
@@ -2282,9 +2282,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0017112164961441774,
-              "max_abs_error": 0.5018351078033447,
-              "rmse": 0.10112810615620696,
+              "kl_reference_candidate_nats": 0.0013736842275505932,
+              "max_abs_error": 0.4417610168457031,
+              "rmse": 0.0982439067313716,
               "allclose": false
             },
             {
@@ -2292,9 +2292,9 @@
               "reference_top1": 7772,
               "candidate_top1": 7772,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0017941837058034033,
-              "max_abs_error": 0.5074598789215088,
-              "rmse": 0.09691147461256978,
+              "kl_reference_candidate_nats": 0.005843710153771847,
+              "max_abs_error": 0.4492340087890625,
+              "rmse": 0.09196201471363111,
               "allclose": false
             },
             {
@@ -2302,9 +2302,9 @@
               "reference_top1": 3283,
               "candidate_top1": 3283,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0007685163973766258,
-              "max_abs_error": 0.43691492080688477,
-              "rmse": 0.0951287245732082,
+              "kl_reference_candidate_nats": 0.00037094780344245276,
+              "max_abs_error": 0.5266079902648926,
+              "rmse": 0.10413914839225238,
               "allclose": false
             },
             {
@@ -2312,9 +2312,9 @@
               "reference_top1": 304,
               "candidate_top1": 304,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0009227417473393957,
-              "max_abs_error": 0.608259916305542,
-              "rmse": 0.11637644649214172,
+              "kl_reference_candidate_nats": 0.0004037729447011873,
+              "max_abs_error": 0.7702782154083252,
+              "rmse": 0.17007560731134358,
               "allclose": false
             }
           ],
@@ -2507,8 +2507,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 1.0,
-          "max_kl_reference_candidate_nats": 0.043614451519341825,
-          "mean_kl_reference_candidate_nats": 0.0024568204527361816,
+          "max_kl_reference_candidate_nats": 0.04240462487538346,
+          "mean_kl_reference_candidate_nats": 0.0024393592952285706,
           "passed": true,
           "positions": [
             {
@@ -2516,9 +2516,9 @@
               "reference_top1": 1887,
               "candidate_top1": 1887,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.043614451519341825,
-              "max_abs_error": 1.493249773979187,
-              "rmse": 0.3048721139276114,
+              "kl_reference_candidate_nats": 0.04240462487538346,
+              "max_abs_error": 1.579569935798645,
+              "rmse": 0.3046790879004825,
               "allclose": false
             },
             {
@@ -2526,9 +2526,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0022728609534750054,
-              "max_abs_error": 0.7301287651062012,
-              "rmse": 0.13867406420390957,
+              "kl_reference_candidate_nats": 0.002687087277891934,
+              "max_abs_error": 0.7326960563659668,
+              "rmse": 0.13875530109300674,
               "allclose": false
             },
             {
@@ -2536,9 +2536,9 @@
               "reference_top1": 982,
               "candidate_top1": 982,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0010871868990382243,
-              "max_abs_error": 0.6963825225830078,
-              "rmse": 0.1363507228727938,
+              "kl_reference_candidate_nats": 0.0007744264516728011,
+              "max_abs_error": 0.7789287567138672,
+              "rmse": 0.14019016740547904,
               "allclose": false
             },
             {
@@ -2546,9 +2546,9 @@
               "reference_top1": 262,
               "candidate_top1": 262,
               "top1_match": true,
-              "kl_reference_candidate_nats": 6.247524953811764e-05,
-              "max_abs_error": 0.4714350700378418,
-              "rmse": 0.0996954067108393,
+              "kl_reference_candidate_nats": 0.00014147094033554488,
+              "max_abs_error": 0.5113639831542969,
+              "rmse": 0.10707336912345504,
               "allclose": false
             },
             {
@@ -2556,9 +2556,9 @@
               "reference_top1": 421,
               "candidate_top1": 421,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.001829841474703312,
-              "max_abs_error": 0.5422101020812988,
-              "rmse": 0.11308355797678728,
+              "kl_reference_candidate_nats": 0.0014867005035882836,
+              "max_abs_error": 0.6004018783569336,
+              "rmse": 0.11693931785977456,
               "allclose": false
             },
             {
@@ -2566,9 +2566,9 @@
               "reference_top1": 308,
               "candidate_top1": 308,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00011823038100493249,
-              "max_abs_error": 0.5635032653808594,
-              "rmse": 0.11529849335016523,
+              "kl_reference_candidate_nats": 0.00017468465900987394,
+              "max_abs_error": 0.49439334869384766,
+              "rmse": 0.110192527891895,
               "allclose": false
             },
             {
@@ -2576,9 +2576,9 @@
               "reference_top1": 2651,
               "candidate_top1": 2651,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.004248546386317359,
-              "max_abs_error": 0.5933866500854492,
-              "rmse": 0.13279869187467597,
+              "kl_reference_candidate_nats": 0.0033686799291247735,
+              "max_abs_error": 0.5402374267578125,
+              "rmse": 0.1112364988624219,
               "allclose": false
             },
             {
@@ -2586,9 +2586,9 @@
               "reference_top1": 220,
               "candidate_top1": 220,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.82843416898861e-05,
-              "max_abs_error": 0.560976505279541,
-              "rmse": 0.11099446138242088,
+              "kl_reference_candidate_nats": 4.5743634966420405e-05,
+              "max_abs_error": 0.5415945053100586,
+              "rmse": 0.10644209205076154,
               "allclose": false
             },
             {
@@ -2596,9 +2596,9 @@
               "reference_top1": 15,
               "candidate_top1": 15,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0010363586983805166,
-              "max_abs_error": 0.6049513816833496,
-              "rmse": 0.11883808818058694,
+              "kl_reference_candidate_nats": 0.000666985580107019,
+              "max_abs_error": 0.6653505563735962,
+              "rmse": 0.11673839684235862,
               "allclose": false
             },
             {
@@ -2606,9 +2606,9 @@
               "reference_top1": 510,
               "candidate_top1": 510,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0001644258301018029,
-              "max_abs_error": 0.5877914428710938,
-              "rmse": 0.11378654921043053,
+              "kl_reference_candidate_nats": 0.0007694580559806527,
+              "max_abs_error": 0.5371173620223999,
+              "rmse": 0.11129902230558689,
               "allclose": false
             },
             {
@@ -2616,9 +2616,9 @@
               "reference_top1": 286,
               "candidate_top1": 286,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.0497564859003257e-05,
-              "max_abs_error": 0.48487961292266846,
-              "rmse": 0.09990688062824643,
+              "kl_reference_candidate_nats": 2.960787195155084e-06,
+              "max_abs_error": 0.478432297706604,
+              "rmse": 0.10307675374813967,
               "allclose": false
             },
             {
@@ -2626,9 +2626,9 @@
               "reference_top1": 470,
               "candidate_top1": 470,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.5677130792973184e-05,
-              "max_abs_error": 0.5879223346710205,
-              "rmse": 0.12301416498313143,
+              "kl_reference_candidate_nats": 4.444154110072637e-05,
+              "max_abs_error": 0.5053952932357788,
+              "rmse": 0.10827444966865289,
               "allclose": false
             },
             {
@@ -2636,9 +2636,9 @@
               "reference_top1": 308,
               "candidate_top1": 308,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0001174715638936645,
-              "max_abs_error": 0.6370890140533447,
-              "rmse": 0.13156493712527378,
+              "kl_reference_candidate_nats": 0.001169448558031983,
+              "max_abs_error": 0.673311710357666,
+              "rmse": 0.12261972788131538,
               "allclose": false
             },
             {
@@ -2646,9 +2646,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.003452338154604661,
-              "max_abs_error": 0.5742812156677246,
-              "rmse": 0.1228723561834946,
+              "kl_reference_candidate_nats": 0.0006291582841897357,
+              "max_abs_error": 0.5774326324462891,
+              "rmse": 0.11957748040123196,
               "allclose": false
             },
             {
@@ -2656,9 +2656,9 @@
               "reference_top1": 262,
               "candidate_top1": 262,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.532373848988156e-06,
-              "max_abs_error": 0.5955712795257568,
-              "rmse": 0.1260471280355799,
+              "kl_reference_candidate_nats": 6.272894301248146e-06,
+              "max_abs_error": 0.6363213062286377,
+              "rmse": 0.13844763146081235,
               "allclose": false
             },
             {
@@ -2666,9 +2666,9 @@
               "reference_top1": 770,
               "candidate_top1": 770,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0006902871022838512,
-              "max_abs_error": 0.6119067668914795,
-              "rmse": 0.11561459734605226,
+              "kl_reference_candidate_nats": 0.0037486518716079256,
+              "max_abs_error": 0.6221222877502441,
+              "rmse": 0.15192572759994616,
               "allclose": false
             },
             {
@@ -2676,9 +2676,9 @@
               "reference_top1": 75698,
               "candidate_top1": 75698,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.315562686253427e-05,
-              "max_abs_error": 0.6084966659545898,
-              "rmse": 0.12481218356914334,
+              "kl_reference_candidate_nats": 8.170542949908908e-05,
+              "max_abs_error": 0.5655055046081543,
+              "rmse": 0.1236161511537606,
               "allclose": false
             },
             {
@@ -2686,9 +2686,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.3784712072128606e-05,
-              "max_abs_error": 0.6536655426025391,
-              "rmse": 0.14660968559824752,
+              "kl_reference_candidate_nats": 2.3847943643760426e-05,
+              "max_abs_error": 0.7168091535568237,
+              "rmse": 0.14287732993280355,
               "allclose": false
             },
             {
@@ -2696,9 +2696,9 @@
               "reference_top1": 12,
               "candidate_top1": 12,
               "top1_match": true,
-              "kl_reference_candidate_nats": 5.268317346434574e-06,
-              "max_abs_error": 0.6209678649902344,
-              "rmse": 0.11430701751018173,
+              "kl_reference_candidate_nats": 0.00029936244559287516,
+              "max_abs_error": 0.5277199745178223,
+              "rmse": 0.10004899426631132,
               "allclose": false
             },
             {
@@ -2706,9 +2706,9 @@
               "reference_top1": 16,
               "candidate_top1": 16,
               "top1_match": true,
-              "kl_reference_candidate_nats": 7.84227150172488e-05,
-              "max_abs_error": 0.5927238464355469,
-              "rmse": 0.11864263931852237,
+              "kl_reference_candidate_nats": 2.561396848797306e-06,
+              "max_abs_error": 0.6072196960449219,
+              "rmse": 0.12127121187753853,
               "allclose": false
             },
             {
@@ -2716,9 +2716,9 @@
               "reference_top1": 8,
               "candidate_top1": 8,
               "top1_match": true,
-              "kl_reference_candidate_nats": 4.3773285071762294e-05,
-              "max_abs_error": 0.5598938465118408,
-              "rmse": 0.1333267208986164,
+              "kl_reference_candidate_nats": 1.0256456527022936e-05,
+              "max_abs_error": 0.5957269668579102,
+              "rmse": 0.11750299272425715,
               "allclose": false
             },
             {
@@ -2726,9 +2726,9 @@
               "reference_top1": 488,
               "candidate_top1": 488,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.147408569048431e-06,
-              "max_abs_error": 0.5709257125854492,
-              "rmse": 0.10964447544845635,
+              "kl_reference_candidate_nats": 1.8976771123049196e-06,
+              "max_abs_error": 0.4894369840621948,
+              "rmse": 0.1037557374726739,
               "allclose": false
             },
             {
@@ -2736,9 +2736,9 @@
               "reference_top1": 75698,
               "candidate_top1": 75698,
               "top1_match": true,
-              "kl_reference_candidate_nats": 3.0507252419281277e-06,
-              "max_abs_error": 0.5043206214904785,
-              "rmse": 0.10843164449232712,
+              "kl_reference_candidate_nats": 9.692703243084518e-07,
+              "max_abs_error": 0.5491735935211182,
+              "rmse": 0.10561971493724445,
               "allclose": false
             },
             {
@@ -2746,9 +2746,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 6.224516131558975e-07,
-              "max_abs_error": 0.5809879302978516,
-              "rmse": 0.12117916188263926,
+              "kl_reference_candidate_nats": 3.22662144999223e-06,
+              "max_abs_error": 0.5778094828128815,
+              "rmse": 0.11628506027050024,
               "allclose": false
             }
           ],
@@ -2975,8 +2975,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 0.8823529411764706,
-          "max_kl_reference_candidate_nats": 0.056147230282587605,
-          "mean_kl_reference_candidate_nats": 0.007099042566582205,
+          "max_kl_reference_candidate_nats": 0.0540405619950172,
+          "mean_kl_reference_candidate_nats": 0.007704265117877172,
           "passed": true,
           "positions": [
             {
@@ -2984,9 +2984,9 @@
               "reference_top1": 220,
               "candidate_top1": 1550,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.056147230282587605,
-              "max_abs_error": 1.941380262374878,
-              "rmse": 0.40831068403564,
+              "kl_reference_candidate_nats": 0.0540405619950172,
+              "max_abs_error": 1.9336941242218018,
+              "rmse": 0.4084339663877687,
               "allclose": false
             },
             {
@@ -2994,9 +2994,9 @@
               "reference_top1": 6290,
               "candidate_top1": 6290,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.007952343284402726,
-              "max_abs_error": 1.1927714347839355,
-              "rmse": 0.14561504679335338,
+              "kl_reference_candidate_nats": 0.007830762844038955,
+              "max_abs_error": 1.1565446853637695,
+              "rmse": 0.154737581057054,
               "allclose": false
             },
             {
@@ -3004,9 +3004,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00613813040735492,
-              "max_abs_error": 0.761949360370636,
-              "rmse": 0.16872312190756314,
+              "kl_reference_candidate_nats": 0.006242065670478735,
+              "max_abs_error": 0.8096535205841064,
+              "rmse": 0.14976447119127992,
               "allclose": false
             },
             {
@@ -3014,9 +3014,9 @@
               "reference_top1": 264,
               "candidate_top1": 264,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.002515515001253736,
-              "max_abs_error": 0.8686063289642334,
-              "rmse": 0.1957835191099742,
+              "kl_reference_candidate_nats": 0.005033145438743676,
+              "max_abs_error": 0.9373154640197754,
+              "rmse": 0.1614283465280028,
               "allclose": false
             },
             {
@@ -3024,9 +3024,9 @@
               "reference_top1": 821,
               "candidate_top1": 5109,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.006645175911546121,
-              "max_abs_error": 0.946094274520874,
-              "rmse": 0.18614727039666576,
+              "kl_reference_candidate_nats": 0.018674577206146306,
+              "max_abs_error": 0.9473681449890137,
+              "rmse": 0.18132112238182307,
               "allclose": false
             },
             {
@@ -3034,9 +3034,9 @@
               "reference_top1": 504,
               "candidate_top1": 504,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0021373766487088183,
-              "max_abs_error": 0.8044452667236328,
-              "rmse": 0.15018187753202603,
+              "kl_reference_candidate_nats": 0.0029358981045054834,
+              "max_abs_error": 0.7506728172302246,
+              "rmse": 0.15791573449940952,
               "allclose": false
             },
             {
@@ -3044,9 +3044,9 @@
               "reference_top1": 264,
               "candidate_top1": 264,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0012342327519647485,
-              "max_abs_error": 0.5128982067108154,
-              "rmse": 0.1085856684070375,
+              "kl_reference_candidate_nats": 0.0011621445246597806,
+              "max_abs_error": 0.4939309358596802,
+              "rmse": 0.09993751787116663,
               "allclose": false
             },
             {
@@ -3054,9 +3054,9 @@
               "reference_top1": 323,
               "candidate_top1": 323,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.003042363778202894,
-              "max_abs_error": 0.7144701480865479,
-              "rmse": 0.1490258351676497,
+              "kl_reference_candidate_nats": 0.0030470350046065482,
+              "max_abs_error": 0.7493710517883301,
+              "rmse": 0.14899002951243445,
               "allclose": false
             },
             {
@@ -3064,9 +3064,9 @@
               "reference_top1": 576,
               "candidate_top1": 576,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.006898634842283386,
-              "max_abs_error": 0.7232539653778076,
-              "rmse": 0.14509606464187008,
+              "kl_reference_candidate_nats": 0.0032359357662590325,
+              "max_abs_error": 0.6262805461883545,
+              "rmse": 0.13562674232944216,
               "allclose": false
             },
             {
@@ -3074,9 +3074,9 @@
               "reference_top1": 11,
               "candidate_top1": 11,
               "top1_match": true,
-              "kl_reference_candidate_nats": 9.500864761083353e-05,
-              "max_abs_error": 0.5078661441802979,
-              "rmse": 0.10163407365641922,
+              "kl_reference_candidate_nats": 8.706633405868381e-05,
+              "max_abs_error": 0.47707033157348633,
+              "rmse": 0.10094547127208728,
               "allclose": false
             },
             {
@@ -3084,9 +3084,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0013240201074561013,
-              "max_abs_error": 0.4532434940338135,
-              "rmse": 0.10666049538474769,
+              "kl_reference_candidate_nats": 0.0014690610319280453,
+              "max_abs_error": 0.47208261489868164,
+              "rmse": 0.10046003440165419,
               "allclose": false
             },
             {
@@ -3094,9 +3094,9 @@
               "reference_top1": 13940,
               "candidate_top1": 13940,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.003737004386421478,
-              "max_abs_error": 0.4945880174636841,
-              "rmse": 0.09808401404673976,
+              "kl_reference_candidate_nats": 0.004495107496136386,
+              "max_abs_error": 0.5024536848068237,
+              "rmse": 0.10751140013643513,
               "allclose": false
             },
             {
@@ -3104,9 +3104,9 @@
               "reference_top1": 646,
               "candidate_top1": 646,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.002521479401395415,
-              "max_abs_error": 0.4508916139602661,
-              "rmse": 0.08953904089091219,
+              "kl_reference_candidate_nats": 0.0038534297638520044,
+              "max_abs_error": 0.38840192556381226,
+              "rmse": 0.08447106082810603,
               "allclose": false
             },
             {
@@ -3114,9 +3114,9 @@
               "reference_top1": 1172,
               "candidate_top1": 1172,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.011101832618439576,
-              "max_abs_error": 0.49587881565093994,
-              "rmse": 0.10219190986209137,
+              "kl_reference_candidate_nats": 0.009176155297144106,
+              "max_abs_error": 0.4890570640563965,
+              "rmse": 0.09741466772580534,
               "allclose": false
             },
             {
@@ -3124,9 +3124,9 @@
               "reference_top1": 1349,
               "candidate_top1": 1349,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0029530015844381405,
-              "max_abs_error": 0.42757654190063477,
-              "rmse": 0.0869414945695407,
+              "kl_reference_candidate_nats": 0.0036486110692632474,
+              "max_abs_error": 0.47220921516418457,
+              "rmse": 0.10377828995914816,
               "allclose": false
             },
             {
@@ -3134,9 +3134,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0033785473624878934,
-              "max_abs_error": 0.4666637182235718,
-              "rmse": 0.09560723552729725,
+              "kl_reference_candidate_nats": 0.004324647984889497,
+              "max_abs_error": 0.4602384567260742,
+              "rmse": 0.08474566726776314,
               "allclose": false
             },
             {
@@ -3144,9 +3144,9 @@
               "reference_top1": 14324,
               "candidate_top1": 14324,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.002861826615343086,
-              "max_abs_error": 0.49121761322021484,
-              "rmse": 0.0964693230503715,
+              "kl_reference_candidate_nats": 0.0017163014721842385,
+              "max_abs_error": 0.4939908981323242,
+              "rmse": 0.10586660652003542,
               "allclose": false
             }
           ],
@@ -3380,9 +3380,9 @@
             39020
           ],
           "exact_greedy_match": true,
-          "top1_agreement": 1.0,
-          "max_kl_reference_candidate_nats": 0.17844710182969753,
-          "mean_kl_reference_candidate_nats": 0.009929054494928485,
+          "top1_agreement": 0.9714285714285714,
+          "max_kl_reference_candidate_nats": 0.17845165595966994,
+          "mean_kl_reference_candidate_nats": 0.011067122602352509,
           "passed": true,
           "positions": [
             {
@@ -3390,9 +3390,9 @@
               "reference_top1": 72030,
               "candidate_top1": 72030,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.17844710182969753,
-              "max_abs_error": 2.0693697929382324,
-              "rmse": 0.45644269024318196,
+              "kl_reference_candidate_nats": 0.17845165595966994,
+              "max_abs_error": 2.06941294670105,
+              "rmse": 0.45644234658456356,
               "allclose": false
             },
             {
@@ -3400,9 +3400,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.012303459518868404,
-              "max_abs_error": 1.1268749237060547,
-              "rmse": 0.235635163459762,
+              "kl_reference_candidate_nats": 0.011944235785298272,
+              "max_abs_error": 1.0219836235046387,
+              "rmse": 0.2206221669617323,
               "allclose": false
             },
             {
@@ -3410,9 +3410,9 @@
               "reference_top1": 2,
               "candidate_top1": 2,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.007417717144521666,
-              "max_abs_error": 0.6597611904144287,
-              "rmse": 0.12291847126505231,
+              "kl_reference_candidate_nats": 0.008179013825219024,
+              "max_abs_error": 0.6345372200012207,
+              "rmse": 0.12922877102462804,
               "allclose": false
             },
             {
@@ -3420,9 +3420,9 @@
               "reference_top1": 525,
               "candidate_top1": 525,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0022986456928120614,
-              "max_abs_error": 0.61197829246521,
-              "rmse": 0.1293954671512801,
+              "kl_reference_candidate_nats": 0.0029641409963668134,
+              "max_abs_error": 0.6342530250549316,
+              "rmse": 0.12370431020662385,
               "allclose": false
             },
             {
@@ -3430,9 +3430,9 @@
               "reference_top1": 2661,
               "candidate_top1": 2661,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.004951613959190192,
-              "max_abs_error": 0.7609848976135254,
-              "rmse": 0.17302809359832458,
+              "kl_reference_candidate_nats": 0.0037492870682503516,
+              "max_abs_error": 0.8579807281494141,
+              "rmse": 0.15205091868499962,
               "allclose": false
             },
             {
@@ -3440,9 +3440,9 @@
               "reference_top1": 10950,
               "candidate_top1": 10950,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.005628738101627218,
-              "max_abs_error": 1.027451992034912,
-              "rmse": 0.20950573311612572,
+              "kl_reference_candidate_nats": 0.007917651526941061,
+              "max_abs_error": 0.9147634506225586,
+              "rmse": 0.1932860757996851,
               "allclose": false
             },
             {
@@ -3450,19 +3450,19 @@
               "reference_top1": 17847,
               "candidate_top1": 17847,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.013474491039997712,
-              "max_abs_error": 1.2429383993148804,
-              "rmse": 0.24504949253613562,
+              "kl_reference_candidate_nats": 0.012596797529041014,
+              "max_abs_error": 1.2003388404846191,
+              "rmse": 0.26017164585440683,
               "allclose": false
             },
             {
               "position": 7,
               "reference_top1": 382,
-              "candidate_top1": 382,
-              "top1_match": true,
-              "kl_reference_candidate_nats": 0.013274098988186923,
-              "max_abs_error": 1.7741379141807556,
-              "rmse": 0.2834989305120142,
+              "candidate_top1": 448,
+              "top1_match": false,
+              "kl_reference_candidate_nats": 0.040766301357903455,
+              "max_abs_error": 1.701789379119873,
+              "rmse": 0.3611655481745842,
               "allclose": false
             },
             {
@@ -3470,9 +3470,9 @@
               "reference_top1": 5209,
               "candidate_top1": 5209,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.004282507926073465,
-              "max_abs_error": 0.6499004364013672,
-              "rmse": 0.11991496137510137,
+              "kl_reference_candidate_nats": 0.0050212153611094434,
+              "max_abs_error": 0.6447925567626953,
+              "rmse": 0.132536079530537,
               "allclose": false
             },
             {
@@ -3480,9 +3480,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0024722376498947487,
-              "max_abs_error": 1.5414857864379883,
-              "rmse": 0.27874055273467496,
+              "kl_reference_candidate_nats": 0.0035875182593610375,
+              "max_abs_error": 1.2846152782440186,
+              "rmse": 0.2897512586180232,
               "allclose": false
             },
             {
@@ -3490,9 +3490,9 @@
               "reference_top1": 304,
               "candidate_top1": 304,
               "top1_match": true,
-              "kl_reference_candidate_nats": 9.249924323005139e-06,
-              "max_abs_error": 1.336674690246582,
-              "rmse": 0.2556447604991584,
+              "kl_reference_candidate_nats": 0.00028820742738708006,
+              "max_abs_error": 1.401578426361084,
+              "rmse": 0.2666518090426206,
               "allclose": false
             },
             {
@@ -3500,9 +3500,9 @@
               "reference_top1": 7414,
               "candidate_top1": 7414,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.026704037889005175,
-              "max_abs_error": 1.5024988651275635,
-              "rmse": 0.34706391177441054,
+              "kl_reference_candidate_nats": 0.04405789701187807,
+              "max_abs_error": 1.2303640842437744,
+              "rmse": 0.2548382687558738,
               "allclose": false
             },
             {
@@ -3510,9 +3510,9 @@
               "reference_top1": 46487,
               "candidate_top1": 46487,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.01438625989408204,
-              "max_abs_error": 1.5619981288909912,
-              "rmse": 0.30099512320012856,
+              "kl_reference_candidate_nats": 0.006597009657445967,
+              "max_abs_error": 1.4926342070102692,
+              "rmse": 0.30067700165889244,
               "allclose": false
             },
             {
@@ -3520,9 +3520,9 @@
               "reference_top1": 785,
               "candidate_top1": 785,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.01714814731167939,
-              "max_abs_error": 1.30135940015316,
-              "rmse": 0.2806281154351783,
+              "kl_reference_candidate_nats": 0.015606366047115926,
+              "max_abs_error": 1.263103723526001,
+              "rmse": 0.2631235028698716,
               "allclose": false
             },
             {
@@ -3530,9 +3530,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.004614976825517802,
-              "max_abs_error": 1.5665674209594727,
-              "rmse": 0.31134739039732895,
+              "kl_reference_candidate_nats": 0.006143748748297962,
+              "max_abs_error": 1.4796876907348633,
+              "rmse": 0.31843734841617743,
               "allclose": false
             },
             {
@@ -3540,9 +3540,9 @@
               "reference_top1": 25,
               "candidate_top1": 25,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.446651631809751e-05,
-              "max_abs_error": 1.8976447582244873,
-              "rmse": 0.3893268594569787,
+              "kl_reference_candidate_nats": 9.026926276938004e-06,
+              "max_abs_error": 1.9147775173187256,
+              "rmse": 0.3170205131237334,
               "allclose": false
             },
             {
@@ -3550,9 +3550,9 @@
               "reference_top1": 40,
               "candidate_top1": 40,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0060264882100126375,
-              "max_abs_error": 0.7563056945800781,
-              "rmse": 0.1318666113235664,
+              "kl_reference_candidate_nats": 0.008509021649631018,
+              "max_abs_error": 0.8000471591949463,
+              "rmse": 0.1757964406000583,
               "allclose": false
             },
             {
@@ -3560,9 +3560,9 @@
               "reference_top1": 653,
               "candidate_top1": 653,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00036423050509155094,
-              "max_abs_error": 0.4739046096801758,
-              "rmse": 0.09849457090200449,
+              "kl_reference_candidate_nats": 0.0016936418282610319,
+              "max_abs_error": 0.4399399757385254,
+              "rmse": 0.09070043840047268,
               "allclose": false
             },
             {
@@ -3570,9 +3570,9 @@
               "reference_top1": 432,
               "candidate_top1": 432,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.002137248477388264,
-              "max_abs_error": 0.454758882522583,
-              "rmse": 0.10611394876775772,
+              "kl_reference_candidate_nats": 0.0022004291398942943,
+              "max_abs_error": 0.47153663635253906,
+              "rmse": 0.09752681098989137,
               "allclose": false
             },
             {
@@ -3580,9 +3580,9 @@
               "reference_top1": 17788,
               "candidate_top1": 17788,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0043495014746757574,
-              "max_abs_error": 0.4755253791809082,
-              "rmse": 0.09529102943871122,
+              "kl_reference_candidate_nats": 0.003866682217502334,
+              "max_abs_error": 0.49061107635498047,
+              "rmse": 0.12162913463187601,
               "allclose": false
             },
             {
@@ -3590,9 +3590,9 @@
               "reference_top1": 6303,
               "candidate_top1": 6303,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0025777535077083262,
-              "max_abs_error": 0.5368728637695312,
-              "rmse": 0.11302843601381996,
+              "kl_reference_candidate_nats": 0.0019026365373763544,
+              "max_abs_error": 0.5119929313659668,
+              "rmse": 0.11121867246010518,
               "allclose": false
             },
             {
@@ -3600,9 +3600,9 @@
               "reference_top1": 30,
               "candidate_top1": 30,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.005630190295722061,
-              "max_abs_error": 0.5701491832733154,
-              "rmse": 0.11999805908045709,
+              "kl_reference_candidate_nats": 0.0013672195664126523,
+              "max_abs_error": 0.5549716949462891,
+              "rmse": 0.1207974233597127,
               "allclose": false
             },
             {
@@ -3610,9 +3610,9 @@
               "reference_top1": 151645,
               "candidate_top1": 151645,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.001125746971089009,
-              "max_abs_error": 0.8133368492126465,
-              "rmse": 0.1536363386245394,
+              "kl_reference_candidate_nats": 0.0022168411345627834,
+              "max_abs_error": 0.8471348285675049,
+              "rmse": 0.16707522819912274,
               "allclose": false
             },
             {
@@ -3620,9 +3620,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.2876692353166979e-07,
-              "max_abs_error": 1.1401777267456055,
-              "rmse": 0.2121133781418469,
+              "kl_reference_candidate_nats": 1.9820710688996773e-07,
+              "max_abs_error": 0.9879801273345947,
+              "rmse": 0.1895020038843886,
               "allclose": false
             },
             {
@@ -3630,9 +3630,9 @@
               "reference_top1": 151644,
               "candidate_top1": 151644,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.0690430835372566e-06,
-              "max_abs_error": 0.708376407623291,
-              "rmse": 0.14662574708449871,
+              "kl_reference_candidate_nats": 1.767550748005982e-06,
+              "max_abs_error": 0.8077774047851562,
+              "rmse": 0.1607905116066709,
               "allclose": false
             },
             {
@@ -3640,9 +3640,9 @@
               "reference_top1": 872,
               "candidate_top1": 872,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00020234684888690622,
-              "max_abs_error": 1.4182286262512207,
-              "rmse": 0.32436395279664704,
+              "kl_reference_candidate_nats": 0.0001656699637063994,
+              "max_abs_error": 1.19889497756958,
+              "rmse": 0.25673209811704856,
               "allclose": false
             },
             {
@@ -3650,9 +3650,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0012350070972441177,
-              "max_abs_error": 1.4940519332885742,
-              "rmse": 0.30287384744695867,
+              "kl_reference_candidate_nats": 0.0012364288257789098,
+              "max_abs_error": 1.9598331451416016,
+              "rmse": 0.317086524682825,
               "allclose": false
             },
             {
@@ -3660,9 +3660,9 @@
               "reference_top1": 785,
               "candidate_top1": 785,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0001379782824366892,
-              "max_abs_error": 0.6052558422088623,
-              "rmse": 0.11803090814779697,
+              "kl_reference_candidate_nats": 0.00014833224890638987,
+              "max_abs_error": 0.6034882068634033,
+              "rmse": 0.12095711012974975,
               "allclose": false
             },
             {
@@ -3670,9 +3670,9 @@
               "reference_top1": 12884,
               "candidate_top1": 12884,
               "top1_match": true,
-              "kl_reference_candidate_nats": 5.193052073309898e-05,
-              "max_abs_error": 0.4996919631958008,
-              "rmse": 0.09880231550851942,
+              "kl_reference_candidate_nats": 0.0004186650949504358,
+              "max_abs_error": 0.5607686042785645,
+              "rmse": 0.10372249451508939,
               "allclose": false
             },
             {
@@ -3680,9 +3680,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00030788107909661736,
-              "max_abs_error": 0.5158090591430664,
-              "rmse": 0.10999008797874572,
+              "kl_reference_candidate_nats": 0.0005919606685387864,
+              "max_abs_error": 0.535740852355957,
+              "rmse": 0.11314456449033973,
               "allclose": false
             },
             {
@@ -3690,9 +3690,9 @@
               "reference_top1": 6303,
               "candidate_top1": 6303,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.012883770921432317,
-              "max_abs_error": 0.4570131301879883,
-              "rmse": 0.10034971175901433,
+              "kl_reference_candidate_nats": 0.009542517167089893,
+              "max_abs_error": 0.5923881530761719,
+              "rmse": 0.11601635694860249,
               "allclose": false
             },
             {
@@ -3700,9 +3700,9 @@
               "reference_top1": 1576,
               "candidate_top1": 1576,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00028952616816494125,
-              "max_abs_error": 0.578831672668457,
-              "rmse": 0.12229687101985572,
+              "kl_reference_candidate_nats": 0.00011534220959343524,
+              "max_abs_error": 0.690277099609375,
+              "rmse": 0.16413538439537778,
               "allclose": false
             },
             {
@@ -3710,9 +3710,9 @@
               "reference_top1": 432,
               "candidate_top1": 432,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0019269686271176398,
-              "max_abs_error": 0.5759704113006592,
-              "rmse": 0.10792342052412052,
+              "kl_reference_candidate_nats": 0.0014330452857066367,
+              "max_abs_error": 0.5222396850585938,
+              "rmse": 0.10701841159257094,
               "allclose": false
             },
             {
@@ -3720,9 +3720,9 @@
               "reference_top1": 25963,
               "candidate_top1": 25963,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.000374892590157919,
-              "max_abs_error": 0.4761543273925781,
-              "rmse": 0.09398324287286504,
+              "kl_reference_candidate_nats": 0.0009524242055546739,
+              "max_abs_error": 0.4907665252685547,
+              "rmse": 0.10291608905761339,
               "allclose": false
             },
             {
@@ -3730,9 +3730,9 @@
               "reference_top1": 39020,
               "candidate_top1": 39020,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00045549772373663347,
-              "max_abs_error": 0.5464763641357422,
-              "rmse": 0.1040337363830824,
+              "kl_reference_candidate_nats": 0.0031063940934545043,
+              "max_abs_error": 0.5843944549560547,
+              "rmse": 0.11224442880779113,
               "allclose": false
             }
           ],
@@ -3745,7 +3745,7 @@
               2661,
               10950,
               17847,
-              382,
+              448,
               5209,
               279,
               304,
@@ -4002,8 +4002,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 0.9166666666666666,
-          "max_kl_reference_candidate_nats": 7.046771613051455,
-          "mean_kl_reference_candidate_nats": 0.8510575563345654,
+          "max_kl_reference_candidate_nats": 7.041471544585737,
+          "mean_kl_reference_candidate_nats": 0.8515791011095795,
           "passed": true,
           "positions": [
             {
@@ -4011,9 +4011,9 @@
               "reference_top1": 2701,
               "candidate_top1": 253,
               "top1_match": false,
-              "kl_reference_candidate_nats": 7.046771613051455,
-              "max_abs_error": 13.989767074584961,
-              "rmse": 3.144576258649487,
+              "kl_reference_candidate_nats": 7.041471544585737,
+              "max_abs_error": 14.015104293823242,
+              "rmse": 3.144290627382715,
               "allclose": false
             },
             {
@@ -4021,9 +4021,9 @@
               "reference_top1": 315,
               "candidate_top1": 315,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.23155707731256203,
-              "max_abs_error": 7.859224796295166,
-              "rmse": 1.444047660329653,
+              "kl_reference_candidate_nats": 0.2345267582155068,
+              "max_abs_error": 7.8984315395355225,
+              "rmse": 1.4403729181626284,
               "allclose": false
             },
             {
@@ -4031,9 +4031,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.8207445744823489,
-              "max_abs_error": 7.965045928955078,
-              "rmse": 1.676967847963602,
+              "kl_reference_candidate_nats": 0.8373433344948812,
+              "max_abs_error": 7.958481878042221,
+              "rmse": 1.6783104763137675,
               "allclose": false
             },
             {
@@ -4041,9 +4041,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.13439814297481711,
-              "max_abs_error": 6.218453645706177,
-              "rmse": 1.407539225183202,
+              "kl_reference_candidate_nats": 0.1567340219170324,
+              "max_abs_error": 6.179127216339111,
+              "rmse": 1.461225872085331,
               "allclose": false
             },
             {
@@ -4051,9 +4051,9 @@
               "reference_top1": 12095,
               "candidate_top1": 12095,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.9172251977043909,
-              "max_abs_error": 5.813553810119629,
-              "rmse": 1.1699719063341834,
+              "kl_reference_candidate_nats": 0.9089181388013248,
+              "max_abs_error": 5.828474998474121,
+              "rmse": 1.1673007191969822,
               "allclose": false
             },
             {
@@ -4061,9 +4061,9 @@
               "reference_top1": 13,
               "candidate_top1": 13,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.3129431545987595,
-              "max_abs_error": 5.551348567008972,
-              "rmse": 1.1523821805374166,
+              "kl_reference_candidate_nats": 0.31003933940969314,
+              "max_abs_error": 5.657573103904724,
+              "rmse": 1.169602659553458,
               "allclose": false
             },
             {
@@ -4071,9 +4071,9 @@
               "reference_top1": 1084,
               "candidate_top1": 1084,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.21256097725949755,
-              "max_abs_error": 4.716899037361145,
-              "rmse": 0.9839523676591295,
+              "kl_reference_candidate_nats": 0.20595799192068104,
+              "max_abs_error": 4.615874648094177,
+              "rmse": 0.9736325981522707,
               "allclose": false
             },
             {
@@ -4081,9 +4081,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.1445626355499995,
-              "max_abs_error": 4.105943918228149,
-              "rmse": 0.9915083394732761,
+              "kl_reference_candidate_nats": 0.14148885723573168,
+              "max_abs_error": 4.067054510116577,
+              "rmse": 0.9634262214350677,
               "allclose": false
             },
             {
@@ -4091,9 +4091,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.13991498042565934,
-              "max_abs_error": 4.007711410522461,
-              "rmse": 0.8904745577449716,
+              "kl_reference_candidate_nats": 0.13750904253513382,
+              "max_abs_error": 3.981200695037842,
+              "rmse": 0.8954409143617008,
               "allclose": false
             },
             {
@@ -4101,9 +4101,9 @@
               "reference_top1": 7772,
               "candidate_top1": 7772,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.2082201325745833,
-              "max_abs_error": 4.6990063190460205,
-              "rmse": 0.8804866226792794,
+              "kl_reference_candidate_nats": 0.19969523020678356,
+              "max_abs_error": 4.562654495239258,
+              "rmse": 0.8701737123891784,
               "allclose": false
             },
             {
@@ -4111,9 +4111,9 @@
               "reference_top1": 3283,
               "candidate_top1": 3283,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.020650562557292543,
-              "max_abs_error": 4.807915687561035,
-              "rmse": 0.9079166341385775,
+              "kl_reference_candidate_nats": 0.01937751424659822,
+              "max_abs_error": 4.81928014755249,
+              "rmse": 0.8985034064012172,
               "allclose": false
             },
             {
@@ -4121,9 +4121,9 @@
               "reference_top1": 304,
               "candidate_top1": 304,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.023141627523419327,
-              "max_abs_error": 4.79638934135437,
-              "rmse": 1.0632057463972264,
+              "kl_reference_candidate_nats": 0.025887439745850407,
+              "max_abs_error": 4.767933368682861,
+              "rmse": 1.024472922239264,
               "allclose": false
             }
           ],
@@ -4316,8 +4316,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 0.8333333333333334,
-          "max_kl_reference_candidate_nats": 4.943407932637369,
-          "mean_kl_reference_candidate_nats": 0.31104820195740923,
+          "max_kl_reference_candidate_nats": 4.980425716356631,
+          "mean_kl_reference_candidate_nats": 0.3099079215408272,
           "passed": true,
           "positions": [
             {
@@ -4325,9 +4325,9 @@
               "reference_top1": 1887,
               "candidate_top1": 253,
               "top1_match": false,
-              "kl_reference_candidate_nats": 4.943407932637369,
-              "max_abs_error": 16.385701656341553,
-              "rmse": 2.9759955081523977,
+              "kl_reference_candidate_nats": 4.980425716356631,
+              "max_abs_error": 16.38941764831543,
+              "rmse": 2.976633762830205,
               "allclose": false
             },
             {
@@ -4335,9 +4335,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.23362410682973633,
-              "max_abs_error": 6.808209300041199,
-              "rmse": 1.2817697494574072,
+              "kl_reference_candidate_nats": 0.23359736424122488,
+              "max_abs_error": 6.880073547363281,
+              "rmse": 1.2829165645334533,
               "allclose": false
             },
             {
@@ -4345,9 +4345,9 @@
               "reference_top1": 982,
               "candidate_top1": 982,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.09877722352891757,
-              "max_abs_error": 6.971007347106934,
-              "rmse": 1.328202082406407,
+              "kl_reference_candidate_nats": 0.09816315651355721,
+              "max_abs_error": 7.085313320159912,
+              "rmse": 1.329241334815278,
               "allclose": false
             },
             {
@@ -4355,9 +4355,9 @@
               "reference_top1": 262,
               "candidate_top1": 262,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.014146901331767638,
-              "max_abs_error": 4.520197629928589,
-              "rmse": 0.854576958584467,
+              "kl_reference_candidate_nats": 0.012443477360672865,
+              "max_abs_error": 4.446245193481445,
+              "rmse": 0.8393489458409428,
               "allclose": false
             },
             {
@@ -4365,9 +4365,9 @@
               "reference_top1": 421,
               "candidate_top1": 421,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.12770391892820712,
-              "max_abs_error": 4.306928873062134,
-              "rmse": 0.8655849739437911,
+              "kl_reference_candidate_nats": 0.13074362401504017,
+              "max_abs_error": 4.484287261962891,
+              "rmse": 0.861361537999934,
               "allclose": false
             },
             {
@@ -4375,9 +4375,9 @@
               "reference_top1": 308,
               "candidate_top1": 308,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.06554088259383513,
-              "max_abs_error": 4.377634048461914,
-              "rmse": 1.0484814407485958,
+              "kl_reference_candidate_nats": 0.07319545922329262,
+              "max_abs_error": 4.2540499567985535,
+              "rmse": 1.0234965220966492,
               "allclose": false
             },
             {
@@ -4385,9 +4385,9 @@
               "reference_top1": 2651,
               "candidate_top1": 621,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.09236265837956048,
-              "max_abs_error": 3.7951186895370483,
-              "rmse": 0.8845546693143347,
+              "kl_reference_candidate_nats": 0.06941727329858843,
+              "max_abs_error": 3.745526909828186,
+              "rmse": 0.8964341262557741,
               "allclose": false
             },
             {
@@ -4395,9 +4395,9 @@
               "reference_top1": 220,
               "candidate_top1": 220,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.006237120341065548,
-              "max_abs_error": 4.745189666748047,
-              "rmse": 0.9822285842450523,
+              "kl_reference_candidate_nats": 0.005709830252547913,
+              "max_abs_error": 4.700811862945557,
+              "rmse": 0.9880190016235797,
               "allclose": false
             },
             {
@@ -4405,9 +4405,9 @@
               "reference_top1": 15,
               "candidate_top1": 17,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.3338869845836477,
-              "max_abs_error": 6.17286491394043,
-              "rmse": 1.3293116699785972,
+              "kl_reference_candidate_nats": 0.3809861304861451,
+              "max_abs_error": 6.100790977478027,
+              "rmse": 1.3315681360986793,
               "allclose": false
             },
             {
@@ -4415,9 +4415,9 @@
               "reference_top1": 510,
               "candidate_top1": 510,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.12305393801439898,
-              "max_abs_error": 3.821969509124756,
-              "rmse": 0.8239816910532265,
+              "kl_reference_candidate_nats": 0.11066378059059899,
+              "max_abs_error": 3.910473346710205,
+              "rmse": 0.829056286869817,
               "allclose": false
             },
             {
@@ -4425,9 +4425,9 @@
               "reference_top1": 286,
               "candidate_top1": 286,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.004485177651672108,
-              "max_abs_error": 4.094177007675171,
-              "rmse": 0.8675593653809412,
+              "kl_reference_candidate_nats": 0.004016990584265466,
+              "max_abs_error": 4.096675157546997,
+              "rmse": 0.8747002971910457,
               "allclose": false
             },
             {
@@ -4435,9 +4435,9 @@
               "reference_top1": 470,
               "candidate_top1": 470,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.012165757374742186,
-              "max_abs_error": 4.532155513763428,
-              "rmse": 0.8919206976023312,
+              "kl_reference_candidate_nats": 0.01290061724164957,
+              "max_abs_error": 4.465068340301514,
+              "rmse": 0.912229772870129,
               "allclose": false
             },
             {
@@ -4445,9 +4445,9 @@
               "reference_top1": 308,
               "candidate_top1": 220,
               "top1_match": false,
-              "kl_reference_candidate_nats": 1.2495163702059562,
-              "max_abs_error": 5.8475542068481445,
-              "rmse": 1.2383813305892015,
+              "kl_reference_candidate_nats": 1.1634054840591344,
+              "max_abs_error": 5.411081790924072,
+              "rmse": 1.1807738064173032,
               "allclose": false
             },
             {
@@ -4455,9 +4455,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.050435377580208385,
-              "max_abs_error": 5.26234245300293,
-              "rmse": 1.0314250700236252,
+              "kl_reference_candidate_nats": 0.05334468458447889,
+              "max_abs_error": 5.379021644592285,
+              "rmse": 1.0280845835990169,
               "allclose": false
             },
             {
@@ -4465,9 +4465,9 @@
               "reference_top1": 262,
               "candidate_top1": 262,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00016924097137939272,
-              "max_abs_error": 4.593957245349884,
-              "rmse": 0.9498039613868021,
+              "kl_reference_candidate_nats": 0.00016826459559892437,
+              "max_abs_error": 4.770342826843262,
+              "rmse": 0.9427996891283688,
               "allclose": false
             },
             {
@@ -4475,9 +4475,9 @@
               "reference_top1": 770,
               "candidate_top1": 770,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.08789914864009644,
-              "max_abs_error": 5.718698024749756,
-              "rmse": 1.1252588236947074,
+              "kl_reference_candidate_nats": 0.0803723273670856,
+              "max_abs_error": 5.761020183563232,
+              "rmse": 1.141854302403656,
               "allclose": false
             },
             {
@@ -4485,9 +4485,9 @@
               "reference_top1": 75698,
               "candidate_top1": 75698,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0070957163505105765,
-              "max_abs_error": 5.472902059555054,
-              "rmse": 1.1433023361694816,
+              "kl_reference_candidate_nats": 0.007927363296282174,
+              "max_abs_error": 5.834628582000732,
+              "rmse": 1.184649396316574,
               "allclose": false
             },
             {
@@ -4495,9 +4495,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.000853324638931968,
-              "max_abs_error": 5.816766738891602,
-              "rmse": 1.5944853461500688,
+              "kl_reference_candidate_nats": 0.0008243355051966077,
+              "max_abs_error": 6.000952959060669,
+              "rmse": 1.6185806042929236,
               "allclose": false
             },
             {
@@ -4505,9 +4505,9 @@
               "reference_top1": 12,
               "candidate_top1": 12,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00043184108786204005,
-              "max_abs_error": 5.1459527015686035,
-              "rmse": 0.9402788823821816,
+              "kl_reference_candidate_nats": 0.005577232803628415,
+              "max_abs_error": 5.4189982414245605,
+              "rmse": 0.9299644805102111,
               "allclose": false
             },
             {
@@ -4515,9 +4515,9 @@
               "reference_top1": 16,
               "candidate_top1": 16,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.001543841924161866,
-              "max_abs_error": 4.649361610412598,
-              "rmse": 1.0813781552005375,
+              "kl_reference_candidate_nats": 0.0019482895726684773,
+              "max_abs_error": 4.572664976119995,
+              "rmse": 1.048787380872566,
               "allclose": false
             },
             {
@@ -4525,9 +4525,9 @@
               "reference_top1": 8,
               "candidate_top1": 8,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0073813688047401176,
-              "max_abs_error": 6.049204230308533,
-              "rmse": 1.0352034180330378,
+              "kl_reference_candidate_nats": 0.008219855344591178,
+              "max_abs_error": 6.2639312744140625,
+              "rmse": 1.0663784420818425,
               "allclose": false
             },
             {
@@ -4535,9 +4535,9 @@
               "reference_top1": 488,
               "candidate_top1": 488,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0006588046273039784,
-              "max_abs_error": 5.459890365600586,
-              "rmse": 1.0198431489262187,
+              "kl_reference_candidate_nats": 0.0007074549918517103,
+              "max_abs_error": 5.478753089904785,
+              "rmse": 1.0162655274875063,
               "allclose": false
             },
             {
@@ -4545,9 +4545,9 @@
               "reference_top1": 75698,
               "candidate_top1": 75698,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0025639757905318136,
-              "max_abs_error": 5.597002029418945,
-              "rmse": 1.1889789545544955,
+              "kl_reference_candidate_nats": 0.002155392020010304,
+              "max_abs_error": 5.662915229797363,
+              "rmse": 1.22194012873179,
               "allclose": false
             },
             {
@@ -4555,9 +4555,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0012152341612192167,
-              "max_abs_error": 5.221886157989502,
-              "rmse": 1.1883909066115916,
+              "kl_reference_candidate_nats": 0.0008760126751108439,
+              "max_abs_error": 5.261131763458252,
+              "rmse": 1.234834880716084,
               "allclose": false
             }
           ],
@@ -4784,8 +4784,8 @@
           ],
           "exact_greedy_match": false,
           "top1_agreement": 0.7647058823529411,
-          "max_kl_reference_candidate_nats": 5.851410626110429,
-          "mean_kl_reference_candidate_nats": 0.5832239128066543,
+          "max_kl_reference_candidate_nats": 5.82781424473768,
+          "mean_kl_reference_candidate_nats": 0.5726575281368318,
           "passed": true,
           "positions": [
             {
@@ -4793,9 +4793,9 @@
               "reference_top1": 220,
               "candidate_top1": 253,
               "top1_match": false,
-              "kl_reference_candidate_nats": 5.851410626110429,
-              "max_abs_error": 16.938531398773193,
-              "rmse": 3.3886409063546634,
+              "kl_reference_candidate_nats": 5.82781424473768,
+              "max_abs_error": 16.8990318775177,
+              "rmse": 3.3814815193205887,
               "allclose": false
             },
             {
@@ -4803,9 +4803,9 @@
               "reference_top1": 6290,
               "candidate_top1": 6290,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.6432498130389063,
-              "max_abs_error": 5.626115620136261,
-              "rmse": 1.0441256767076306,
+              "kl_reference_candidate_nats": 0.58654851987942,
+              "max_abs_error": 5.559713363647461,
+              "rmse": 1.0342049459573006,
               "allclose": false
             },
             {
@@ -4813,9 +4813,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.3218232710497764,
-              "max_abs_error": 6.122962236404419,
-              "rmse": 1.172633066243364,
+              "kl_reference_candidate_nats": 0.33168792241277223,
+              "max_abs_error": 6.290681600570679,
+              "rmse": 1.1962070585017799,
               "allclose": false
             },
             {
@@ -4823,9 +4823,9 @@
               "reference_top1": 264,
               "candidate_top1": 264,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.128285674452975,
-              "max_abs_error": 5.911540508270264,
-              "rmse": 1.0019163942709928,
+              "kl_reference_candidate_nats": 0.12183249415118698,
+              "max_abs_error": 5.941900253295898,
+              "rmse": 1.0005820246900108,
               "allclose": false
             },
             {
@@ -4833,9 +4833,9 @@
               "reference_top1": 821,
               "candidate_top1": 821,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.0882993380463297,
-              "max_abs_error": 5.861269474029541,
-              "rmse": 1.2066088873028646,
+              "kl_reference_candidate_nats": 1.0441897849599804,
+              "max_abs_error": 5.784820795059204,
+              "rmse": 1.1913032477835357,
               "allclose": false
             },
             {
@@ -4843,9 +4843,9 @@
               "reference_top1": 504,
               "candidate_top1": 504,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.14628465027111173,
-              "max_abs_error": 5.532879590988159,
-              "rmse": 1.021612366302179,
+              "kl_reference_candidate_nats": 0.14644818055311606,
+              "max_abs_error": 5.5532066822052,
+              "rmse": 1.028042637498689,
               "allclose": false
             },
             {
@@ -4853,9 +4853,9 @@
               "reference_top1": 264,
               "candidate_top1": 264,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.055206586182834555,
-              "max_abs_error": 3.9199423789978027,
-              "rmse": 0.818022629561232,
+              "kl_reference_candidate_nats": 0.0531527587005818,
+              "max_abs_error": 3.9473233222961426,
+              "rmse": 0.8282964320089676,
               "allclose": false
             },
             {
@@ -4863,9 +4863,9 @@
               "reference_top1": 323,
               "candidate_top1": 323,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.1189760812986512,
-              "max_abs_error": 4.326526165008545,
-              "rmse": 0.9501225189480672,
+              "kl_reference_candidate_nats": 0.1137212310274127,
+              "max_abs_error": 4.538754463195801,
+              "rmse": 0.9637416517488804,
               "allclose": false
             },
             {
@@ -4873,9 +4873,9 @@
               "reference_top1": 576,
               "candidate_top1": 576,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.15813142261849036,
-              "max_abs_error": 3.943624973297119,
-              "rmse": 0.7867761873711763,
+              "kl_reference_candidate_nats": 0.1430056110320175,
+              "max_abs_error": 3.8990836143493652,
+              "rmse": 0.770090348794001,
               "allclose": false
             },
             {
@@ -4883,9 +4883,9 @@
               "reference_top1": 11,
               "candidate_top1": 11,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.022110585563721065,
-              "max_abs_error": 3.4534045457839966,
-              "rmse": 0.6896043221419498,
+              "kl_reference_candidate_nats": 0.023243502812326712,
+              "max_abs_error": 3.610341191291809,
+              "rmse": 0.6945830222645146,
               "allclose": false
             },
             {
@@ -4893,9 +4893,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.08299833881064907,
-              "max_abs_error": 3.2600417137145996,
-              "rmse": 0.6722230863854131,
+              "kl_reference_candidate_nats": 0.07309001754767669,
+              "max_abs_error": 3.3922674655914307,
+              "rmse": 0.6697162321639222,
               "allclose": false
             },
             {
@@ -4903,9 +4903,9 @@
               "reference_top1": 13940,
               "candidate_top1": 13940,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.20041214971137744,
-              "max_abs_error": 3.4140539169311523,
-              "rmse": 0.7025644723899466,
+              "kl_reference_candidate_nats": 0.20202402564918948,
+              "max_abs_error": 3.32517147064209,
+              "rmse": 0.6916209136300601,
               "allclose": false
             },
             {
@@ -4913,9 +4913,9 @@
               "reference_top1": 646,
               "candidate_top1": 646,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.14993284655299188,
-              "max_abs_error": 3.8375942707061768,
-              "rmse": 0.7625230222394254,
+              "kl_reference_candidate_nats": 0.14930256959991967,
+              "max_abs_error": 3.753248929977417,
+              "rmse": 0.7501843595010554,
               "allclose": false
             },
             {
@@ -4923,9 +4923,9 @@
               "reference_top1": 1172,
               "candidate_top1": 387,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.2545599032860522,
-              "max_abs_error": 3.2002159357070923,
-              "rmse": 0.7048055395281565,
+              "kl_reference_candidate_nats": 0.23226608332343618,
+              "max_abs_error": 3.239219546318054,
+              "rmse": 0.7025159195460539,
               "allclose": false
             },
             {
@@ -4933,9 +4933,9 @@
               "reference_top1": 1349,
               "candidate_top1": 2615,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.19571761545610478,
-              "max_abs_error": 3.220134735107422,
-              "rmse": 0.7020825296319597,
+              "kl_reference_candidate_nats": 0.18282871165044184,
+              "max_abs_error": 3.265241026878357,
+              "rmse": 0.7020428806446659,
               "allclose": false
             },
             {
@@ -4943,9 +4943,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.10684550454377068,
-              "max_abs_error": 3.9348807334899902,
-              "rmse": 0.7637398828656691,
+              "kl_reference_candidate_nats": 0.10396687987331803,
+              "max_abs_error": 3.8758127689361572,
+              "rmse": 0.7560960031905198,
               "allclose": false
             },
             {
@@ -4953,9 +4953,9 @@
               "reference_top1": 14324,
               "candidate_top1": 1614,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.3905621107189517,
-              "max_abs_error": 4.213741064071655,
-              "rmse": 0.8320157653625618,
+              "kl_reference_candidate_nats": 0.40005544041566393,
+              "max_abs_error": 4.168870687484741,
+              "rmse": 0.8302140216259081,
               "allclose": false
             }
           ],
@@ -5189,9 +5189,9 @@
             25963
           ],
           "exact_greedy_match": false,
-          "top1_agreement": 0.6857142857142857,
-          "max_kl_reference_candidate_nats": 5.718212933072031,
-          "mean_kl_reference_candidate_nats": 0.5605533055746791,
+          "top1_agreement": 0.7142857142857143,
+          "max_kl_reference_candidate_nats": 5.741059103272377,
+          "mean_kl_reference_candidate_nats": 0.5565228294246715,
           "passed": true,
           "positions": [
             {
@@ -5199,9 +5199,9 @@
               "reference_top1": 72030,
               "candidate_top1": 253,
               "top1_match": false,
-              "kl_reference_candidate_nats": 5.718212933072031,
-              "max_abs_error": 15.977542877197266,
-              "rmse": 3.1129343387702293,
+              "kl_reference_candidate_nats": 5.741059103272377,
+              "max_abs_error": 16.024879932403564,
+              "rmse": 3.1163637200631698,
               "allclose": false
             },
             {
@@ -5209,9 +5209,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.701128399906369,
-              "max_abs_error": 7.567674875259399,
-              "rmse": 1.402400396489373,
+              "kl_reference_candidate_nats": 0.7082557872037796,
+              "max_abs_error": 7.583063840866089,
+              "rmse": 1.3894999251473326,
               "allclose": false
             },
             {
@@ -5219,9 +5219,9 @@
               "reference_top1": 2,
               "candidate_top1": 220,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.8049404322892832,
-              "max_abs_error": 5.4120484590530396,
-              "rmse": 1.1737946257620808,
+              "kl_reference_candidate_nats": 0.8191160248979614,
+              "max_abs_error": 5.2970662117004395,
+              "rmse": 1.1945930031292933,
               "allclose": false
             },
             {
@@ -5229,9 +5229,9 @@
               "reference_top1": 525,
               "candidate_top1": 525,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.21155672860658906,
-              "max_abs_error": 5.539882659912109,
-              "rmse": 1.1676794996220528,
+              "kl_reference_candidate_nats": 0.21041156256575722,
+              "max_abs_error": 5.598014831542969,
+              "rmse": 1.1653166972722362,
               "allclose": false
             },
             {
@@ -5239,9 +5239,9 @@
               "reference_top1": 2661,
               "candidate_top1": 2661,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.26197249714509674,
-              "max_abs_error": 4.949183464050293,
-              "rmse": 0.9489781921794518,
+              "kl_reference_candidate_nats": 0.2382710911571597,
+              "max_abs_error": 4.72943115234375,
+              "rmse": 0.949988882282805,
               "allclose": false
             },
             {
@@ -5249,9 +5249,9 @@
               "reference_top1": 10950,
               "candidate_top1": 10950,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.6240794757502819,
-              "max_abs_error": 6.582591891288757,
-              "rmse": 1.4723648581375397,
+              "kl_reference_candidate_nats": 0.634102006644806,
+              "max_abs_error": 6.699711084365845,
+              "rmse": 1.4891951964513903,
               "allclose": false
             },
             {
@@ -5259,9 +5259,9 @@
               "reference_top1": 17847,
               "candidate_top1": 17847,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.3275008383021371,
-              "max_abs_error": 11.989684343338013,
-              "rmse": 2.1837285499840116,
+              "kl_reference_candidate_nats": 0.3207770853136106,
+              "max_abs_error": 12.059568405151367,
+              "rmse": 2.1799448049715178,
               "allclose": false
             },
             {
@@ -5269,9 +5269,9 @@
               "reference_top1": 382,
               "candidate_top1": 304,
               "top1_match": false,
-              "kl_reference_candidate_nats": 1.5128329704192534,
-              "max_abs_error": 10.256282329559326,
-              "rmse": 2.1223910102184766,
+              "kl_reference_candidate_nats": 1.5896785481301736,
+              "max_abs_error": 10.345354557037354,
+              "rmse": 2.14528295675431,
               "allclose": false
             },
             {
@@ -5279,9 +5279,9 @@
               "reference_top1": 5209,
               "candidate_top1": 358,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.4717763518348372,
-              "max_abs_error": 6.781172752380371,
-              "rmse": 1.4297789429742276,
+              "kl_reference_candidate_nats": 0.4957330997795178,
+              "max_abs_error": 6.836962699890137,
+              "rmse": 1.481735298606141,
               "allclose": false
             },
             {
@@ -5289,19 +5289,19 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.5930371333719168,
-              "max_abs_error": 10.634121417999268,
-              "rmse": 1.9670092096882554,
+              "kl_reference_candidate_nats": 0.5414696648856531,
+              "max_abs_error": 10.382419109344482,
+              "rmse": 1.963624655787849,
               "allclose": false
             },
             {
               "position": 10,
               "reference_top1": 304,
-              "candidate_top1": 624,
-              "top1_match": false,
-              "kl_reference_candidate_nats": 1.3239739523176777,
-              "max_abs_error": 11.47876650094986,
-              "rmse": 2.2704839656432427,
+              "candidate_top1": 304,
+              "top1_match": true,
+              "kl_reference_candidate_nats": 1.1053914075789966,
+              "max_abs_error": 11.292368948459625,
+              "rmse": 2.3032587890018075,
               "allclose": false
             },
             {
@@ -5309,9 +5309,9 @@
               "reference_top1": 7414,
               "candidate_top1": 4710,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.8688656859262349,
-              "max_abs_error": 6.783468246459961,
-              "rmse": 1.3956454396697668,
+              "kl_reference_candidate_nats": 0.9115301106203153,
+              "max_abs_error": 6.550572395324707,
+              "rmse": 1.387207676591228,
               "allclose": false
             },
             {
@@ -5319,9 +5319,9 @@
               "reference_top1": 46487,
               "candidate_top1": 15936,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.6194233304227021,
-              "max_abs_error": 9.22712504863739,
-              "rmse": 1.9656484538822572,
+              "kl_reference_candidate_nats": 0.6426256242286396,
+              "max_abs_error": 9.38966703414917,
+              "rmse": 2.0085447483089096,
               "allclose": false
             },
             {
@@ -5329,9 +5329,9 @@
               "reference_top1": 785,
               "candidate_top1": 95456,
               "top1_match": false,
-              "kl_reference_candidate_nats": 1.3942277674456283,
-              "max_abs_error": 10.0789475440979,
-              "rmse": 1.9978185609359371,
+              "kl_reference_candidate_nats": 1.3939431693617912,
+              "max_abs_error": 9.809104442596436,
+              "rmse": 1.9089685628592616,
               "allclose": false
             },
             {
@@ -5339,9 +5339,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.06174826498450815,
-              "max_abs_error": 9.604154229164124,
-              "rmse": 2.1729205851382885,
+              "kl_reference_candidate_nats": 0.05801559722964073,
+              "max_abs_error": 9.49507486820221,
+              "rmse": 2.1246955724979446,
               "allclose": false
             },
             {
@@ -5349,9 +5349,9 @@
               "reference_top1": 25,
               "candidate_top1": 25,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.8217850850352899,
-              "max_abs_error": 17.879626750946045,
-              "rmse": 2.650630155508617,
+              "kl_reference_candidate_nats": 0.7944437025478429,
+              "max_abs_error": 17.497340202331543,
+              "rmse": 2.5762602349301034,
               "allclose": false
             },
             {
@@ -5359,9 +5359,9 @@
               "reference_top1": 40,
               "candidate_top1": 40,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.0618473367775771,
-              "max_abs_error": 7.459484100341797,
-              "rmse": 1.5475810832969226,
+              "kl_reference_candidate_nats": 0.9925470325674263,
+              "max_abs_error": 7.298831939697266,
+              "rmse": 1.5350088246776386,
               "allclose": false
             },
             {
@@ -5369,9 +5369,9 @@
               "reference_top1": 653,
               "candidate_top1": 374,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.12418613093218438,
-              "max_abs_error": 4.474406719207764,
-              "rmse": 0.9302072431256232,
+              "kl_reference_candidate_nats": 0.14938921988637177,
+              "max_abs_error": 4.512776136398315,
+              "rmse": 0.939666280507463,
               "allclose": false
             },
             {
@@ -5379,9 +5379,9 @@
               "reference_top1": 432,
               "candidate_top1": 432,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.363412615359485,
-              "max_abs_error": 4.380147457122803,
-              "rmse": 0.8267073454440586,
+              "kl_reference_candidate_nats": 0.3532908221542543,
+              "max_abs_error": 4.642667293548584,
+              "rmse": 0.8422930410771624,
               "allclose": false
             },
             {
@@ -5389,9 +5389,9 @@
               "reference_top1": 17788,
               "candidate_top1": 11652,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.29916731881390507,
-              "max_abs_error": 4.035772323608398,
-              "rmse": 0.8199244709932954,
+              "kl_reference_candidate_nats": 0.3122106767031695,
+              "max_abs_error": 4.06873083114624,
+              "rmse": 0.8198210869397081,
               "allclose": false
             },
             {
@@ -5399,9 +5399,9 @@
               "reference_top1": 6303,
               "candidate_top1": 6303,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.06221884222988594,
-              "max_abs_error": 4.395648717880249,
-              "rmse": 0.8942003899088947,
+              "kl_reference_candidate_nats": 0.06293652977178696,
+              "max_abs_error": 4.318499803543091,
+              "rmse": 0.9045097274877537,
               "allclose": false
             },
             {
@@ -5409,9 +5409,9 @@
               "reference_top1": 30,
               "candidate_top1": 30,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.1186547904045227,
-              "max_abs_error": 4.80445408821106,
-              "rmse": 0.8933192822347904,
+              "kl_reference_candidate_nats": 0.1184530387239526,
+              "max_abs_error": 4.730550289154053,
+              "rmse": 0.8926771792053425,
               "allclose": false
             },
             {
@@ -5419,9 +5419,9 @@
               "reference_top1": 151645,
               "candidate_top1": 151645,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.17869845849275393,
-              "max_abs_error": 4.916737079620361,
-              "rmse": 1.050580509220353,
+              "kl_reference_candidate_nats": 0.1786806362580682,
+              "max_abs_error": 4.912981033325195,
+              "rmse": 1.0419661417230686,
               "allclose": false
             },
             {
@@ -5429,9 +5429,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 2.3477541679761073e-05,
-              "max_abs_error": 7.66272759437561,
-              "rmse": 1.492763141881416,
+              "kl_reference_candidate_nats": 2.0377274016632567e-05,
+              "max_abs_error": 7.604918003082275,
+              "rmse": 1.4863294865602625,
               "allclose": false
             },
             {
@@ -5439,9 +5439,9 @@
               "reference_top1": 151644,
               "candidate_top1": 151644,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.000533731252305553,
-              "max_abs_error": 7.577999591827393,
-              "rmse": 1.3921377628357026,
+              "kl_reference_candidate_nats": 0.0005859368120561569,
+              "max_abs_error": 7.700263500213623,
+              "rmse": 1.3860224425487393,
               "allclose": false
             },
             {
@@ -5449,9 +5449,9 @@
               "reference_top1": 872,
               "candidate_top1": 872,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.01024122534729745,
-              "max_abs_error": 9.01842212677002,
-              "rmse": 1.870150731055245,
+              "kl_reference_candidate_nats": 0.007098299325852385,
+              "max_abs_error": 8.702850341796875,
+              "rmse": 1.8373567501550645,
               "allclose": false
             },
             {
@@ -5459,9 +5459,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.013513344454133462,
-              "max_abs_error": 5.6541526317596436,
-              "rmse": 1.2933289976465858,
+              "kl_reference_candidate_nats": 0.01351098927937098,
+              "max_abs_error": 5.693838834762573,
+              "rmse": 1.2891808352288943,
               "allclose": false
             },
             {
@@ -5469,9 +5469,9 @@
               "reference_top1": 785,
               "candidate_top1": 785,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.008532326079294128,
-              "max_abs_error": 4.923321723937988,
-              "rmse": 0.8827408691774643,
+              "kl_reference_candidate_nats": 0.007407673458558821,
+              "max_abs_error": 4.781288146972656,
+              "rmse": 0.8693823559347778,
               "allclose": false
             },
             {
@@ -5479,9 +5479,9 @@
               "reference_top1": 12884,
               "candidate_top1": 12884,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0023146020143231627,
-              "max_abs_error": 4.035907506942749,
-              "rmse": 0.8005615976881433,
+              "kl_reference_candidate_nats": 0.0018639073735048843,
+              "max_abs_error": 3.8660497665405273,
+              "rmse": 0.7926219166643435,
               "allclose": false
             },
             {
@@ -5489,9 +5489,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.07960638073436777,
-              "max_abs_error": 5.621433258056641,
-              "rmse": 0.9844436947162614,
+              "kl_reference_candidate_nats": 0.07582272353939844,
+              "max_abs_error": 5.623569488525391,
+              "rmse": 0.9717335622329294,
               "allclose": false
             },
             {
@@ -5499,9 +5499,9 @@
               "reference_top1": 6303,
               "candidate_top1": 5990,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.5159435210960482,
-              "max_abs_error": 5.442317485809326,
-              "rmse": 1.1148017399769292,
+              "kl_reference_candidate_nats": 0.557680839427088,
+              "max_abs_error": 5.168858528137207,
+              "rmse": 1.096729490346529,
               "allclose": false
             },
             {
@@ -5509,9 +5509,9 @@
               "reference_top1": 1576,
               "candidate_top1": 1576,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.011599260598479239,
-              "max_abs_error": 4.776169776916504,
-              "rmse": 1.015442337764943,
+              "kl_reference_candidate_nats": 0.0127357355370576,
+              "max_abs_error": 4.577427864074707,
+              "rmse": 1.0052436209909756,
               "allclose": false
             },
             {
@@ -5519,9 +5519,9 @@
               "reference_top1": 432,
               "candidate_top1": 432,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.1586238301148813,
-              "max_abs_error": 4.6347246170043945,
-              "rmse": 0.9332079573161915,
+              "kl_reference_candidate_nats": 0.14391969776496097,
+              "max_abs_error": 4.647909879684448,
+              "rmse": 0.9327827984972382,
               "allclose": false
             },
             {
@@ -5529,9 +5529,9 @@
               "reference_top1": 25963,
               "candidate_top1": 25963,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.17078680712516447,
-              "max_abs_error": 4.682370662689209,
-              "rmse": 0.9988661489632009,
+              "kl_reference_candidate_nats": 0.16072628954298393,
+              "max_abs_error": 4.570115089416504,
+              "rmse": 0.9988184563995678,
               "allclose": false
             },
             {
@@ -5539,9 +5539,9 @@
               "reference_top1": 39020,
               "candidate_top1": 39020,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.12239984891564451,
-              "max_abs_error": 5.257254123687744,
-              "rmse": 1.1397141905336552,
+              "kl_reference_candidate_nats": 0.12459501904560005,
+              "max_abs_error": 5.12846565246582,
+              "rmse": 1.140421426943469,
               "allclose": false
             }
           ],
@@ -5557,7 +5557,7 @@
               304,
               358,
               279,
-              624,
+              304,
               4710,
               15936,
               95456,
@@ -5811,8 +5811,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 0.9166666666666666,
-          "max_kl_reference_candidate_nats": 6.959074686368147,
-          "mean_kl_reference_candidate_nats": 0.7873118658184537,
+          "max_kl_reference_candidate_nats": 6.968484573093763,
+          "mean_kl_reference_candidate_nats": 0.7957561419353544,
           "passed": true,
           "positions": [
             {
@@ -5820,9 +5820,9 @@
               "reference_top1": 2701,
               "candidate_top1": 253,
               "top1_match": false,
-              "kl_reference_candidate_nats": 6.959074686368147,
-              "max_abs_error": 14.279605388641357,
-              "rmse": 3.137180452412668,
+              "kl_reference_candidate_nats": 6.968484573093763,
+              "max_abs_error": 14.285264015197754,
+              "rmse": 3.1337811168366323,
               "allclose": false
             },
             {
@@ -5830,9 +5830,9 @@
               "reference_top1": 315,
               "candidate_top1": 315,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.20886899483619056,
-              "max_abs_error": 7.800229072570801,
-              "rmse": 1.3827630449460626,
+              "kl_reference_candidate_nats": 0.19276792530555734,
+              "max_abs_error": 7.671804428100586,
+              "rmse": 1.3847663668066432,
               "allclose": false
             },
             {
@@ -5840,9 +5840,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.5235696217162084,
-              "max_abs_error": 7.21626353263855,
-              "rmse": 1.4906846975697838,
+              "kl_reference_candidate_nats": 0.5092476738153533,
+              "max_abs_error": 7.251595973968506,
+              "rmse": 1.4818088287997704,
               "allclose": false
             },
             {
@@ -5850,9 +5850,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.1090705084575646,
-              "max_abs_error": 5.623598098754883,
-              "rmse": 1.319302816167437,
+              "kl_reference_candidate_nats": 0.1086609379905754,
+              "max_abs_error": 5.539204835891724,
+              "rmse": 1.355447521990941,
               "allclose": false
             },
             {
@@ -5860,9 +5860,9 @@
               "reference_top1": 12095,
               "candidate_top1": 12095,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.888578272207946,
-              "max_abs_error": 5.344738245010376,
-              "rmse": 0.9878846941673458,
+              "kl_reference_candidate_nats": 1.0220563723473732,
+              "max_abs_error": 5.73659348487854,
+              "rmse": 1.038188004450494,
               "allclose": false
             },
             {
@@ -5870,9 +5870,9 @@
               "reference_top1": 13,
               "candidate_top1": 13,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.12445279944847369,
-              "max_abs_error": 4.545578360557556,
-              "rmse": 0.9916373638722643,
+              "kl_reference_candidate_nats": 0.11862704665598442,
+              "max_abs_error": 4.6652727127075195,
+              "rmse": 0.9884902103221124,
               "allclose": false
             },
             {
@@ -5880,9 +5880,9 @@
               "reference_top1": 1084,
               "candidate_top1": 1084,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.15535481517770292,
-              "max_abs_error": 4.025774002075195,
-              "rmse": 0.8772198867790423,
+              "kl_reference_candidate_nats": 0.15592584930378306,
+              "max_abs_error": 4.178554058074951,
+              "rmse": 0.8728544710908,
               "allclose": false
             },
             {
@@ -5890,9 +5890,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.09411267807743301,
-              "max_abs_error": 3.662274956703186,
-              "rmse": 0.9401555633917551,
+              "kl_reference_candidate_nats": 0.09033780371715251,
+              "max_abs_error": 3.7307796478271484,
+              "rmse": 0.9295929183344885,
               "allclose": false
             },
             {
@@ -5900,9 +5900,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.12748417937102877,
-              "max_abs_error": 3.4132633209228516,
-              "rmse": 0.7933665002460847,
+              "kl_reference_candidate_nats": 0.11908240586943514,
+              "max_abs_error": 3.32059907913208,
+              "rmse": 0.7711927226735308,
               "allclose": false
             },
             {
@@ -5910,9 +5910,9 @@
               "reference_top1": 7772,
               "candidate_top1": 7772,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.20140919930562076,
-              "max_abs_error": 3.9514944553375244,
-              "rmse": 0.7914131179218145,
+              "kl_reference_candidate_nats": 0.2067557812233417,
+              "max_abs_error": 3.9671266078948975,
+              "rmse": 0.7842608413597214,
               "allclose": false
             },
             {
@@ -5920,9 +5920,9 @@
               "reference_top1": 3283,
               "candidate_top1": 3283,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.01723117576081842,
-              "max_abs_error": 4.448152780532837,
-              "rmse": 0.8173163012569917,
+              "kl_reference_candidate_nats": 0.013293514391415882,
+              "max_abs_error": 4.51889181137085,
+              "rmse": 0.8138589739596768,
               "allclose": false
             },
             {
@@ -5930,9 +5930,9 @@
               "reference_top1": 304,
               "candidate_top1": 304,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.038535459094309346,
-              "max_abs_error": 4.163829684257507,
-              "rmse": 0.9302043685636023,
+              "kl_reference_candidate_nats": 0.04383381951051733,
+              "max_abs_error": 4.179632544517517,
+              "rmse": 0.9583400549656432,
               "allclose": false
             }
           ],
@@ -6125,8 +6125,8 @@
           ],
           "exact_greedy_match": true,
           "top1_agreement": 0.8333333333333334,
-          "max_kl_reference_candidate_nats": 4.9291111371759095,
-          "mean_kl_reference_candidate_nats": 0.2776269788951679,
+          "max_kl_reference_candidate_nats": 4.928419280093743,
+          "mean_kl_reference_candidate_nats": 0.28113743481401243,
           "passed": true,
           "positions": [
             {
@@ -6134,9 +6134,9 @@
               "reference_top1": 1887,
               "candidate_top1": 253,
               "top1_match": false,
-              "kl_reference_candidate_nats": 4.9291111371759095,
-              "max_abs_error": 16.413629055023193,
-              "rmse": 2.9578196665555083,
+              "kl_reference_candidate_nats": 4.928419280093743,
+              "max_abs_error": 16.405137538909912,
+              "rmse": 2.9563515054332155,
               "allclose": false
             },
             {
@@ -6144,9 +6144,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.3097953028697874,
-              "max_abs_error": 6.492706537246704,
-              "rmse": 1.2053902621565298,
+              "kl_reference_candidate_nats": 0.29130663762199377,
+              "max_abs_error": 6.428920149803162,
+              "rmse": 1.1907830160764146,
               "allclose": false
             },
             {
@@ -6154,9 +6154,9 @@
               "reference_top1": 982,
               "candidate_top1": 982,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.09693882328109352,
-              "max_abs_error": 6.701438307762146,
-              "rmse": 1.2795080332762572,
+              "kl_reference_candidate_nats": 0.0905937877720216,
+              "max_abs_error": 6.618322372436523,
+              "rmse": 1.2757501398432478,
               "allclose": false
             },
             {
@@ -6164,9 +6164,9 @@
               "reference_top1": 262,
               "candidate_top1": 262,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.005576433831151157,
-              "max_abs_error": 3.4860119819641113,
-              "rmse": 0.764139534914619,
+              "kl_reference_candidate_nats": 0.005722086786168976,
+              "max_abs_error": 3.600151538848877,
+              "rmse": 0.7635420421641644,
               "allclose": false
             },
             {
@@ -6174,9 +6174,9 @@
               "reference_top1": 421,
               "candidate_top1": 421,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.1343968343798719,
-              "max_abs_error": 3.986332654953003,
-              "rmse": 0.7832697765636488,
+              "kl_reference_candidate_nats": 0.11847065540282559,
+              "max_abs_error": 4.023723602294922,
+              "rmse": 0.7717027790690256,
               "allclose": false
             },
             {
@@ -6184,9 +6184,9 @@
               "reference_top1": 308,
               "candidate_top1": 308,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.022389445196405303,
-              "max_abs_error": 3.6473984718322754,
-              "rmse": 0.9816014157280657,
+              "kl_reference_candidate_nats": 0.027457862327984597,
+              "max_abs_error": 3.543182373046875,
+              "rmse": 0.9470463492194378,
               "allclose": false
             },
             {
@@ -6194,9 +6194,9 @@
               "reference_top1": 2651,
               "candidate_top1": 621,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.08086159456312104,
-              "max_abs_error": 3.892225742340088,
-              "rmse": 0.8298400688208359,
+              "kl_reference_candidate_nats": 0.07644441881088443,
+              "max_abs_error": 3.8462166786193848,
+              "rmse": 0.8224393511021181,
               "allclose": false
             },
             {
@@ -6204,9 +6204,9 @@
               "reference_top1": 220,
               "candidate_top1": 220,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.020977281446988374,
-              "max_abs_error": 3.9547882080078125,
-              "rmse": 0.8727165452952551,
+              "kl_reference_candidate_nats": 0.01852277491722692,
+              "max_abs_error": 3.9950971007347107,
+              "rmse": 0.8774771316660541,
               "allclose": false
             },
             {
@@ -6214,9 +6214,9 @@
               "reference_top1": 15,
               "candidate_top1": 17,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.4234255066601863,
-              "max_abs_error": 5.842973709106445,
-              "rmse": 1.2477839423545756,
+              "kl_reference_candidate_nats": 0.39433812043712274,
+              "max_abs_error": 5.875766277313232,
+              "rmse": 1.2621876741538764,
               "allclose": false
             },
             {
@@ -6224,9 +6224,9 @@
               "reference_top1": 510,
               "candidate_top1": 510,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.01097987415021326,
-              "max_abs_error": 3.550931692123413,
-              "rmse": 0.7232741339659738,
+              "kl_reference_candidate_nats": 0.011702792722984481,
+              "max_abs_error": 3.3458127975463867,
+              "rmse": 0.7245817438582132,
               "allclose": false
             },
             {
@@ -6234,9 +6234,9 @@
               "reference_top1": 286,
               "candidate_top1": 286,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.002488377073497783,
-              "max_abs_error": 3.4874167442321777,
-              "rmse": 0.7967515229195811,
+              "kl_reference_candidate_nats": 0.002620885999560655,
+              "max_abs_error": 3.4977688789367676,
+              "rmse": 0.8107021852324877,
               "allclose": false
             },
             {
@@ -6244,9 +6244,9 @@
               "reference_top1": 470,
               "candidate_top1": 470,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.006509803284753258,
-              "max_abs_error": 4.1871018409729,
-              "rmse": 0.8259876850052663,
+              "kl_reference_candidate_nats": 0.0069872118289733475,
+              "max_abs_error": 4.112046718597412,
+              "rmse": 0.7954644469218282,
               "allclose": false
             },
             {
@@ -6254,9 +6254,9 @@
               "reference_top1": 308,
               "candidate_top1": 220,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.509321877055051,
-              "max_abs_error": 5.171882688999176,
-              "rmse": 1.1887970445105263,
+              "kl_reference_candidate_nats": 0.6656665163937269,
+              "max_abs_error": 5.054339647293091,
+              "rmse": 1.2018484583863267,
               "allclose": false
             },
             {
@@ -6264,9 +6264,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.02612446123499132,
-              "max_abs_error": 4.7494964599609375,
-              "rmse": 0.9585556492489994,
+              "kl_reference_candidate_nats": 0.03183789678680916,
+              "max_abs_error": 4.883136749267578,
+              "rmse": 0.9645818807719733,
               "allclose": false
             },
             {
@@ -6274,9 +6274,9 @@
               "reference_top1": 262,
               "candidate_top1": 262,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00011273156512664176,
-              "max_abs_error": 4.542653918266296,
-              "rmse": 0.8520588816567195,
+              "kl_reference_candidate_nats": 0.00012277027768747473,
+              "max_abs_error": 4.5014567375183105,
+              "rmse": 0.8583357550770774,
               "allclose": false
             },
             {
@@ -6284,9 +6284,9 @@
               "reference_top1": 770,
               "candidate_top1": 770,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.07298192775593565,
-              "max_abs_error": 4.8616626262664795,
-              "rmse": 1.0421650998256182,
+              "kl_reference_candidate_nats": 0.06338307253090487,
+              "max_abs_error": 4.873573303222656,
+              "rmse": 1.0091112737279384,
               "allclose": false
             },
             {
@@ -6294,9 +6294,9 @@
               "reference_top1": 75698,
               "candidate_top1": 75698,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.004440209948974382,
-              "max_abs_error": 5.365774869918823,
-              "rmse": 1.1408413858813988,
+              "kl_reference_candidate_nats": 0.0044053597450507435,
+              "max_abs_error": 5.2308666706085205,
+              "rmse": 1.101923338525285,
               "allclose": false
             },
             {
@@ -6304,9 +6304,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0007726885977386253,
-              "max_abs_error": 5.250253677368164,
-              "rmse": 1.4624492937818585,
+              "kl_reference_candidate_nats": 0.0007707778056858065,
+              "max_abs_error": 5.268120765686035,
+              "rmse": 1.4643652675466345,
               "allclose": false
             },
             {
@@ -6314,9 +6314,9 @@
               "reference_top1": 12,
               "candidate_top1": 12,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0010135998883762606,
-              "max_abs_error": 4.5643229484558105,
-              "rmse": 0.8716120060250355,
+              "kl_reference_candidate_nats": 0.003555390725144681,
+              "max_abs_error": 4.715677738189697,
+              "rmse": 0.8907741096438531,
               "allclose": false
             },
             {
@@ -6324,9 +6324,9 @@
               "reference_top1": 16,
               "candidate_top1": 16,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.00021942014890831188,
-              "max_abs_error": 4.473572492599487,
-              "rmse": 0.9805277385266797,
+              "kl_reference_candidate_nats": 0.000319423540501,
+              "max_abs_error": 4.578752279281616,
+              "rmse": 0.9828135589310979,
               "allclose": false
             },
             {
@@ -6334,9 +6334,9 @@
               "reference_top1": 8,
               "candidate_top1": 8,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0005662032458193941,
-              "max_abs_error": 6.077060580253601,
-              "rmse": 1.0409858615819496,
+              "kl_reference_candidate_nats": 0.0009726525602413859,
+              "max_abs_error": 6.11479926109314,
+              "rmse": 1.0462715507268476,
               "allclose": false
             },
             {
@@ -6344,9 +6344,9 @@
               "reference_top1": 488,
               "candidate_top1": 488,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.000724973120056834,
-              "max_abs_error": 5.105240821838379,
-              "rmse": 0.976217821295218,
+              "kl_reference_candidate_nats": 0.0007423014110266838,
+              "max_abs_error": 5.096184730529785,
+              "rmse": 0.9548487269112012,
               "allclose": false
             },
             {
@@ -6354,9 +6354,9 @@
               "reference_top1": 75698,
               "candidate_top1": 75698,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0019499016495744999,
-              "max_abs_error": 4.979013919830322,
-              "rmse": 1.1436987817878848,
+              "kl_reference_candidate_nats": 0.001883511846981116,
+              "max_abs_error": 4.766363859176636,
+              "rmse": 1.121434227070484,
               "allclose": false
             },
             {
@@ -6364,9 +6364,9 @@
               "reference_top1": 1445,
               "candidate_top1": 1445,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0013690853604971481,
-              "max_abs_error": 4.823396801948547,
-              "rmse": 1.160081201637332,
+              "kl_reference_candidate_nats": 0.001052247191048564,
+              "max_abs_error": 4.7680535316467285,
+              "rmse": 1.1887810942840344,
               "allclose": false
             }
           ],
@@ -6593,8 +6593,8 @@
           ],
           "exact_greedy_match": false,
           "top1_agreement": 0.8235294117647058,
-          "max_kl_reference_candidate_nats": 5.735202567988653,
-          "mean_kl_reference_candidate_nats": 0.5162101362275829,
+          "max_kl_reference_candidate_nats": 5.738793531000703,
+          "mean_kl_reference_candidate_nats": 0.5206419507962842,
           "passed": true,
           "positions": [
             {
@@ -6602,9 +6602,9 @@
               "reference_top1": 220,
               "candidate_top1": 253,
               "top1_match": false,
-              "kl_reference_candidate_nats": 5.735202567988653,
-              "max_abs_error": 16.994897842407227,
-              "rmse": 3.363286972807763,
+              "kl_reference_candidate_nats": 5.738793531000703,
+              "max_abs_error": 17.03392219543457,
+              "rmse": 3.3636015311860077,
               "allclose": false
             },
             {
@@ -6612,9 +6612,9 @@
               "reference_top1": 6290,
               "candidate_top1": 65144,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.520979878831796,
-              "max_abs_error": 4.8454999923706055,
-              "rmse": 0.9804244454241273,
+              "kl_reference_candidate_nats": 0.5107627046855059,
+              "max_abs_error": 4.9835731983184814,
+              "rmse": 0.9754940669890834,
               "allclose": false
             },
             {
@@ -6622,9 +6622,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.28831131985321257,
-              "max_abs_error": 5.726185917854309,
-              "rmse": 1.1557239008479052,
+              "kl_reference_candidate_nats": 0.27903600376588994,
+              "max_abs_error": 5.722030401229858,
+              "rmse": 1.130580496923464,
               "allclose": false
             },
             {
@@ -6632,9 +6632,9 @@
               "reference_top1": 264,
               "candidate_top1": 264,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.09869966534493413,
-              "max_abs_error": 4.9410600662231445,
-              "rmse": 0.9236351635994063,
+              "kl_reference_candidate_nats": 0.09775479683961208,
+              "max_abs_error": 5.091413497924805,
+              "rmse": 0.9193019235383442,
               "allclose": false
             },
             {
@@ -6642,9 +6642,9 @@
               "reference_top1": 821,
               "candidate_top1": 821,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.9556080616398411,
-              "max_abs_error": 5.554444313049316,
-              "rmse": 1.1332872447795477,
+              "kl_reference_candidate_nats": 0.9958955312358648,
+              "max_abs_error": 5.34400749206543,
+              "rmse": 1.1276432265249838,
               "allclose": false
             },
             {
@@ -6652,9 +6652,9 @@
               "reference_top1": 504,
               "candidate_top1": 504,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.11206525120196584,
-              "max_abs_error": 4.9637839794158936,
-              "rmse": 0.9480843754051893,
+              "kl_reference_candidate_nats": 0.11791701749138006,
+              "max_abs_error": 5.05645489692688,
+              "rmse": 0.9505290017347205,
               "allclose": false
             },
             {
@@ -6662,9 +6662,9 @@
               "reference_top1": 264,
               "candidate_top1": 264,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.07447448777227707,
-              "max_abs_error": 3.3686996698379517,
-              "rmse": 0.7617158630241203,
+              "kl_reference_candidate_nats": 0.06767095715060442,
+              "max_abs_error": 3.380697250366211,
+              "rmse": 0.7555482916112712,
               "allclose": false
             },
             {
@@ -6672,9 +6672,9 @@
               "reference_top1": 323,
               "candidate_top1": 323,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.12033294284016417,
-              "max_abs_error": 4.623050928115845,
-              "rmse": 0.8592298452543801,
+              "kl_reference_candidate_nats": 0.11893551320616753,
+              "max_abs_error": 4.6431052684783936,
+              "rmse": 0.856367784257023,
               "allclose": false
             },
             {
@@ -6682,9 +6682,9 @@
               "reference_top1": 576,
               "candidate_top1": 576,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.107511534095212,
-              "max_abs_error": 2.942333698272705,
-              "rmse": 0.6267310825717174,
+              "kl_reference_candidate_nats": 0.10894137905630488,
+              "max_abs_error": 2.894080638885498,
+              "rmse": 0.6268104064676557,
               "allclose": false
             },
             {
@@ -6692,9 +6692,9 @@
               "reference_top1": 11,
               "candidate_top1": 11,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0022692580298806176,
-              "max_abs_error": 2.8777910470962524,
-              "rmse": 0.5511548904433204,
+              "kl_reference_candidate_nats": 0.002850997602718563,
+              "max_abs_error": 2.8455439805984497,
+              "rmse": 0.5400540189423019,
               "allclose": false
             },
             {
@@ -6702,9 +6702,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.056515275958346524,
-              "max_abs_error": 2.4312851428985596,
-              "rmse": 0.5128411984735436,
+              "kl_reference_candidate_nats": 0.06031724634063701,
+              "max_abs_error": 2.416145443916321,
+              "rmse": 0.5133339411907879,
               "allclose": false
             },
             {
@@ -6712,9 +6712,9 @@
               "reference_top1": 13940,
               "candidate_top1": 13940,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.12186213212480299,
-              "max_abs_error": 2.7795815467834473,
-              "rmse": 0.530367812473067,
+              "kl_reference_candidate_nats": 0.1354139184049717,
+              "max_abs_error": 2.7652010917663574,
+              "rmse": 0.5301452846030132,
               "allclose": false
             },
             {
@@ -6722,9 +6722,9 @@
               "reference_top1": 646,
               "candidate_top1": 646,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.09251624722983037,
-              "max_abs_error": 2.969082236289978,
-              "rmse": 0.6253558509584926,
+              "kl_reference_candidate_nats": 0.09133679401223878,
+              "max_abs_error": 3.0280107259750366,
+              "rmse": 0.6227588625878736,
               "allclose": false
             },
             {
@@ -6732,9 +6732,9 @@
               "reference_top1": 1172,
               "candidate_top1": 387,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.15689547217075195,
-              "max_abs_error": 2.7358169555664062,
-              "rmse": 0.5927813039292227,
+              "kl_reference_candidate_nats": 0.15392228379218673,
+              "max_abs_error": 2.940676212310791,
+              "rmse": 0.6022249359788339,
               "allclose": false
             },
             {
@@ -6742,9 +6742,9 @@
               "reference_top1": 1349,
               "candidate_top1": 1349,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.09028033525213283,
-              "max_abs_error": 2.8290326595306396,
-              "rmse": 0.5917367386360632,
+              "kl_reference_candidate_nats": 0.08843712172562253,
+              "max_abs_error": 2.8780406713485718,
+              "rmse": 0.593460670825571,
               "allclose": false
             },
             {
@@ -6752,9 +6752,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.07025053109766469,
-              "max_abs_error": 2.898893117904663,
-              "rmse": 0.6172444893884876,
+              "kl_reference_candidate_nats": 0.06849725686640454,
+              "max_abs_error": 2.8865301609039307,
+              "rmse": 0.6189420524294459,
               "allclose": false
             },
             {
@@ -6762,9 +6762,9 @@
               "reference_top1": 14324,
               "candidate_top1": 14324,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.17179735443744382,
-              "max_abs_error": 3.100513279438019,
-              "rmse": 0.6753122077018714,
+              "kl_reference_candidate_nats": 0.21443011036001747,
+              "max_abs_error": 3.2079193592071533,
+              "rmse": 0.6632956193367028,
               "allclose": false
             }
           ],
@@ -6998,9 +6998,9 @@
             25963
           ],
           "exact_greedy_match": false,
-          "top1_agreement": 0.6285714285714286,
-          "max_kl_reference_candidate_nats": 5.903466733186244,
-          "mean_kl_reference_candidate_nats": 0.5772795890351357,
+          "top1_agreement": 0.6857142857142857,
+          "max_kl_reference_candidate_nats": 5.909105709207799,
+          "mean_kl_reference_candidate_nats": 0.5589067476276685,
           "passed": true,
           "positions": [
             {
@@ -7008,19 +7008,19 @@
               "reference_top1": 72030,
               "candidate_top1": 253,
               "top1_match": false,
-              "kl_reference_candidate_nats": 5.903466733186244,
-              "max_abs_error": 16.904705047607422,
-              "rmse": 3.1067221119475827,
+              "kl_reference_candidate_nats": 5.909105709207799,
+              "max_abs_error": 16.908926010131836,
+              "rmse": 3.1105750550212745,
               "allclose": false
             },
             {
               "position": 1,
               "reference_top1": 198,
-              "candidate_top1": 69425,
-              "top1_match": false,
-              "kl_reference_candidate_nats": 0.795643749903307,
-              "max_abs_error": 7.760782718658447,
-              "rmse": 1.4058506346273993,
+              "candidate_top1": 198,
+              "top1_match": true,
+              "kl_reference_candidate_nats": 0.7898168638064124,
+              "max_abs_error": 8.004279136657715,
+              "rmse": 1.4132115062465143,
               "allclose": false
             },
             {
@@ -7028,9 +7028,9 @@
               "reference_top1": 2,
               "candidate_top1": 474,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.6783650771771069,
-              "max_abs_error": 4.825459957122803,
-              "rmse": 1.0630187824617086,
+              "kl_reference_candidate_nats": 0.6860976814768083,
+              "max_abs_error": 4.832638740539551,
+              "rmse": 1.0623679747406105,
               "allclose": false
             },
             {
@@ -7038,9 +7038,9 @@
               "reference_top1": 525,
               "candidate_top1": 525,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.12900906802118428,
-              "max_abs_error": 5.945571422576904,
-              "rmse": 1.2155015674156509,
+              "kl_reference_candidate_nats": 0.12620591558831343,
+              "max_abs_error": 6.029858469963074,
+              "rmse": 1.236286160462541,
               "allclose": false
             },
             {
@@ -7048,9 +7048,9 @@
               "reference_top1": 2661,
               "candidate_top1": 2661,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.12257984588786129,
-              "max_abs_error": 4.374343156814575,
-              "rmse": 0.8883501361977625,
+              "kl_reference_candidate_nats": 0.11889704205055986,
+              "max_abs_error": 4.0917017459869385,
+              "rmse": 0.8760790897892788,
               "allclose": false
             },
             {
@@ -7058,9 +7058,9 @@
               "reference_top1": 10950,
               "candidate_top1": 10950,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.8113627989399146,
-              "max_abs_error": 6.464776158332825,
-              "rmse": 1.437957351780636,
+              "kl_reference_candidate_nats": 0.8623874764764982,
+              "max_abs_error": 6.413131594657898,
+              "rmse": 1.4351981775808516,
               "allclose": false
             },
             {
@@ -7068,9 +7068,9 @@
               "reference_top1": 17847,
               "candidate_top1": 17847,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.3493752353032834,
-              "max_abs_error": 11.696664333343506,
-              "rmse": 2.1377837654560587,
+              "kl_reference_candidate_nats": 0.3429238118441209,
+              "max_abs_error": 11.697961807250977,
+              "rmse": 2.1362729683676065,
               "allclose": false
             },
             {
@@ -7078,9 +7078,9 @@
               "reference_top1": 382,
               "candidate_top1": 304,
               "top1_match": false,
-              "kl_reference_candidate_nats": 1.928525437942316,
-              "max_abs_error": 10.569297313690186,
-              "rmse": 1.9974504512770472,
+              "kl_reference_candidate_nats": 1.6708619206774007,
+              "max_abs_error": 9.917309284210205,
+              "rmse": 2.0023843830639105,
               "allclose": false
             },
             {
@@ -7088,9 +7088,9 @@
               "reference_top1": 5209,
               "candidate_top1": 358,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.29503765185394853,
-              "max_abs_error": 5.344045639038086,
-              "rmse": 1.1675125057631826,
+              "kl_reference_candidate_nats": 0.2840339375201611,
+              "max_abs_error": 5.419853210449219,
+              "rmse": 1.1689875521034179,
               "allclose": false
             },
             {
@@ -7098,9 +7098,9 @@
               "reference_top1": 279,
               "candidate_top1": 279,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.3694283094325435,
-              "max_abs_error": 10.11366891860962,
-              "rmse": 1.8882334511837517,
+              "kl_reference_candidate_nats": 0.3051830054814588,
+              "max_abs_error": 9.949656009674072,
+              "rmse": 1.9018532219849458,
               "allclose": false
             },
             {
@@ -7108,9 +7108,9 @@
               "reference_top1": 304,
               "candidate_top1": 624,
               "top1_match": false,
-              "kl_reference_candidate_nats": 1.1992058370003424,
-              "max_abs_error": 11.134822249412537,
-              "rmse": 2.160810681147669,
+              "kl_reference_candidate_nats": 1.054785014543828,
+              "max_abs_error": 11.172726035118103,
+              "rmse": 2.1639408334406385,
               "allclose": false
             },
             {
@@ -7118,9 +7118,9 @@
               "reference_top1": 7414,
               "candidate_top1": 4710,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.8687863869881258,
-              "max_abs_error": 6.046705007553101,
-              "rmse": 1.3407619037435312,
+              "kl_reference_candidate_nats": 0.8984294029621634,
+              "max_abs_error": 6.21179461479187,
+              "rmse": 1.353565880131871,
               "allclose": false
             },
             {
@@ -7128,9 +7128,9 @@
               "reference_top1": 46487,
               "candidate_top1": 15936,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.6588670922269741,
-              "max_abs_error": 8.731053829193115,
-              "rmse": 1.8761383610697238,
+              "kl_reference_candidate_nats": 0.6009947240625325,
+              "max_abs_error": 8.891658067703247,
+              "rmse": 1.9026079711495558,
               "allclose": false
             },
             {
@@ -7138,9 +7138,9 @@
               "reference_top1": 785,
               "candidate_top1": 95456,
               "top1_match": false,
-              "kl_reference_candidate_nats": 1.767363505288768,
-              "max_abs_error": 9.496511459350586,
-              "rmse": 1.8540340563338185,
+              "kl_reference_candidate_nats": 1.791240133108406,
+              "max_abs_error": 9.565608501434326,
+              "rmse": 1.8783327004701051,
               "allclose": false
             },
             {
@@ -7148,19 +7148,19 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.09933243086524916,
-              "max_abs_error": 10.41231894493103,
-              "rmse": 2.2068900683491535,
+              "kl_reference_candidate_nats": 0.11118499499420335,
+              "max_abs_error": 10.511513948440552,
+              "rmse": 2.253824913804137,
               "allclose": false
             },
             {
               "position": 15,
               "reference_top1": 25,
-              "candidate_top1": 7414,
-              "top1_match": false,
-              "kl_reference_candidate_nats": 1.1365367839385612,
-              "max_abs_error": 17.299630641937256,
-              "rmse": 2.5335287917165754,
+              "candidate_top1": 25,
+              "top1_match": true,
+              "kl_reference_candidate_nats": 0.8947030182477046,
+              "max_abs_error": 17.645262718200684,
+              "rmse": 2.5878619655410366,
               "allclose": false
             },
             {
@@ -7168,9 +7168,9 @@
               "reference_top1": 40,
               "candidate_top1": 40,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.9393406403433576,
-              "max_abs_error": 7.08671760559082,
-              "rmse": 1.507470253984473,
+              "kl_reference_candidate_nats": 1.0898170339344533,
+              "max_abs_error": 7.01894211769104,
+              "rmse": 1.4451944512440928,
               "allclose": false
             },
             {
@@ -7178,9 +7178,9 @@
               "reference_top1": 653,
               "candidate_top1": 374,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.2320698213900959,
-              "max_abs_error": 4.082505941390991,
-              "rmse": 0.900324022218904,
+              "kl_reference_candidate_nats": 0.21834506595983308,
+              "max_abs_error": 3.8022804260253906,
+              "rmse": 0.8689951875796402,
               "allclose": false
             },
             {
@@ -7188,9 +7188,9 @@
               "reference_top1": 432,
               "candidate_top1": 432,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.4137059755270054,
-              "max_abs_error": 4.131464958190918,
-              "rmse": 0.7121340182490692,
+              "kl_reference_candidate_nats": 0.3675750613069812,
+              "max_abs_error": 4.02602481842041,
+              "rmse": 0.6932334706015042,
               "allclose": false
             },
             {
@@ -7198,9 +7198,9 @@
               "reference_top1": 17788,
               "candidate_top1": 7286,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.21007263154255848,
-              "max_abs_error": 3.4910383224487305,
-              "rmse": 0.6882731359705575,
+              "kl_reference_candidate_nats": 0.20891056131397462,
+              "max_abs_error": 3.3253653049468994,
+              "rmse": 0.6759593197168062,
               "allclose": false
             },
             {
@@ -7208,9 +7208,9 @@
               "reference_top1": 6303,
               "candidate_top1": 6303,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.058843152915496695,
-              "max_abs_error": 3.96223783493042,
-              "rmse": 0.7941375338808462,
+              "kl_reference_candidate_nats": 0.06310737955940818,
+              "max_abs_error": 3.7814602851867676,
+              "rmse": 0.7818459787544102,
               "allclose": false
             },
             {
@@ -7218,9 +7218,9 @@
               "reference_top1": 30,
               "candidate_top1": 30,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.1953714633733339,
-              "max_abs_error": 4.113308310508728,
-              "rmse": 0.8493322369922859,
+              "kl_reference_candidate_nats": 0.19628450991714586,
+              "max_abs_error": 3.907550573348999,
+              "rmse": 0.855660448017203,
               "allclose": false
             },
             {
@@ -7228,9 +7228,9 @@
               "reference_top1": 151645,
               "candidate_top1": 151645,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.09426540375930421,
-              "max_abs_error": 4.872936010360718,
-              "rmse": 1.0255083318527858,
+              "kl_reference_candidate_nats": 0.08757755172710198,
+              "max_abs_error": 4.897127866744995,
+              "rmse": 1.0438601881229876,
               "allclose": false
             },
             {
@@ -7238,9 +7238,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 1.3073432288177156e-05,
-              "max_abs_error": 6.658726215362549,
-              "rmse": 1.395537761474959,
+              "kl_reference_candidate_nats": 1.7304840321010827e-05,
+              "max_abs_error": 6.731003284454346,
+              "rmse": 1.426189221513052,
               "allclose": false
             },
             {
@@ -7248,9 +7248,9 @@
               "reference_top1": 151644,
               "candidate_top1": 151644,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0008621025822089517,
-              "max_abs_error": 7.273152828216553,
-              "rmse": 1.2974016274837326,
+              "kl_reference_candidate_nats": 0.0008653895454454153,
+              "max_abs_error": 6.852168560028076,
+              "rmse": 1.286561214863347,
               "allclose": false
             },
             {
@@ -7258,9 +7258,9 @@
               "reference_top1": 872,
               "candidate_top1": 872,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.003981183073385125,
-              "max_abs_error": 8.819080352783203,
-              "rmse": 1.8590810589356535,
+              "kl_reference_candidate_nats": 0.0040296401284160704,
+              "max_abs_error": 8.91667652130127,
+              "rmse": 1.8618069924090515,
               "allclose": false
             },
             {
@@ -7268,9 +7268,9 @@
               "reference_top1": 198,
               "candidate_top1": 198,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.015001267301684846,
-              "max_abs_error": 6.217371940612793,
-              "rmse": 1.2421066809165189,
+              "kl_reference_candidate_nats": 0.013696071312106716,
+              "max_abs_error": 5.645059585571289,
+              "rmse": 1.2327173773810747,
               "allclose": false
             },
             {
@@ -7278,9 +7278,9 @@
               "reference_top1": 785,
               "candidate_top1": 785,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.005512564173317655,
-              "max_abs_error": 4.058737754821777,
-              "rmse": 0.7477403571072364,
+              "kl_reference_candidate_nats": 0.00561827609494816,
+              "max_abs_error": 4.118943214416504,
+              "rmse": 0.7584066026864359,
               "allclose": false
             },
             {
@@ -7288,9 +7288,9 @@
               "reference_top1": 12884,
               "candidate_top1": 12884,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.002297986294585578,
-              "max_abs_error": 3.5416975021362305,
-              "rmse": 0.7273133029847514,
+              "kl_reference_candidate_nats": 0.003323470720869557,
+              "max_abs_error": 3.632661819458008,
+              "rmse": 0.7366125555634349,
               "allclose": false
             },
             {
@@ -7298,9 +7298,9 @@
               "reference_top1": 374,
               "candidate_top1": 374,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.07978047601106304,
-              "max_abs_error": 4.807403564453125,
-              "rmse": 0.9057882607078417,
+              "kl_reference_candidate_nats": 0.1037563428419746,
+              "max_abs_error": 4.658503532409668,
+              "rmse": 0.9125299127345604,
               "allclose": false
             },
             {
@@ -7308,9 +7308,9 @@
               "reference_top1": 6303,
               "candidate_top1": 5990,
               "top1_match": false,
-              "kl_reference_candidate_nats": 0.41050329238632083,
-              "max_abs_error": 4.621286392211914,
-              "rmse": 0.9950150803161958,
+              "kl_reference_candidate_nats": 0.36462390646406584,
+              "max_abs_error": 4.405766487121582,
+              "rmse": 0.9626162980840756,
               "allclose": false
             },
             {
@@ -7318,9 +7318,9 @@
               "reference_top1": 1576,
               "candidate_top1": 1576,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0037205740854078613,
-              "max_abs_error": 4.7156922817230225,
-              "rmse": 0.9558128122671233,
+              "kl_reference_candidate_nats": 0.002729098976030354,
+              "max_abs_error": 4.66552996635437,
+              "rmse": 0.9435758731149011,
               "allclose": false
             },
             {
@@ -7328,9 +7328,9 @@
               "reference_top1": 432,
               "candidate_top1": 432,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.2950652212432383,
-              "max_abs_error": 4.3197842836380005,
-              "rmse": 0.8996187769593212,
+              "kl_reference_candidate_nats": 0.22804577329028086,
+              "max_abs_error": 4.142319679260254,
+              "rmse": 0.8945625340933464,
               "allclose": false
             },
             {
@@ -7338,9 +7338,9 @@
               "reference_top1": 25963,
               "candidate_top1": 25963,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.05719935464672733,
-              "max_abs_error": 4.169835567474365,
-              "rmse": 0.939292685632629,
+              "kl_reference_candidate_nats": 0.07732410318629473,
+              "max_abs_error": 4.417904853820801,
+              "rmse": 0.9611419360738159,
               "allclose": false
             },
             {
@@ -7348,16 +7348,16 @@
               "reference_top1": 39020,
               "candidate_top1": 39020,
               "top1_match": true,
-              "kl_reference_candidate_nats": 0.0742934881926405,
-              "max_abs_error": 5.0927629470825195,
-              "rmse": 1.0580204503703614,
+              "kl_reference_candidate_nats": 0.07923897380037197,
+              "max_abs_error": 5.023815631866455,
+              "rmse": 1.0662762673724848,
               "allclose": false
             }
           ],
           "engine_settings": {
             "argmax": [
               253,
-              69425,
+              198,
               474,
               525,
               2661,
@@ -7371,7 +7371,7 @@
               15936,
               95456,
               198,
-              7414,
+              25,
               40,
               374,
               432,
