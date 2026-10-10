@@ -1,5 +1,9 @@
 // Read-only STREAM-style sweep, not a memory-controller measurement.
+#if defined(__x86_64__)
 #include <immintrin.h>
+#elif defined(__aarch64__)
+#include <arm_neon.h>
+#endif
 #include <omp.h>
 #include <chrono>
 #include <cstdint>
@@ -12,6 +16,7 @@
 
 static volatile uint64_t sink = 0;
 
+#if defined(__x86_64__)
 __attribute__((target("avx2"), noinline))
 static uint64_t read256(const uint64_t* p, size_t n, int passes) {
     __m256i a = _mm256_setzero_si256(), b = a, c = a, d = a;
@@ -54,6 +59,45 @@ static uint64_t read512(const uint64_t* p, size_t n, int passes) {
     for (auto x : lanes) rest ^= x;
     return rest;
 }
+#elif defined(__aarch64__)
+__attribute__((noinline))
+static uint64_t read_neon(const uint64_t* p, size_t n, int passes) {
+    uint64x2_t a = vdupq_n_u64(0), b = a, c = a, d = a;
+    uint64_t rest = 0;
+    for (int pass = 0; pass < passes; ++pass) {
+        size_t i = 0;
+        for (; i + 8 <= n; i += 8) {
+            a = veorq_u64(a, vld1q_u64(p+i));
+            b = veorq_u64(b, vld1q_u64(p+i+2));
+            c = veorq_u64(c, vld1q_u64(p+i+4));
+            d = veorq_u64(d, vld1q_u64(p+i+6));
+        }
+        for (; i < n; ++i) rest ^= p[i];
+        asm volatile("" : "+w"(a), "+w"(b), "+w"(c), "+w"(d) : : "memory");
+    }
+    uint64x2_t all = veorq_u64(veorq_u64(a, b), veorq_u64(c, d));
+    return rest ^ vgetq_lane_u64(all, 0) ^ vgetq_lane_u64(all, 1);
+}
+#endif
+
+static uint64_t read(const std::string& kernel, const uint64_t* p, size_t n, int passes) {
+#if defined(__x86_64__)
+    return kernel == "simd256" ? read256(p, n, passes) : read512(p, n, passes);
+#elif defined(__aarch64__)
+    (void)kernel;
+    return read_neon(p, n, passes);
+#endif
+}
+
+static bool available(const std::string& kernel) {
+#if defined(__x86_64__)
+    return (kernel == "simd256" && __builtin_cpu_supports("avx2")) || (kernel == "simd512" && __builtin_cpu_supports("avx512f"));
+#elif defined(__aarch64__)
+    return kernel == "neon";
+#else
+    return false;
+#endif
+}
 
 int main(int argc, char** argv) {
     try {
@@ -71,9 +115,7 @@ int main(int argc, char** argv) {
         }
         if (threads < 1 || threads > 256 || mib < 32 || mib > 1024 || passes < 1 || repeats < 1)
             throw std::runtime_error("invalid sweep parameters");
-        if (kernel != "simd256" && kernel != "simd512") throw std::runtime_error("invalid kernel");
-        if (!__builtin_cpu_supports("avx2") || (kernel == "simd512" && !__builtin_cpu_supports("avx512f")))
-            throw std::runtime_error("requested SIMD is unavailable");
+        if (!available(kernel)) throw std::runtime_error("invalid or unavailable kernel: " + kernel);
         omp_set_dynamic(0);
         omp_set_num_threads(threads);
         const size_t bytes = static_cast<size_t>(mib) * 1024 * 1024, n = bytes / sizeof(uint64_t);
@@ -88,8 +130,7 @@ int main(int argc, char** argv) {
             {
                 const size_t id = omp_get_thread_num(), total = omp_get_num_threads();
                 const size_t start = n*id/total, end = n*(id+1)/total;
-                checksum ^= kernel == "simd256" ? read256(data.get()+start,end-start,count)
-                                                : read512(data.get()+start,end-start,count);
+                checksum ^= read(kernel, data.get()+start, end-start, count);
             }
             sink = checksum;
         };

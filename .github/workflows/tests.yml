@@ -16,3 +16,20 @@ jobs:
       - run: cmake --build build -j4
       - run: ctest --test-dir build --output-on-failure
       - run: uv run pytest -q tests
+
+  tests-arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0, Node 24
+        with:
+          version: "0.12.5"
+      - run: uv sync --locked --python 3.12
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPU_DECODE_NATIVE=OFF
+      - run: cmake --build build -j4
+      - run: ctest --test-dir build --output-on-failure
+      - run: uv run pytest -q tests
+      # Exercises the AVX-512 kernels on ARM through SIMDe.
+      - run: cmake -S . -B build-avx512 -DCMAKE_BUILD_TYPE=Release -DCPU_DECODE_NATIVE=OFF -DCPU_DECODE_EMULATE_AVX512=ON
+      - run: cmake --build build-avx512 -j4
+      - run: ctest --test-dir build-avx512 --output-on-failure

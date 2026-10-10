@@ -1,194 +1,255 @@
 #include "decode.hpp"
+#include "simd.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
-#if defined(__x86_64__) || defined(__i386__)
-#include <immintrin.h>
-#define DECODE_X86 1
+#if defined(__aarch64__) && defined(__linux__)
+#include <sys/auxv.h>
+#include <asm/hwcap.h>
 #endif
 
 namespace decode {
+namespace detail {
+bool avx512_supported() {
+#if defined(CPU_DECODE_EMULATE_AVX512)
+    return true;
+#elif defined(DECODE_X86)
+    __builtin_cpu_init();
+    return __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw") &&
+           __builtin_cpu_supports("avx512vl") && __builtin_cpu_supports("avx512dq") &&
+           __builtin_cpu_supports("avx512vnni") && __builtin_cpu_supports("avx2") &&
+           __builtin_cpu_supports("f16c") && __builtin_cpu_supports("fma");
+#else
+    return false;
+#endif
+}
+bool neon_supported() {
+#if defined(DECODE_NEON) && defined(__linux__)
+    return (getauxval(AT_HWCAP) & HWCAP_ASIMDDP) != 0;
+#else
+    return false;
+#endif
+}
+} // namespace detail
+
 float bf16_float(uint16_t value) {
     uint32_t bits = uint32_t(value) << 16;
     float result;
     std::memcpy(&result, &bits, sizeof(result));
     return result;
 }
-static float value(const Matrix& m, size_t i) {
-    if (m.dtype == DType::bf16) return bf16_float(static_cast<const uint16_t*>(m.data)[i]);
-    if (m.dtype == DType::f32) return static_cast<const float*>(m.data)[i];
-    return float(static_cast<const int8_t*>(m.data)[i]);
-}
-static float dot_scalar(const Matrix& m, size_t row, const float* x) {
-    float sum = 0;
-    for (size_t j = 0; j < m.cols; ++j) sum += value(m, row * m.cols + j) * x[j];
-    return m.dtype == DType::i8 ? sum * m.scales[row] : sum;
-}
-#ifdef DECODE_X86
-__attribute__((target("avx2")))
-static float dot256(const Matrix& m, size_t row, const float* x) {
-    size_t j = 0, start = row * m.cols;
-    __m256 sum = _mm256_setzero_ps();
-    for (; j + 8 <= m.cols; j += 8) {
-        __m256 w;
-        if (m.dtype == DType::bf16) {
-            auto bits = _mm_loadu_si128(reinterpret_cast<const __m128i*>(static_cast<const uint16_t*>(m.data) + start + j));
-            w = _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_cvtepu16_epi32(bits), 16));
-        } else if (m.dtype == DType::i8) {
-            auto bits = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(static_cast<const int8_t*>(m.data) + start + j));
-            w = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(bits));
-        } else w = _mm256_loadu_ps(static_cast<const float*>(m.data) + start + j);
-        sum = _mm256_add_ps(sum, _mm256_mul_ps(w, _mm256_loadu_ps(x + j)));
+float half_float(uint16_t h) {
+    uint32_t sign = uint32_t(h & 0x8000u) << 16, exponent = (h >> 10) & 0x1fu, mantissa = h & 0x3ffu, bits;
+    if (exponent == 0x1f) bits = sign | 0x7f800000u | (mantissa << 13);
+    else if (exponent) bits = sign | ((exponent + 112) << 23) | (mantissa << 13);
+    else {
+        float magnitude = float(mantissa) * 0x1p-24f;  // zero or subnormal, exact
+        return sign ? -magnitude : magnitude;
     }
-    alignas(32) float lanes[8];
-    _mm256_store_ps(lanes, sum);
-    float total = 0;
-    for (float lane : lanes) total += lane;
-    for (; j < m.cols; ++j) total += value(m, start + j) * x[j];
-    return m.dtype == DType::i8 ? total * m.scales[row] : total;
+    float result;
+    std::memcpy(&result, &bits, sizeof(result));
+    return result;
 }
-__attribute__((target("avx512f,avx512bw"), always_inline))
-static inline __m512 load512(const Matrix& m, size_t index) {
-    if (m.dtype == DType::bf16) {
-        auto bits = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(static_cast<const uint16_t*>(m.data) + index));
-        return _mm512_castsi512_ps(_mm512_slli_epi32(_mm512_cvtepu16_epi32(bits), 16));
+uint16_t float_half(float value) {
+    // Round-to-nearest-even conversion (F. Giesen, float_to_half_fast3_rtne).
+    uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    const uint32_t sign = bits & 0x80000000u;
+    bits ^= sign;
+    uint16_t out;
+    if (bits >= (127u + 16u) << 23) out = bits > 0x7f800000u ? 0x7e00 : 0x7c00;
+    else if (bits < 113u << 23) {
+        float magnitude, magic;
+        const uint32_t magic_bits = 126u << 23;
+        std::memcpy(&magnitude, &bits, 4);
+        std::memcpy(&magic, &magic_bits, 4);
+        magnitude += magic;
+        uint32_t rounded;
+        std::memcpy(&rounded, &magnitude, 4);
+        out = uint16_t(rounded - magic_bits);
+    } else {
+        const uint32_t odd = (bits >> 13) & 1u;
+        bits += 0xc8000fffu + odd;  // rebias exponent (15 - 127) << 23, then round
+        out = uint16_t(bits >> 13);
     }
-    if (m.dtype == DType::i8) {
-        auto bits = _mm_loadu_si128(reinterpret_cast<const __m128i*>(static_cast<const int8_t*>(m.data) + index));
-        return _mm512_cvtepi32_ps(_mm512_cvtepi8_epi32(bits));
-    }
-    return _mm512_loadu_ps(static_cast<const float*>(m.data) + index);
+    return uint16_t(out | (sign >> 16));
 }
-__attribute__((target("avx512f,avx512bw")))
-static float dot512(const Matrix& m, size_t row, const float* x) {
-    size_t j = 0, start = row * m.cols;
-    __m512 sum = _mm512_setzero_ps();
-    for (; j + 16 <= m.cols; j += 16)
-        sum = _mm512_add_ps(sum, _mm512_mul_ps(load512(m, start + j), _mm512_loadu_ps(x + j)));
-    float total = _mm512_reduce_add_ps(sum);
-    for (; j < m.cols; ++j) total += value(m, start + j) * x[j];
-    return m.dtype == DType::i8 ? total * m.scales[row] : total;
-}
-__attribute__((target("avx512f,avx512bw")))
-static float dot512x4(const Matrix& m, size_t row, const float* x) {
-    size_t j = 0, start = row * m.cols;
-    __m512 a = _mm512_setzero_ps(), b = a, c = a, d = a;
-    for (; j + 64 <= m.cols; j += 64) {
-        a = _mm512_add_ps(a, _mm512_mul_ps(load512(m, start + j), _mm512_loadu_ps(x + j)));
-        b = _mm512_add_ps(b, _mm512_mul_ps(load512(m, start + j + 16), _mm512_loadu_ps(x + j + 16)));
-        c = _mm512_add_ps(c, _mm512_mul_ps(load512(m, start + j + 32), _mm512_loadu_ps(x + j + 32)));
-        d = _mm512_add_ps(d, _mm512_mul_ps(load512(m, start + j + 48), _mm512_loadu_ps(x + j + 48)));
-    }
-    for (; j + 16 <= m.cols; j += 16)
-        a = _mm512_add_ps(a, _mm512_mul_ps(load512(m, start + j), _mm512_loadu_ps(x + j)));
-    float total = _mm512_reduce_add_ps(_mm512_add_ps(_mm512_add_ps(a, b), _mm512_add_ps(c, d)));
-    for (; j < m.cols; ++j) total += value(m, start + j) * x[j];
-    return m.dtype == DType::i8 ? total * m.scales[row] : total;
-}
-#endif
+
 Kernel parse_kernel(const std::string& name) {
+    if (name == "auto") return detail::avx512_supported() ? Kernel::avx512 : detail::neon_supported() ? Kernel::neon : Kernel::scalar;
     if (name == "scalar") return Kernel::scalar;
-#ifdef DECODE_X86
-    __builtin_cpu_init();
-    if (name == "simd256" && __builtin_cpu_supports("avx2")) return Kernel::simd256;
-    if (name == "simd512" && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw")) return Kernel::simd512;
-    if (name == "simd512x4" && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw")) return Kernel::simd512x4;
-#endif
+    if (name == "avx512" && detail::avx512_supported()) return Kernel::avx512;
+    if (name == "neon" && detail::neon_supported()) return Kernel::neon;
     throw std::runtime_error("unknown or unsupported kernel: " + name);
 }
 std::string kernel_name(Kernel k) {
-    if (k == Kernel::scalar) return "scalar";
-    if (k == Kernel::simd256) return "simd256";
-    if (k == Kernel::simd512) return "simd512";
-    return "simd512x4";
+    if (k == Kernel::avx512) return "avx512";
+    if (k == Kernel::neon) return "neon";
+    return "scalar";
 }
-void matvec(const Matrix& m, const float* x, float* y, Kernel kernel, int threads) {
-    if (!m.data || !m.rows || !m.cols || (m.dtype == DType::i8 && !m.scales) || threads < 1)
-        throw std::runtime_error("invalid matvec arguments");
-    float (*dot)(const Matrix&, size_t, const float*) = dot_scalar;
-#ifdef DECODE_X86
-    if (kernel == Kernel::simd256) dot = dot256;
-    if (kernel == Kernel::simd512) dot = dot512;
-    if (kernel == Kernel::simd512x4) dot = dot512x4;
-#else
-    if (kernel != Kernel::scalar) throw std::runtime_error("SIMD requires x86");
-#endif
-    #pragma omp parallel for num_threads(threads) schedule(static) if(threads > 1)
-    for (size_t row = 0; row < m.rows; ++row) y[row] = dot(m, row, x);
+Format parse_format(const std::string& name) {
+    if (name == "bf16") return Format::bf16;
+    if (name == "q8") return Format::q8;
+    if (name == "q4") return Format::q4;
+    throw std::runtime_error("unknown weight format: " + name);
 }
-void quantize_row(const float* source, size_t n, int8_t* out, float& scale) {
-    if (!n) throw std::runtime_error("empty quantization row");
-    float maximum = 0;
-    for (size_t j = 0; j < n; ++j) {
-        if (!std::isfinite(source[j])) throw std::runtime_error("nonfinite model weight");
-        maximum = std::max(maximum, std::abs(source[j]));
-    }
-    scale = maximum == 0 ? 1.0f : maximum / 127.0f;
+std::string format_name(Format f) { return f == Format::q8 ? "q8" : f == Format::q4 ? "q4" : "bf16"; }
+KvType parse_kv(const std::string& name) {
+    if (name == "f32") return KvType::f32;
+    if (name == "f16") return KvType::f16;
+    throw std::runtime_error("kv must be f32 or f16");
+}
+std::string kv_name(KvType kv) { return kv == KvType::f16 ? "f16" : "f32"; }
+WeightMemory parse_weight_memory(const std::string& name) {
+    if (name == "mmap") return WeightMemory::mmap;
+    if (name == "hugepage") return WeightMemory::hugepage;
+    throw std::runtime_error("weights must be mmap or hugepage");
+}
+std::string weight_memory_name(WeightMemory m) { return m == WeightMemory::hugepage ? "hugepage" : "mmap"; }
+
+size_t Matrix::weight_bytes() const {
+    return format == Format::bf16 ? rows * cols * 2 : format == Format::q8 ? rows * cols : rows * cols / 2;
+}
+size_t Matrix::scale_bytes() const { return format == Format::bf16 ? 0 : rows * (cols / block_size) * 2; }
+
+void Activation::resize(size_t size) {
+    n = size;
+    q.assign(size, 0);
+    d.assign(size / block_size, 0.0f);
+    bias.assign((size + 2 * block_size - 1) / (2 * block_size) * 16, 0);
+}
+
+static void finite_or_throw(const float* x, size_t n) {
     for (size_t j = 0; j < n; ++j)
-        out[j] = static_cast<int8_t>(std::clamp(std::round(source[j] / scale), -127.0f, 127.0f));
+        if (!std::isfinite(x[j])) throw std::runtime_error("nonfinite model weight");
 }
+void quantize_q8(const float* source, size_t n, int8_t* out, uint16_t* scales) {
+    if (!n || n % block_size) throw std::runtime_error("q8 rows must be a nonzero multiple of 32");
+    finite_or_throw(source, n);
+    for (size_t b = 0; b < n / block_size; ++b) {
+        const float* x = source + b * block_size;
+        float maximum = 0;
+        for (size_t j = 0; j < block_size; ++j) maximum = std::max(maximum, std::abs(x[j]));
+        scales[b] = float_half(maximum / 127.0f);
+        float d = half_float(scales[b]), inverse = d ? 1.0f / d : 0.0f;
+        for (size_t j = 0; j < block_size; ++j)
+            out[b * block_size + j] = int8_t(std::clamp(std::nearbyint(x[j] * inverse), -127.0f, 127.0f));
+    }
+}
+void quantize_q4(const float* source, size_t n, uint8_t* out, uint16_t* scales) {
+    if (!n || n % (2 * block_size)) throw std::runtime_error("q4 rows must be a nonzero multiple of 64");
+    finite_or_throw(source, n);
+    uint8_t levels[2 * block_size];
+    for (size_t g = 0; g < n / (2 * block_size); ++g) {
+        for (size_t half = 0; half < 2; ++half) {
+            size_t b = 2 * g + half;
+            const float* x = source + b * block_size;
+            float extreme = 0;  // signed value of largest magnitude maps to level 0
+            for (size_t j = 0; j < block_size; ++j) if (std::abs(x[j]) > std::abs(extreme)) extreme = x[j];
+            scales[b] = float_half(extreme / -8.0f);
+            float d = half_float(scales[b]), inverse = d ? 1.0f / d : 0.0f;
+            for (size_t j = 0; j < block_size; ++j)
+                levels[half * block_size + j] = uint8_t(std::clamp(std::floor(x[j] * inverse + 8.5f), 0.0f, 15.0f));
+        }
+        for (size_t j = 0; j < block_size; ++j) out[g * block_size + j] = uint8_t(levels[j] | (levels[block_size + j] << 4));
+    }
+}
+void dequantize_row(const Matrix& m, size_t row, float* out) {
+    if (m.format == Format::bf16) {
+        const uint16_t* w = static_cast<const uint16_t*>(m.data) + row * m.cols;
+        for (size_t j = 0; j < m.cols; ++j) out[j] = bf16_float(w[j]);
+        return;
+    }
+    const uint16_t* s = m.scales + row * (m.cols / block_size);
+    if (m.format == Format::q8) {
+        const int8_t* w = static_cast<const int8_t*>(m.data) + row * m.cols;
+        for (size_t j = 0; j < m.cols; ++j) out[j] = float(w[j]) * half_float(s[j / block_size]);
+        return;
+    }
+    const uint8_t* w = static_cast<const uint8_t*>(m.data) + row * m.cols / 2;
+    for (size_t g = 0; g < m.cols / (2 * block_size); ++g)
+        for (size_t j = 0; j < block_size; ++j) {
+            uint8_t byte = w[g * block_size + j];
+            out[2 * g * block_size + j] = float(int(byte & 15) - 8) * half_float(s[2 * g]);
+            out[(2 * g + 1) * block_size + j] = float(int(byte >> 4) - 8) * half_float(s[2 * g + 1]);
+        }
+}
+void quantize_activation(const float* x, Activation& a, size_t first, size_t last) {
+    for (size_t b = first; b < last; ++b) {
+        const float* v = x + b * block_size;
+        int8_t* q = a.q.data() + b * block_size;
+        int32_t sum = 0;
+#ifdef DECODE_NEON
+        // Same operations as the scalar path (max |v|, v * (127 / max), round to nearest even).
+        float32x4_t lanes[8], m = vdupq_n_f32(0);
+        for (size_t i = 0; i < 8; ++i) { lanes[i] = vld1q_f32(v + 4 * i); m = vmaxq_f32(m, vabsq_f32(lanes[i])); }
+        const float d = vmaxvq_f32(m) / 127.0f, inverse = d ? 1.0f / d : 0.0f;
+        int32x4_t total = vdupq_n_s32(0);
+        for (size_t i = 0; i < 8; i += 2) {
+            const int32x4_t lo = vcvtnq_s32_f32(vmulq_n_f32(lanes[i], inverse)), hi = vcvtnq_s32_f32(vmulq_n_f32(lanes[i + 1], inverse));
+            total = vaddq_s32(total, vaddq_s32(lo, hi));
+            vst1_s8(q + 4 * i, vmovn_s16(vcombine_s16(vmovn_s32(lo), vmovn_s32(hi))));
+        }
+        sum = vaddvq_s32(total);
+#else
+        float maximum = 0;
+        for (size_t j = 0; j < block_size; ++j) maximum = std::max(maximum, std::abs(v[j]));
+        const float d = maximum / 127.0f, inverse = d ? 1.0f / d : 0.0f;
+        for (size_t j = 0; j < block_size; ++j) {
+            q[j] = int8_t(std::nearbyint(v[j] * inverse));
+            sum += q[j];
+        }
+#endif
+        a.d[b] = d;
+        a.bias[(b / 2) * 16 + (b % 2) * 8] = -128 * sum;
+    }
+}
+void silu_multiply(const float* gate, const float* up, float* out, size_t n, Kernel kernel) {
+    size_t j = 0;
+#ifdef DECODE_NEON
+    if (kernel == Kernel::neon)
+        for (; j + 4 <= n; j += 4) {
+            const float32x4_t g = vld1q_f32(gate + j);
+            const float32x4_t sigmoid_denominator = vaddq_f32(vdupq_n_f32(1.0f), detail::exp_neon(vnegq_f32(g)));
+            vst1q_f32(out + j, vmulq_f32(vdivq_f32(g, sigmoid_denominator), vld1q_f32(up + j)));
+        }
+#endif
+    (void)kernel;
+    for (; j < n; ++j) out[j] = (gate[j] / (1.0f + std::exp(-gate[j]))) * up[j];
+}
+
 void rmsnorm(const float* x, const float* weight, float* out, size_t n, float epsilon) {
     float sum = 0;
     for (size_t j = 0; j < n; ++j) sum += x[j] * x[j];
     float inv = 1.0f / std::sqrt(sum / float(n) + epsilon);
     for (size_t j = 0; j < n; ++j) out[j] = x[j] * inv * weight[j];
 }
-void rope(float* x, size_t heads, size_t dim, size_t position, float theta) {
-    for (size_t j = 0; j < dim / 2; ++j) {
-        float angle = float(position) / std::pow(theta, float(2 * j) / float(dim));
-        float c = std::cos(angle), s = std::sin(angle);
-        for (size_t h = 0; h < heads; ++h) {
-            float* v = x + h * dim;
-            float a = v[j], b = v[j + dim / 2];
-            v[j] = a * c - b * s;
-            v[j + dim / 2] = b * c + a * s;
-        }
-    }
-}
-void attention(const float* q, const float* keys, const float* values, float* out,
-               float* scores, size_t length, size_t heads, size_t kv_heads,
-               size_t dim, int threads) {
-    if (!length || !kv_heads || heads % kv_heads || !dim || threads < 1)
-        throw std::runtime_error("invalid attention dimensions");
-    const size_t stride = kv_heads * dim;
-    const float scale = 1.0f / std::sqrt(float(dim));
-    #pragma omp parallel for num_threads(threads) schedule(static) if(threads > 1)
+void rope(float* x, size_t heads, size_t dim, const float* cos, const float* sin) {
     for (size_t h = 0; h < heads; ++h) {
-        size_t kv = h / (heads / kv_heads);
-        float* probability = scores + h * length;
-        float maximum = -std::numeric_limits<float>::infinity();
-        for (size_t t = 0; t < length; ++t) {
-            float dot = 0;
-            for (size_t j = 0; j < dim; ++j) dot += q[h * dim + j] * keys[t * stride + kv * dim + j];
-            probability[t] = dot * scale;
-            maximum = std::max(maximum, probability[t]);
-        }
-        float total = 0;
-        for (size_t t = 0; t < length; ++t) {
-            probability[t] = std::exp(probability[t] - maximum);
-            total += probability[t];
-        }
-        std::fill(out + h * dim, out + (h + 1) * dim, 0.0f);
-        for (size_t t = 0; t < length; ++t) {
-            float p = probability[t] / total;
-            for (size_t j = 0; j < dim; ++j) out[h * dim + j] += p * values[t * stride + kv * dim + j];
+        float* v = x + h * dim;
+        for (size_t j = 0; j < dim / 2; ++j) {
+            float a = v[j], b = v[j + dim / 2];
+            v[j] = a * cos[j] - b * sin[j];
+            v[j + dim / 2] = b * cos[j] + a * sin[j];
         }
     }
 }
+
 Profile::Profile() {
-    for (const char* name : {"embedding", "rmsnorm", "qkv", "rope", "kv_write", "attention", "attention_output", "residual", "mlp_gate_up", "silu", "mlp_down", "lm_head", "argmax", "timing_overhead_and_loop"})
+    // Phases of one token; norms run inside qkv/mlp_gate_up/lm_head, RoPE and KV writes inside attention.
+    for (const char* name : {"embedding", "qkv", "attention", "attention_merge", "attention_output",
+                             "mlp_gate_up", "silu", "mlp_down", "lm_head", "argmax", "timing_overhead_and_loop"})
         seconds.emplace(name, 0.0);
 }
 Json Profile::json() const {
-    uint64_t minimum = matrix_weight_bytes + scale_bytes + norm_bias_bytes + embedding_bytes + kv_write_bytes + kv_read_min_bytes;
+    uint64_t minimum = matrix_weight_bytes + scale_bytes + norm_bias_bytes + embedding_bytes + kv_write_bytes + kv_read_bytes;
     return {{"operation_seconds", seconds}, {"steps", steps}, {"head_steps", head_steps},
             {"matrix_weight_bytes", matrix_weight_bytes}, {"scale_bytes", scale_bytes},
             {"lm_head_weight_bytes", lm_head_weight_bytes}, {"lm_head_scale_bytes", lm_head_scale_bytes},
             {"norm_bias_bytes", norm_bias_bytes}, {"embedding_bytes", embedding_bytes},
-            {"kv_write_bytes", kv_write_bytes}, {"kv_read_min_bytes", kv_read_min_bytes},
-            {"kv_read_logical_bytes", kv_read_logical_bytes}, {"minimum_bytes", minimum},
-            {"byte_model", "algorithmic weight/scale reads plus embedding row, FP32 KV writes and minimum GQA KV reads; excludes activation/cache-line/allocator traffic"}};
+            {"kv_write_bytes", kv_write_bytes}, {"kv_read_bytes", kv_read_bytes}, {"minimum_bytes", minimum},
+            {"byte_model", "algorithmic weight/scale reads plus embedding row, KV writes and one read of each cached K/V row per KV head; excludes activation/cache-line/allocator traffic"}};
 }
 } // namespace decode

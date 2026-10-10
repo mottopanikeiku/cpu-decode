@@ -1,38 +1,39 @@
 # Measurement protocol
 
-The experiment asks about single-stream CPU decoding, not batched serving or prompt-processing speed. One model, one machine, and one quantization format are measured. Timings exclude model loading, tokenization and prompt prefill. Greedy selection is included in the small engine and eager measurements; llama-bench omits sampling, a small favorable difference for the baseline. llama-bench uses its synthetic tokens; the other paths use a repeated fixed token-ID sequence. These are matched shapes, not identical workloads.
+Only single-stream decoding is timed. Model loading, tokenization and filling the context are excluded. The engine fills its context one token at a time; it has no batched prefill, so prefill speed is not measured or claimed.
 
-## Machine and scheduling
+## Sweep
 
-The raw measurement directories contain CPU/OS/compiler/Python/library versions, invocation arguments, environment variables and portable command equivalents. Only directory locations are replaced (`$MODEL`, `$INT8`, `$RAW`, `$CACHE`, `$LLAMA_BENCH`, `$PYTHON`); flags, artifact hashes and numeric observations are preserved. Native builds use release optimization and native ISA selection. Reported timings used nice priority 19 with other scheduled compute paused, but unrelated desktop processes were not isolated. Clocks and temperatures were not fixed, and boost was not disabled. No GPU or paid compute was used.
+`make measure` runs, for initial cache lengths 128, 1024 and 4096 and 1, 2, 4, 6 and 12 threads, 16 decoding steps after one untimed warmup step, three repeats each:
 
-Default sweep: 1, 2, 4, 6 and 12 threads; initial cache lengths 128, 1024 and 4096; 16 measured decoding steps; three repeats. Each model path warms one untimed decoding step. Upstream llama-bench warms before depth fill, while the other paths warm at the requested context; prefill/depth fill is excluded in every case. Report medians and minimum–maximum spread, not the reciprocal of mean latency. Any differently sized slice is explicitly recorded. The small engine uses FP32 KV, while upstream llama.cpp uses its supported default F16 KV and flash attention auto; this favors the baseline's cache traffic and available attention kernels. The eager baseline uses BF16 weights/KV and eager attention. Q8_0 stores 32 weights and a two-byte scale per block; the new engine stores int8 rows and a four-byte scale per output channel. Both use eight-bit weights, but neither cache precision nor quantization is numerically identical.
+| Engine | Matched llama.cpp run |
+|---|---|
+| `q8-f16`: q8 weights and head, F16 KV | `q8_0-f16`: Q8_0, F16 KV, flash attention auto |
+| `q4h8-f16`: q4 projections, q8 head, F16 KV | `q4_0-f16`: llama-quantize's default Q4_0 mix (its tied embedding/head is Q8_0), F16 KV |
+| `q8-f32` (6 threads, 128 and 4096) | `q8_0-f32`: F32 KV with flash attention **off** (the pinned llama.cpp casts an F32 cache to F16 when flash attention is on) |
+
+Both engines get the same KV type in every pair. Rates are medians with min–max ranges. llama-bench feeds synthetic tokens and omits sampling; the engine repeats a fixed token sequence and includes greedy argmax. The shapes match; the token streams do not.
+
+Ablations (6 threads, contexts 128 and 4096) change one setting at a time: F32 vs F16 KV, mmap vs huge-page weight copy, unfused vs fused projections, scalar vs SIMD kernel, q4 head vs q8 head, q4 vs q8 projections. `tools/summarize.py` pairs every two runs that differ in exactly one field.
+
+## Threads
+
+Every engine, llama.cpp and bandwidth run gets `OMP_PROC_BIND=close OMP_PLACES=cores` by default (`tools/measure.py --places cores`). `--places fast` builds an explicit place list from the physical cores with the highest `lscpu -e` maximum clock, for chips that mix core types; `--places none` leaves the environment alone. The chosen places and `lscpu -e` are recorded next to each run. llama.cpp is built with OpenMP, so the same variables apply to it.
 
 ## Read-bandwidth ceiling
 
-`tools/bandwidth.cpp` reads a 256 MiB array, substantially larger than the last-level cache, repeatedly with four independent XOR vector accumulators. It writes only a final checksum during each timed sweep. Initialization and warmup are excluded. SIMD256 and SIMD512 are measured rather than assuming a wider instruction is faster. Bytes/s is array size × passes / elapsed time. This is a read-only STREAM-style sweep, not STREAM triad and not a memory-controller counter.
+`tools/bandwidth.cpp` reads a 256 MiB array with four independent vector XOR accumulators (AVX2/AVX-512 on x86-64, NEON on AArch64) and reports bytes/s. It is a read-only STREAM-style sweep, not a memory-controller counter.
 
-For a decoded step at cache position n, the storage lower bound is:
+The ideal tokens/s at a cache length is that bandwidth divided by the bytes a step must touch: every projection's weights and block scales once, the tied vocabulary matrix once as the LM head plus one embedding row, norms and biases, the new K/V row, and each cached K/V row once per KV head. The engine counts these as it runs (`bytes_per_token.total_min`). Activations, cache-line effects and clock changes are not included, so the percentage of the ceiling is an estimate, not measured DRAM utilization.
 
-- all projection matrix weights and scales, once;
-- the tied vocabulary matrix as the LM head, once, plus one embedding row;
-- each distinct layer's K and V cache through n, once, and its new K/V writes;
-- norm and bias vectors.
+## Quality
 
-The ideal tokens/s ceiling is sustained read bytes/s divided by these bytes/token. The numerator is read bandwidth even though the denominator includes the much smaller KV write term; this is an approximation. GQA lets several query heads share each KV head. A straightforward attention loop can read the same KV head repeatedly; the engine also records logical KV reads separately where applicable. Cache reuse, activation traffic, write allocation, dequantization, nonlinearities, reductions, synchronization and clock changes are not captured by the ideal ceiling. The reported percentage is achieved tokens/s / ideal tokens/s. It is not a claim to have measured physical DRAM utilization. Cache position grows over the generation window; use the engine's average step byte count when computing percentages.
+- `make correctness`: Transformers FP32 arithmetic on the pinned BF16 weights is the oracle. The unquantized engine (F32 KV) must match every logit within tolerance and every greedy token. Each quantized model is reported at every teacher-forced position of four fixed prompts as top-1 agreement and KL(reference ‖ candidate), with no pass threshold.
+- `make llama-quality`: the same positions through llama.cpp Q8_0 and Q4_0 (F16 KV, flash attention auto, one token per batch).
+- `make long-context`: the first 4096 tokens of tinyshakespeare (pinned commit and SHA-256). The oracle runs one FP32 forward pass with SDPA attention; the engine and llama.cpp emit logits at positions 960–1023 and 4032–4095 only. The same metrics are reported per window.
 
-`tools/traffic.py` reads actual GGUF tensor sizes and the native profile to compare formats. For the pinned model, FP32 KV stores `24 layers × 2 KV heads × 64 head dimensions × K/V × 4 bytes = 24,576 bytes` per cached token; F16 halves it. The generated traffic table averages unique-head reads over the growing generation window, alongside weight/scales/bias/embedding bytes for both formats. Q8 KV traffic is a geometry estimate, not instrumented DRAM traffic.
+These are distribution checks, not task accuracy or perplexity.
 
-## Baselines and ablations
+## AVX-512 coverage
 
-llama.cpp is built at the pinned commit in `tools/prepare_llama.py`, using native CPU flags and at most four build jobs. Its GGUF is converted from the exact pinned Hugging Face snapshot, then quantized to Q8_0. `llama-bench -p 0 -n 16 -d CONTEXT` excludes the depth-fill from decoding timing. The eager baseline uses Transformers, with its dtype stated in the raw output.
-
-The ablations compare BF16 storage with int8 storage at identical FP32 arithmetic, scalar/SIMD256/SIMD512 matrix-vector kernels, one versus four SIMD512 accumulators, and direct versus cached RoPE, at fixed thread count and context. The four-accumulator variant exposes independent additions instead of one serial accumulator; it changes reduction order but not activation or weight quantization. Compare recorded medians, not expectations about Zen 5. Operation timings are collected inside the forward pass; the separate loop/timing-overhead field closes the breakdown to whole-step time. Interpret a dominant matrix-vector section as a mixture of weight loads and arithmetic, not direct proof of a bandwidth bottleneck.
-
-## Correctness
-
-`tools/reference.py` uses the downloaded BF16 values as the starting weights for a Hugging Face Transformers CPU oracle, with FP32 execution implemented without holding the whole expanded model at once. The comparison records the exact dtype strategy, absolute-logit tolerance and fixed prompt set. The unquantized engine must meet that tolerance and generate identical greedy tokens for the tested steps. Int8 quality is reported at every teacher-forced prompt position as top-1 agreement and KL(reference || quantized), rather than hiding changed tokens behind a text example. This is a small deterministic check, not a perplexity benchmark or a claim about downstream task accuracy.
-
-The oracle verifies the pinned snapshot before loading and records its checked file identities. Full-model pytest comparisons require explicit `CPU_DECODE_MODEL`; an absent explicitly requested engine is an error, not a skip. The int8 artifact is also opened with the official Safetensors parser in integration tests. This quantizer requires each matrix element count to be divisible by four, so FP32 row scales remain aligned without invalid unindexed padding. Unsupported shapes are rejected before output creation; the loader rejects gaps and trailing unindexed data.
-
-The optional `llama-quality` target links a small reader to the same pinned upstream library. It uses Q8_0, F16 KV and flash attention auto on every exact oracle teacher-forced token, with one-token batches and fresh contexts. The comparison verifies artifact and oracle hashes, then reports all per-position top-1/KL and separate prompt-only and reference-continuation aggregates. It does not evaluate Q8 free-running greedy generation. Thus the comparison describes the complete numerical paths, not an isolated weight-quantizer ranking.
+The x86 kernels use AVX-512 VNNI (`vpdpbusd`) and are selected at run time. CI also builds them through [SIMDe](https://github.com/simd-everywhere/simde) (`-DCPU_DECODE_EMULATE_AVX512=ON`) on an ARM runner, so their arithmetic is tested on hosts without AVX-512. That checks results, not speed.

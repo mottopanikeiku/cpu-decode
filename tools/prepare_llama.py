@@ -23,11 +23,26 @@ from tools.portable import portable
 LLAMA_COMMIT = "6c73b3e12dc501de35fe5f6979960d06921a2f6c"
 LLAMA_URL = "https://github.com/ggml-org/llama.cpp.git"
 DEFAULT_CACHE = Path("external")
+QUANTIZED = ["Q8_0", "Q4_0"]
+# Read with the pinned clone's own gguf-py so the stored type names match llama.cpp's.
+TENSOR_TYPES = """
+import collections, json, sys
+sys.path.insert(0, sys.argv[1])
+from gguf import GGUFReader
+tensors = GGUFReader(sys.argv[2]).tensors
+counts = collections.Counter(t.tensor_type.name for t in tensors)
+print(json.dumps({"counts": dict(sorted(counts.items())), "token_embd.weight": next(t.tensor_type.name for t in tensors if t.name == "token_embd.weight")}))
+"""
 
 
 def run(command: list[str], cwd: Path | None = None) -> None:
     print("+ " + " ".join(map(str, command)), file=sys.stderr, flush=True)
     subprocess.run(command, cwd=cwd, check=True)
+
+
+def tensor_types(source: Path, path: Path) -> dict:
+    result = subprocess.run([sys.executable, "-c", TENSOR_TYPES, str(source / "gguf-py"), str(path)], check=True, capture_output=True, text=True)
+    return json.loads(result.stdout)
 
 
 def prepare(model: Path, cache: Path, jobs: int, output: Path) -> dict:
@@ -50,12 +65,14 @@ def prepare(model: Path, cache: Path, jobs: int, output: Path) -> dict:
             run(["git", "checkout", "--detach", LLAMA_COMMIT], source)
         build = root / "build"
         run(["cmake", "-S", str(source), "-B", str(build), "-DCMAKE_BUILD_TYPE=Release", "-DGGML_NATIVE=ON", "-DGGML_CUDA=OFF", "-DGGML_VULKAN=OFF", "-DLLAMA_CURL=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DLLAMA_BUILD_EXAMPLES=ON", "-DLLAMA_BUILD_TOOLS=ON"])
-        run(["cmake", "--build", str(build), "--config", "Release", "--target", "llama-bench", "llama-quantize", "-j", str(jobs)])
+        # The shared llama library is linked by this repository's llama-logits reader.
+        run(["cmake", "--build", str(build), "--config", "Release", "--target", "llama", "llama-bench", "llama-quantize", "-j", str(jobs)])
         bf16 = root / f"qwen-{REVISION}-bf16.gguf"
-        q8 = root / f"qwen-{REVISION}-q8_0.gguf"
+        quantized = [(root / f"qwen-{REVISION}-{dtype.lower()}.gguf", dtype) for dtype in QUANTIZED]
+        artifacts = [(bf16, "BF16"), *quantized]
         previous_path = root / "preparation.json"
         previous = json.loads(previous_path.read_text()) if previous_path.exists() else {}
-        for path, dtype in [(bf16, "BF16"), (q8, "Q8_0")]:
+        for path, dtype in artifacts:
             old = previous.get("artifacts", {}).get(dtype)
             if path.exists() and (old is None or file_hash(path) != old["sha256"]):
                 raise ValueError(f"Unverified existing artifact: {path}; move it aside before preparing")
@@ -63,10 +80,12 @@ def prepare(model: Path, cache: Path, jobs: int, output: Path) -> dict:
             temporary = bf16.with_suffix(".partial.gguf")
             run([sys.executable, str(source / "convert_hf_to_gguf.py"), str(model), "--outtype", "bf16", "--use-temp-file", "--outfile", str(temporary)])
             temporary.replace(bf16)
-        if not q8.exists():
-            temporary = q8.with_suffix(".partial.gguf")
-            run([str(build / "bin" / "llama-quantize"), str(bf16), str(temporary), "Q8_0", str(jobs)])
-            temporary.replace(q8)
+        for path, dtype in quantized:
+            if not path.exists():
+                temporary = path.with_suffix(".partial.gguf")
+                # Default llama-quantize tensor mix for the type; the recorded tensor types show any exceptions.
+                run([str(build / "bin" / "llama-quantize"), str(bf16), str(temporary), dtype, str(jobs)])
+                temporary.replace(path)
         manifest = {
             "llama_repository": LLAMA_URL,
             "llama_commit": LLAMA_COMMIT,
@@ -74,8 +93,10 @@ def prepare(model: Path, cache: Path, jobs: int, output: Path) -> dict:
             "build": {"type": "Release", "native_cpu": True, "gpu": False, "jobs": jobs},
             "converter_python": sys.executable,
             "bench_binary": str(build / "bin" / "llama-bench"),
-            "quantization": "llama.cpp Q8_0, blocks of 32 weights; not the engine's per-output-channel int8 scheme",
-            "artifacts": {dtype: {"path": str(path), "sha256": file_hash(path), "bytes": path.stat().st_size} for path, dtype in [(bf16, "BF16"), (q8, "Q8_0")]},
+            "quantization": {"Q8_0": "llama.cpp Q8_0: int8 weights in blocks of 32 with one F16 scale per block",
+                             "Q4_0": "llama.cpp Q4_0 default mix: 4-bit weights in blocks of 32 with one F16 scale per block; see tensor_types for tensors llama-quantize keeps at another type"},
+            "artifacts": {dtype: {"path": str(path), "sha256": file_hash(path), "bytes": path.stat().st_size,
+                                  "tensor_types": tensor_types(source, path)} for path, dtype in artifacts},
         }
         manifest = portable(manifest, {cache.resolve(): "$CACHE", model.resolve(): "$MODEL", sys.executable: "$PYTHON"})
         previous_path.write_text(json.dumps(manifest, indent=2) + "\n")

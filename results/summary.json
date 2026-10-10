@@ -1,987 +1,1523 @@
 {
   "statistic": "median; spread is min/max over repeated runs",
-  "bandwidth_selection": "highest median of measured read SIMD widths at each thread count",
+  "bandwidth_selection": "highest median of measured read kernels at each thread count",
+  "primary_pair": {
+    "engine": "q8-f16",
+    "llama": "q8_0-f16"
+  },
   "bandwidth": [
     {
       "threads": 1,
-      "kernel": "simd256",
-      "median": 38.5651,
-      "min": 38.5354,
-      "max": 38.7063,
-      "file": "results/measurements/bandwidth-t1-c0-simd256.json"
-    },
-    {
-      "threads": 1,
-      "kernel": "simd512",
-      "median": 39.3575,
-      "min": 38.8165,
-      "max": 39.3869,
-      "file": "results/measurements/bandwidth-t1-c0-simd512.json"
+      "kernel": "neon",
+      "median": 31.9398,
+      "min": 31.9206,
+      "max": 32.2101,
+      "file": "results/measurements/bandwidth-t1-c0-neon.json"
     },
     {
       "threads": 12,
-      "kernel": "simd256",
-      "median": 42.8069,
-      "min": 42.5384,
-      "max": 43.4585,
-      "file": "results/measurements/bandwidth-t12-c0-simd256.json"
-    },
-    {
-      "threads": 12,
-      "kernel": "simd512",
-      "median": 42.3849,
-      "min": 42.1393,
-      "max": 42.8098,
-      "file": "results/measurements/bandwidth-t12-c0-simd512.json"
+      "kernel": "neon",
+      "median": 228.818,
+      "min": 227.646,
+      "max": 228.996,
+      "file": "results/measurements/bandwidth-t12-c0-neon.json"
     },
     {
       "threads": 2,
-      "kernel": "simd256",
-      "median": 41.4396,
-      "min": 41.3527,
-      "max": 41.5313,
-      "file": "results/measurements/bandwidth-t2-c0-simd256.json"
-    },
-    {
-      "threads": 2,
-      "kernel": "simd512",
-      "median": 41.5076,
-      "min": 41.0341,
-      "max": 41.5536,
-      "file": "results/measurements/bandwidth-t2-c0-simd512.json"
+      "kernel": "neon",
+      "median": 53.558,
+      "min": 53.3969,
+      "max": 53.6248,
+      "file": "results/measurements/bandwidth-t2-c0-neon.json"
     },
     {
       "threads": 4,
-      "kernel": "simd256",
-      "median": 40.9474,
-      "min": 40.9236,
-      "max": 41.0993,
-      "file": "results/measurements/bandwidth-t4-c0-simd256.json"
-    },
-    {
-      "threads": 4,
-      "kernel": "simd512",
-      "median": 40.9853,
-      "min": 40.5131,
-      "max": 40.9905,
-      "file": "results/measurements/bandwidth-t4-c0-simd512.json"
+      "kernel": "neon",
+      "median": 103.798,
+      "min": 103.186,
+      "max": 103.893,
+      "file": "results/measurements/bandwidth-t4-c0-neon.json"
     },
     {
       "threads": 6,
-      "kernel": "simd256",
-      "median": 41.9671,
-      "min": 41.065,
-      "max": 42.0787,
-      "file": "results/measurements/bandwidth-t6-c0-simd256.json"
-    },
-    {
-      "threads": 6,
-      "kernel": "simd512",
-      "median": 41.3743,
-      "min": 41.3585,
-      "max": 41.5636,
-      "file": "results/measurements/bandwidth-t6-c0-simd512.json"
+      "kernel": "neon",
+      "median": 145.229,
+      "min": 144.912,
+      "max": 145.263,
+      "file": "results/measurements/bandwidth-t6-c0-neon.json"
     }
   ],
   "results": [
     {
       "threads": 1,
       "context": 128,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 44.817757817492165,
-        "min": 44.776681199964685,
-        "max": 45.45539877634975
+        "median": 47.2517144782549,
+        "min": 46.995042962868276,
+        "max": 48.079009052919815
       },
       "llama_tps": {
-        "median": 52.1391,
-        "min": 49.3767,
-        "max": 53.1434
+        "median": 49.1372,
+        "min": 48.3168,
+        "max": 49.7094
       },
-      "eager_tps": {
-        "median": 11.79812236363029,
-        "min": 11.759651653246797,
-        "max": 11.997193766399086
-      },
-      "read_GB_per_s": 39.3575,
-      "bandwidth_kernel": "simd512",
-      "bandwidth_ceiling_tps": 78.80140100812135,
-      "percent_of_ceiling": 56.87431599455092,
-      "engine_over_llama": 0.8595805799772563,
+      "read_GB_per_s": 31.9398,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 60.62862613275825,
+      "percent_of_ceiling": 77.93631076974764,
+      "engine_over_llama": 0.9616281448323245,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 23482368.0,
-        "kv_read_min": 3354624.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 499451780.0
+        "scales": 30872576.0,
+        "total_min": 526810552.0
       },
       "operation_seconds_per_token": {
-        "argmax": 9.594375000000001e-05,
-        "attention": 0.0014417711875000002,
-        "attention_output": 0.0008040365625000005,
-        "embedding": 1.07575e-06,
-        "kv_write": 4.875687500000001e-06,
-        "lm_head": 0.005528433125,
-        "mlp_down": 0.004389670000000002,
-        "mlp_gate_up": 0.008592985687499995,
-        "qkv": 0.0011268739374999989,
-        "residual": 1.0921187499999992e-05,
-        "rmsnorm": 5.3515125e-05,
-        "rope": 1.2774500000000008e-05,
-        "silu": 0.00020848300000000003,
-        "timing_overhead_and_loop": 1.1223062500006348e-05
+        "argmax": 6.14311875e-05,
+        "attention": 0.0006757888750000003,
+        "attention_merge": 6.431874999999999e-05,
+        "attention_output": 0.0008022324374999993,
+        "embedding": 2.072125e-06,
+        "lm_head": 0.005400853749999999,
+        "mlp_down": 0.0040304771875,
+        "mlp_gate_up": 0.008290948625,
+        "qkv": 0.001019366375,
+        "rmsnorm": 0.00015676443749999995,
+        "rope_kv": 3.1555437500000005e-05,
+        "silu": 0.0006211557500000007,
+        "timing_overhead_and_loop": 4.528000000000171e-06
       },
       "files": [
-        "results/measurements/engine-t1-c128-simd512x4.json",
-        "results/measurements/llama-t1-c128-baseline.json",
-        "results/measurements/eager-t1-c128-baseline.json",
-        "results/measurements/bandwidth-t1-c0-simd512.json"
+        "results/measurements/engine-q8-f16-t1-c128.json",
+        "results/measurements/llama-q8_0-f16-t1-c128.json",
+        "results/measurements/bandwidth-t1-c0-neon.json"
       ]
     },
     {
       "threads": 1,
       "context": 1024,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 31.940018944104335,
-        "min": 31.630299054889626,
-        "max": 31.953935845164327
+        "median": 38.5296597335217,
+        "min": 38.31639677949823,
+        "max": 38.761062146710785
       },
       "llama_tps": {
-        "median": 40.2696,
-        "min": 39.431,
-        "max": 40.9967
+        "median": 38.9689,
+        "min": 37.5853,
+        "max": 39.0275
       },
-      "eager_tps": {
-        "median": 11.07946400710781,
-        "min": 10.942718307724371,
-        "max": 11.134675052769452
-      },
-      "read_GB_per_s": 39.3575,
-      "bandwidth_kernel": "simd512",
-      "bandwidth_ceiling_tps": 75.47386889182879,
-      "percent_of_ceiling": 42.319307878441535,
-      "engine_over_llama": 0.7931546115209571,
+      "read_GB_per_s": 31.9398,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 59.38746117199676,
+      "percent_of_ceiling": 64.87844230608357,
+      "engine_over_llama": 0.988728440718668,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 177623040.0,
-        "kv_read_min": 25374720.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 521471876.0
+        "scales": 30872576.0,
+        "total_min": 537820600.0
       },
       "operation_seconds_per_token": {
-        "argmax": 9.490731249999999e-05,
-        "attention": 0.010342289624999996,
-        "attention_output": 0.0008121003125000001,
-        "embedding": 1.19175e-06,
-        "kv_write": 8.401687500000005e-06,
-        "lm_head": 0.005611322750000001,
-        "mlp_down": 0.004379799812500001,
-        "mlp_gate_up": 0.008618062062500004,
-        "qkv": 0.0011423631250000001,
-        "residual": 1.6303999999999968e-05,
-        "rmsnorm": 5.931381249999992e-05,
-        "rope": 2.3590749999999994e-05,
-        "silu": 0.0002061788124999997,
-        "timing_overhead_and_loop": 1.3414250000003125e-05
+        "argmax": 5.9999249999999996e-05,
+        "attention": 0.004935845687500001,
+        "attention_merge": 6.549775e-05,
+        "attention_output": 0.0008677444375000004,
+        "embedding": 2.1599999999999996e-06,
+        "lm_head": 0.005513503937500001,
+        "mlp_down": 0.0041703105,
+        "mlp_gate_up": 0.0084700486875,
+        "qkv": 0.0010468838125000004,
+        "rmsnorm": 0.00015851562499999994,
+        "rope_kv": 3.305512499999998e-05,
+        "silu": 0.0006260263125000009,
+        "timing_overhead_and_loop": 4.564187499996736e-06
       },
       "files": [
-        "results/measurements/engine-t1-c1024-simd512x4.json",
-        "results/measurements/llama-t1-c1024-baseline.json",
-        "results/measurements/eager-t1-c1024-baseline.json",
-        "results/measurements/bandwidth-t1-c0-simd512.json"
+        "results/measurements/engine-q8-f16-t1-c1024.json",
+        "results/measurements/llama-q8_0-f16-t1-c1024.json",
+        "results/measurements/bandwidth-t1-c0-neon.json"
       ]
     },
     {
       "threads": 1,
       "context": 4096,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 16.203580554616074,
-        "min": 16.1537954239389,
-        "max": 16.217433488007647
+        "median": 24.87873807626613,
+        "min": 24.838700274769426,
+        "max": 25.03619682482158
       },
       "llama_tps": {
-        "median": 24.6699,
-        "min": 24.5995,
-        "max": 24.8483
+        "median": 21.5803,
+        "min": 21.3458,
+        "max": 21.6026
       },
-      "eager_tps": {
-        "median": 7.134890610670979,
-        "min": 7.052995752077197,
-        "max": 7.1638232581302885
-      },
-      "read_GB_per_s": 39.3575,
-      "bandwidth_kernel": "simd512",
-      "bandwidth_ceiling_tps": 65.92884564652724,
-      "percent_of_ceiling": 24.57737640590646,
-      "engine_over_llama": 0.6568158182488002,
+      "read_GB_per_s": 31.9398,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 55.49253235408636,
+      "percent_of_ceiling": 44.83258741468141,
+      "engine_over_llama": 1.1528448666731292,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 706105344.0,
-        "kv_read_min": 100872192.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 596969348.0
+        "scales": 30872576.0,
+        "total_min": 575569336.0
       },
       "operation_seconds_per_token": {
-        "argmax": 9.450825e-05,
-        "attention": 0.040722205,
-        "attention_output": 0.0008176544374999999,
-        "embedding": 1.205375e-06,
-        "kv_write": 8.6816875e-06,
-        "lm_head": 0.0055541940625,
-        "mlp_down": 0.004443102875,
-        "mlp_gate_up": 0.008630873562499995,
-        "qkv": 0.0011426738749999992,
-        "residual": 1.9315312499999975e-05,
-        "rmsnorm": 5.872649999999994e-05,
-        "rope": 2.181368750000001e-05,
-        "silu": 0.00020933100000000002,
-        "timing_overhead_and_loop": 1.4118312500040198e-05
+        "argmax": 5.9744437499999996e-05,
+        "attention": 0.019386806874999985,
+        "attention_merge": 6.521343750000003e-05,
+        "attention_output": 0.0008576259999999998,
+        "embedding": 2.1966875e-06,
+        "lm_head": 0.005448364999999999,
+        "mlp_down": 0.0041120290624999944,
+        "mlp_gate_up": 0.008386568625000004,
+        "qkv": 0.0010379221250000003,
+        "rmsnorm": 0.00016223468750000008,
+        "rope_kv": 3.64669375e-05,
+        "silu": 0.0006289600000000007,
+        "timing_overhead_and_loop": 5.11443750000895e-06
       },
       "files": [
-        "results/measurements/engine-t1-c4096-simd512x4.json",
-        "results/measurements/llama-t1-c4096-baseline.json",
-        "results/measurements/eager-t1-c4096-baseline.json",
-        "results/measurements/bandwidth-t1-c0-simd512.json"
+        "results/measurements/engine-q8-f16-t1-c4096.json",
+        "results/measurements/llama-q8_0-f16-t1-c4096.json",
+        "results/measurements/bandwidth-t1-c0-neon.json"
       ]
     },
     {
       "threads": 2,
       "context": 128,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 69.03274591169418,
-        "min": 68.80971839562538,
-        "max": 69.52407123227766
+        "median": 87.78012640820994,
+        "min": 86.1127385820698,
+        "max": 87.78663598582264
       },
       "llama_tps": {
-        "median": 61.7625,
-        "min": 61.4081,
-        "max": 62.1557
+        "median": 80.5238,
+        "min": 80.1069,
+        "max": 80.6366
       },
-      "eager_tps": {
-        "median": 17.70904515624333,
-        "min": 17.313904007876822,
-        "max": 17.812102252973553
-      },
-      "read_GB_per_s": 41.5076,
-      "bandwidth_kernel": "simd512",
-      "bandwidth_ceiling_tps": 83.10632109470107,
-      "percent_of_ceiling": 83.06557792761659,
-      "engine_over_llama": 1.1177129473660259,
+      "read_GB_per_s": 53.558,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 101.66463028629693,
+      "percent_of_ceiling": 86.34283738701754,
+      "engine_over_llama": 1.0901140583058666,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 23482368.0,
-        "kv_read_min": 3354624.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 499451780.0
+        "scales": 30872576.0,
+        "total_min": 526810552.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.00010723862499999999,
-        "attention": 0.0008769794375000006,
-        "attention_output": 0.0005459829374999997,
-        "embedding": 1.33825e-06,
-        "kv_write": 5.73568749999999e-06,
-        "lm_head": 0.003421981375,
-        "mlp_down": 0.0030254153749999977,
-        "mlp_gate_up": 0.005348819125000001,
-        "qkv": 0.0007712663749999991,
-        "residual": 9.79237499999995e-06,
-        "rmsnorm": 5.366087499999996e-05,
-        "rope": 9.114999999999992e-06,
-        "silu": 0.00023167224999999994,
-        "timing_overhead_and_loop": 1.174349999999609e-05
+        "argmax": 6.089662499999999e-05,
+        "attention": 0.0003674641874999996,
+        "attention_merge": 4.2294000000000005e-05,
+        "attention_output": 0.00043765900000000013,
+        "embedding": 2.0073125000000003e-06,
+        "lm_head": 0.002858172875,
+        "mlp_down": 0.0021847859999999993,
+        "mlp_gate_up": 0.0043885975625,
+        "qkv": 0.0005494463125000004,
+        "rmsnorm": 0.0001562686249999999,
+        "rope_kv": 3.31655e-05,
+        "silu": 0.00031697800000000026,
+        "timing_overhead_and_loop": 3.0673750000039662e-06
       },
       "files": [
-        "results/measurements/engine-t2-c128-simd512x4.json",
-        "results/measurements/llama-t2-c128-baseline.json",
-        "results/measurements/eager-t2-c128-baseline.json",
-        "results/measurements/bandwidth-t2-c0-simd512.json"
+        "results/measurements/engine-q8-f16-t2-c128.json",
+        "results/measurements/llama-q8_0-f16-t2-c128.json",
+        "results/measurements/bandwidth-t2-c0-neon.json"
       ]
     },
     {
       "threads": 2,
       "context": 1024,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 48.59952554530938,
-        "min": 47.33529142472145,
-        "max": 49.52707355842375
+        "median": 72.76092895642451,
+        "min": 72.36069999932162,
+        "max": 72.93278272242799
       },
       "llama_tps": {
-        "median": 51.4715,
-        "min": 50.8296,
-        "max": 51.8393
+        "median": 62.011,
+        "min": 60.8528,
+        "max": 62.0166
       },
-      "eager_tps": {
-        "median": 16.4657090340646,
-        "min": 16.408875304673845,
-        "max": 16.612462641024454
-      },
-      "read_GB_per_s": 41.5076,
-      "bandwidth_kernel": "simd512",
-      "bandwidth_ceiling_tps": 79.59700591791838,
-      "percent_of_ceiling": 61.05697693632589,
-      "engine_over_llama": 0.9442026275766081,
+      "read_GB_per_s": 53.558,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 99.5833926777814,
+      "percent_of_ceiling": 73.06532444807797,
+      "engine_over_llama": 1.1733551943433342,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 177623040.0,
-        "kv_read_min": 25374720.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 521471876.0
+        "scales": 30872576.0,
+        "total_min": 537820600.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.0001063815,
-        "attention": 0.006465733625000002,
-        "attention_output": 0.0005491923749999998,
-        "embedding": 1.1524374999999998e-06,
-        "kv_write": 7.73356249999999e-06,
-        "lm_head": 0.0035360363124999996,
-        "mlp_down": 0.003206487812499998,
-        "mlp_gate_up": 0.0056355541875,
-        "qkv": 0.0007963216874999993,
-        "residual": 1.0312937499999963e-05,
-        "rmsnorm": 5.883987500000001e-05,
-        "rope": 9.082062499999998e-06,
-        "silu": 0.00023589862500000014,
-        "timing_overhead_and_loop": 1.206487499999867e-05
+        "argmax": 5.9822875e-05,
+        "attention": 0.002553336187500002,
+        "attention_merge": 4.6208937499999956e-05,
+        "attention_output": 0.00046915524999999983,
+        "embedding": 2.1843125000000004e-06,
+        "lm_head": 0.002885535875,
+        "mlp_down": 0.0022173516875000007,
+        "mlp_gate_up": 0.004426312312500005,
+        "qkv": 0.0005570426875000002,
+        "rmsnorm": 0.0001621541874999998,
+        "rope_kv": 3.6663937500000006e-05,
+        "silu": 0.0003207998749999996,
+        "timing_overhead_and_loop": 3.4045000000034603e-06
       },
       "files": [
-        "results/measurements/engine-t2-c1024-simd512x4.json",
-        "results/measurements/llama-t2-c1024-baseline.json",
-        "results/measurements/eager-t2-c1024-baseline.json",
-        "results/measurements/bandwidth-t2-c0-simd512.json"
+        "results/measurements/engine-q8-f16-t2-c1024.json",
+        "results/measurements/llama-q8_0-f16-t2-c1024.json",
+        "results/measurements/bandwidth-t2-c0-neon.json"
       ]
     },
     {
       "threads": 2,
       "context": 4096,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 25.57136449050242,
-        "min": 24.957328700308906,
-        "max": 25.725673661494483
+        "median": 47.501108586809835,
+        "min": 47.49031141994324,
+        "max": 47.50599000801168
       },
       "llama_tps": {
-        "median": 34.6009,
-        "min": 34.3013,
-        "max": 34.9032
+        "median": 37.962,
+        "min": 37.8532,
+        "max": 37.972
       },
-      "eager_tps": {
-        "median": 9.946021363131395,
-        "min": 9.759292134338452,
-        "max": 10.167798873419196
-      },
-      "read_GB_per_s": 41.5076,
-      "bandwidth_kernel": "simd512",
-      "bandwidth_ceiling_tps": 69.53053810729324,
-      "percent_of_ceiling": 36.777170415455444,
-      "engine_over_llama": 0.7390375536619689,
+      "read_GB_per_s": 53.558,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 93.05221221861618,
+      "percent_of_ceiling": 51.04780150224809,
+      "engine_over_llama": 1.2512804537908917,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 706105344.0,
-        "kv_read_min": 100872192.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 596969348.0
+        "scales": 30872576.0,
+        "total_min": 575569336.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.0001077353125,
-        "attention": 0.024998337187499994,
-        "attention_output": 0.0005520961874999997,
-        "embedding": 1.2541875000000002e-06,
-        "kv_write": 8.072999999999997e-06,
-        "lm_head": 0.0036446925,
-        "mlp_down": 0.0030491310625000026,
-        "mlp_gate_up": 0.005723815375000002,
-        "qkv": 0.0008121586875,
-        "residual": 1.3255749999999965e-05,
-        "rmsnorm": 5.907949999999996e-05,
-        "rope": 1.7069624999999985e-05,
-        "silu": 0.00022995593749999997,
-        "timing_overhead_and_loop": 1.3189499999989585e-05
+        "argmax": 5.815087499999999e-05,
+        "attention": 0.010027374250000002,
+        "attention_merge": 4.561812499999996e-05,
+        "attention_output": 0.00048495475000000004,
+        "embedding": 2.1856874999999996e-06,
+        "lm_head": 0.0028203586875,
+        "mlp_down": 0.0021850357499999993,
+        "mlp_gate_up": 0.004363405749999998,
+        "qkv": 0.0005481166875000001,
+        "rmsnorm": 0.00016020143749999988,
+        "rope_kv": 3.6691875000000005e-05,
+        "silu": 0.0003214848749999998,
+        "timing_overhead_and_loop": 2.9940000000061584e-06
       },
       "files": [
-        "results/measurements/engine-t2-c4096-simd512x4.json",
-        "results/measurements/llama-t2-c4096-baseline.json",
-        "results/measurements/eager-t2-c4096-baseline.json",
-        "results/measurements/bandwidth-t2-c0-simd512.json"
+        "results/measurements/engine-q8-f16-t2-c4096.json",
+        "results/measurements/llama-q8_0-f16-t2-c4096.json",
+        "results/measurements/bandwidth-t2-c0-neon.json"
       ]
     },
     {
       "threads": 4,
       "context": 128,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 68.2079759405914,
-        "min": 67.9795630490372,
-        "max": 68.30188173263655
+        "median": 145.35932584597742,
+        "min": 144.35677647384412,
+        "max": 145.4211977298842
       },
       "llama_tps": {
-        "median": 68.1245,
-        "min": 67.9616,
-        "max": 68.3023
+        "median": 142.597,
+        "min": 142.234,
+        "max": 142.907
       },
-      "eager_tps": {
-        "median": 22.486143398987842,
-        "min": 22.460126116977168,
-        "max": 22.666898284588974
-      },
-      "read_GB_per_s": 40.9853,
-      "bandwidth_kernel": "simd512",
-      "bandwidth_ceiling_tps": 82.06057449630072,
-      "percent_of_ceiling": 83.11905730524249,
-      "engine_over_llama": 1.0012253439011134,
+      "read_GB_per_s": 103.798,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 197.03098126250137,
+      "percent_of_ceiling": 73.77485759577952,
+      "engine_over_llama": 1.0193715565262762,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 23482368.0,
-        "kv_read_min": 3354624.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 499451780.0
+        "scales": 30872576.0,
+        "total_min": 526810552.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.00011156818750000002,
-        "attention": 0.0007360076875000008,
-        "attention_output": 0.0006077147500000002,
-        "embedding": 1.3249999999999998e-06,
-        "kv_write": 5.827812499999996e-06,
-        "lm_head": 0.0034339491249999994,
-        "mlp_down": 0.003162796250000001,
-        "mlp_gate_up": 0.005438006125,
-        "qkv": 0.0007992573124999998,
-        "residual": 9.932562499999981e-06,
-        "rmsnorm": 5.691081250000001e-05,
-        "rope": 8.012812499999986e-06,
-        "silu": 0.0002620629999999999,
-        "timing_overhead_and_loop": 1.1859812499995584e-05
+        "argmax": 5.95356875e-05,
+        "attention": 0.0002744943750000001,
+        "attention_merge": 3.0895687500000006e-05,
+        "attention_output": 0.0002798335625,
+        "embedding": 1.9350625000000002e-06,
+        "lm_head": 0.001715361625,
+        "mlp_down": 0.0012761979999999997,
+        "mlp_gate_up": 0.0025480875624999994,
+        "qkv": 0.00033721618749999984,
+        "rmsnorm": 0.00015735850000000008,
+        "rope_kv": 3.527343749999997e-05,
+        "silu": 0.00016753843750000018,
+        "timing_overhead_and_loop": 2.648874999998732e-06
       },
       "files": [
-        "results/measurements/engine-t4-c128-simd512x4.json",
-        "results/measurements/llama-t4-c128-baseline.json",
-        "results/measurements/eager-t4-c128-baseline.json",
-        "results/measurements/bandwidth-t4-c0-simd512.json"
+        "results/measurements/engine-q8-f16-t4-c128.json",
+        "results/measurements/llama-q8_0-f16-t4-c128.json",
+        "results/measurements/bandwidth-t4-c0-neon.json"
       ]
     },
     {
       "threads": 4,
       "context": 1024,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 53.63617389839847,
-        "min": 53.31665108637492,
-        "max": 54.34735423968262
+        "median": 126.59942348838032,
+        "min": 126.42292258712786,
+        "max": 126.71710487909878
       },
       "llama_tps": {
-        "median": 58.3003,
-        "min": 57.6098,
-        "max": 58.3697
+        "median": 111.942,
+        "min": 111.133,
+        "max": 112.104
       },
-      "eager_tps": {
-        "median": 20.190321949876708,
-        "min": 19.180731612444088,
-        "max": 20.504624630339904
-      },
-      "read_GB_per_s": 40.9853,
-      "bandwidth_kernel": "simd512",
-      "bandwidth_ceiling_tps": 78.5954178667921,
-      "percent_of_ceiling": 68.24338537051109,
-      "engine_over_llama": 0.919998248695092,
+      "read_GB_per_s": 103.798,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 192.99744189791167,
+      "percent_of_ceiling": 65.59642565384189,
+      "engine_over_llama": 1.1309376595771055,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 177623040.0,
-        "kv_read_min": 25374720.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 521471876.0
+        "scales": 30872576.0,
+        "total_min": 537820600.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.00011069525000000001,
-        "attention": 0.0052107497499999985,
-        "attention_output": 0.0005479536249999997,
-        "embedding": 1.12325e-06,
-        "kv_write": 6.944249999999998e-06,
-        "lm_head": 0.0033739374375000007,
-        "mlp_down": 0.0029973964375000013,
-        "mlp_gate_up": 0.005316197499999997,
-        "qkv": 0.0007798721249999994,
-        "residual": 1.116168749999999e-05,
-        "rmsnorm": 6.173187499999996e-05,
-        "rope": 8.674062500000001e-06,
-        "silu": 0.0002634340625000001,
-        "timing_overhead_and_loop": 1.199756250001155e-05
+        "argmax": 5.80545e-05,
+        "attention": 0.0013694374999999991,
+        "attention_merge": 3.430537499999998e-05,
+        "attention_output": 0.0002647406874999998,
+        "embedding": 2.0240625e-06,
+        "lm_head": 0.0017103055625000002,
+        "mlp_down": 0.0012527210000000003,
+        "mlp_gate_up": 0.002514776125,
+        "qkv": 0.000330399125,
+        "rmsnorm": 0.00015837137499999992,
+        "rope_kv": 3.575906250000001e-05,
+        "silu": 0.00016600893750000014,
+        "timing_overhead_and_loop": 2.2415000000032548e-06
       },
       "files": [
-        "results/measurements/engine-t4-c1024-simd512x4.json",
-        "results/measurements/llama-t4-c1024-baseline.json",
-        "results/measurements/eager-t4-c1024-baseline.json",
-        "results/measurements/bandwidth-t4-c0-simd512.json"
+        "results/measurements/engine-q8-f16-t4-c1024.json",
+        "results/measurements/llama-q8_0-f16-t4-c1024.json",
+        "results/measurements/bandwidth-t4-c0-neon.json"
       ]
     },
     {
       "threads": 4,
       "context": 4096,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 30.6743739251963,
-        "min": 30.20951052676167,
-        "max": 32.18972527507956
+        "median": 86.42492671193223,
+        "min": 80.17309853011243,
+        "max": 86.47814672099649
       },
       "llama_tps": {
-        "median": 41.9999,
-        "min": 41.1028,
-        "max": 42.1486
+        "median": 71.828,
+        "min": 71.3999,
+        "max": 71.8737
       },
-      "eager_tps": {
-        "median": 11.955563138504317,
-        "min": 11.251205615026675,
-        "max": 12.222584449546662
-      },
-      "read_GB_per_s": 40.9853,
-      "bandwidth_kernel": "simd512",
-      "bandwidth_ceiling_tps": 68.65561881411706,
-      "percent_of_ceiling": 44.67860672590572,
-      "engine_over_llama": 0.7303439752284244,
+      "read_GB_per_s": 103.798,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 180.3396975963987,
+      "percent_of_ceiling": 47.92340669515356,
+      "engine_over_llama": 1.2032205645699758,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 706105344.0,
-        "kv_read_min": 100872192.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 596969348.0
+        "scales": 30872576.0,
+        "total_min": 575569336.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.00011628581250000001,
-        "attention": 0.01884584481249999,
-        "attention_output": 0.0005434814375000004,
-        "embedding": 1.3903125e-06,
-        "kv_write": 8.535437500000002e-06,
-        "lm_head": 0.0033633341250000003,
-        "mlp_down": 0.0030053630625,
-        "mlp_gate_up": 0.005336050937500002,
-        "qkv": 0.0007937356875,
-        "residual": 1.4482687500000017e-05,
-        "rmsnorm": 6.681256249999996e-05,
-        "rope": 1.69933125e-05,
-        "silu": 0.0002911055,
-        "timing_overhead_and_loop": 1.505325000000085e-05
+        "argmax": 5.9938687500000005e-05,
+        "attention": 0.0052718601875,
+        "attention_merge": 3.5424e-05,
+        "attention_output": 0.00029187087499999977,
+        "embedding": 2.1396875e-06,
+        "lm_head": 0.001697249375,
+        "mlp_down": 0.0011783383749999995,
+        "mlp_gate_up": 0.0023386092499999987,
+        "qkv": 0.00032367787500000016,
+        "rmsnorm": 0.000161280875,
+        "rope_kv": 3.770987500000002e-05,
+        "silu": 0.00016859662500000016,
+        "timing_overhead_and_loop": 2.3877499999991336e-06
       },
       "files": [
-        "results/measurements/engine-t4-c4096-simd512x4.json",
-        "results/measurements/llama-t4-c4096-baseline.json",
-        "results/measurements/eager-t4-c4096-baseline.json",
-        "results/measurements/bandwidth-t4-c0-simd512.json"
+        "results/measurements/engine-q8-f16-t4-c4096.json",
+        "results/measurements/llama-q8_0-f16-t4-c4096.json",
+        "results/measurements/bandwidth-t4-c0-neon.json"
       ]
     },
     {
       "threads": 6,
       "context": 128,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 65.55439218360894,
-        "min": 64.16801290489325,
-        "max": 66.18489194658677
+        "median": 202.4450964469949,
+        "min": 202.2164924459944,
+        "max": 203.6346131191803
       },
       "llama_tps": {
-        "median": 68.5305,
-        "min": 68.0181,
-        "max": 68.8264
+        "median": 184.497,
+        "min": 183.873,
+        "max": 186.186
       },
-      "eager_tps": {
-        "median": 19.312202801342682,
-        "min": 19.1062629924081,
-        "max": 19.87187027901416
-      },
-      "read_GB_per_s": 41.9671,
-      "bandwidth_kernel": "simd256",
-      "bandwidth_ceiling_tps": 84.0263298290778,
-      "percent_of_ceiling": 78.01648878031023,
-      "engine_over_llama": 0.9565725068926819,
+      "read_GB_per_s": 145.229,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 275.6759511529298,
+      "percent_of_ceiling": 73.4358929751872,
+      "engine_over_llama": 1.097281237348005,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 23482368.0,
-        "kv_read_min": 3354624.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 499451780.0
+        "scales": 30872576.0,
+        "total_min": 526810552.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.0001533143125,
-        "attention": 0.0007044539374999997,
-        "attention_output": 0.0005851098125000002,
-        "embedding": 1.6969375000000003e-06,
-        "kv_write": 6.472750000000001e-06,
-        "lm_head": 0.0035425033124999996,
-        "mlp_down": 0.0033207341875000017,
-        "mlp_gate_up": 0.005562886125000003,
-        "qkv": 0.0008463695624999995,
-        "residual": 1.3477250000000007e-05,
-        "rmsnorm": 7.505324999999998e-05,
-        "rope": 1.2308624999999979e-05,
-        "silu": 0.0004451760625,
-        "timing_overhead_and_loop": 1.634150000000105e-05
+        "argmax": 5.972143749999999e-05,
+        "attention": 0.00015175918749999994,
+        "attention_merge": 2.8101062500000012e-05,
+        "attention_output": 0.00019487149999999995,
+        "embedding": 2.0354374999999997e-06,
+        "lm_head": 0.001201428375,
+        "mlp_down": 0.0009133931875000002,
+        "mlp_gate_up": 0.0018184310625000003,
+        "qkv": 0.0002461104374999999,
+        "rmsnorm": 0.00015786506249999995,
+        "rope_kv": 3.611756249999999e-05,
+        "silu": 0.00011879687500000002,
+        "timing_overhead_and_loop": 3.154812499998709e-06
       },
       "files": [
-        "results/measurements/engine-t6-c128-simd512x4.json",
-        "results/measurements/llama-t6-c128-baseline.json",
-        "results/measurements/eager-t6-c128-baseline.json",
-        "results/measurements/bandwidth-t6-c0-simd256.json"
+        "results/measurements/engine-q8-f16-t6-c128.json",
+        "results/measurements/llama-q8_0-f16-t6-c128.json",
+        "results/measurements/bandwidth-t6-c0-neon.json"
       ]
     },
     {
       "threads": 6,
       "context": 1024,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 51.159190681939194,
-        "min": 48.509360411662556,
-        "max": 52.163827450939685
+        "median": 173.15594920444255,
+        "min": 173.02349396268582,
+        "max": 174.41517148625022
       },
       "llama_tps": {
-        "median": 61.0345,
-        "min": 60.9649,
-        "max": 61.3699
+        "median": 149.596,
+        "min": 149.46,
+        "max": 149.901
       },
-      "eager_tps": {
-        "median": 17.59157492507333,
-        "min": 17.032960499960996,
-        "max": 18.393533394661205
-      },
-      "read_GB_per_s": 41.9671,
-      "bandwidth_kernel": "simd256",
-      "bandwidth_ceiling_tps": 80.47816561443862,
-      "percent_of_ceiling": 63.569031788121045,
-      "engine_over_llama": 0.8382011924721132,
+      "read_GB_per_s": 145.229,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 270.03242345124005,
+      "percent_of_ceiling": 64.12413257317948,
+      "engine_over_llama": 1.1574905024495477,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 177623040.0,
-        "kv_read_min": 25374720.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 521471876.0
+        "scales": 30872576.0,
+        "total_min": 537820600.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.0001571734375,
-        "attention": 0.004819248000000004,
-        "attention_output": 0.0006040381875000002,
-        "embedding": 1.85225e-06,
-        "kv_write": 8.426687499999998e-06,
-        "lm_head": 0.0034338246250000004,
-        "mlp_down": 0.0033568643750000017,
-        "mlp_gate_up": 0.005691921312500001,
-        "qkv": 0.0008603750000000005,
-        "residual": 1.5135500000000018e-05,
-        "rmsnorm": 8.237575000000005e-05,
-        "rope": 1.3505500000000008e-05,
-        "silu": 0.0004361075000000001,
-        "timing_overhead_and_loop": 1.7014374999992088e-05
+        "argmax": 6.00504375e-05,
+        "attention": 0.0009600916874999997,
+        "attention_merge": 3.335574999999999e-05,
+        "attention_output": 0.00019699200000000003,
+        "embedding": 1.9042500000000002e-06,
+        "lm_head": 0.0012024451249999998,
+        "mlp_down": 0.0009178196874999995,
+        "mlp_gate_up": 0.0018107776875,
+        "qkv": 0.00024169799999999974,
+        "rmsnorm": 0.00015863249999999992,
+        "rope_kv": 3.5699750000000024e-05,
+        "silu": 0.00011751731250000003,
+        "timing_overhead_and_loop": 2.19337500000083e-06
       },
       "files": [
-        "results/measurements/engine-t6-c1024-simd512x4.json",
-        "results/measurements/llama-t6-c1024-baseline.json",
-        "results/measurements/eager-t6-c1024-baseline.json",
-        "results/measurements/bandwidth-t6-c0-simd256.json"
+        "results/measurements/engine-q8-f16-t6-c1024.json",
+        "results/measurements/llama-q8_0-f16-t6-c1024.json",
+        "results/measurements/bandwidth-t6-c0-neon.json"
       ]
     },
     {
       "threads": 6,
       "context": 4096,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 31.689482430518098,
-        "min": 31.659914203888274,
-        "max": 31.822013432688426
+        "median": 119.59982675367097,
+        "min": 117.74770107364635,
+        "max": 119.68969369701803
       },
       "llama_tps": {
-        "median": 44.0632,
-        "min": 43.8128,
-        "max": 44.6081
+        "median": 99.6188,
+        "min": 98.966,
+        "max": 100.103
       },
-      "eager_tps": {
-        "median": 11.814731261472916,
-        "min": 11.80028441665016,
-        "max": 11.821474096030864
-      },
-      "read_GB_per_s": 41.9671,
-      "bandwidth_kernel": "simd256",
-      "bandwidth_ceiling_tps": 70.3002593694308,
-      "percent_of_ceiling": 45.07733358989266,
-      "engine_over_llama": 0.7191825021904468,
+      "read_GB_per_s": 145.229,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 252.32233706070818,
+      "percent_of_ceiling": 47.39961913276648,
+      "engine_over_llama": 1.200574858898832,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 706105344.0,
-        "kv_read_min": 100872192.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 596969348.0
+        "scales": 30872576.0,
+        "total_min": 575569336.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.00011610124999999998,
-        "attention": 0.017215113625000014,
-        "attention_output": 0.0005729621875000005,
-        "embedding": 1.5028124999999999e-06,
-        "kv_write": 8.290187499999991e-06,
-        "lm_head": 0.0035095729375,
-        "mlp_down": 0.003257363749999998,
-        "mlp_gate_up": 0.005561854687499999,
-        "qkv": 0.0008277071875000006,
-        "residual": 1.47921875e-05,
-        "rmsnorm": 6.882375000000005e-05,
-        "rope": 1.8177687499999996e-05,
-        "silu": 0.0003346114374999998,
-        "timing_overhead_and_loop": 1.5253499999999531e-05
+        "argmax": 5.905981250000001e-05,
+        "attention": 0.0036004352500000015,
+        "attention_merge": 3.7285062499999994e-05,
+        "attention_output": 0.0002253025000000001,
+        "embedding": 2.089625e-06,
+        "lm_head": 0.001217211125,
+        "mlp_down": 0.0008878713124999999,
+        "mlp_gate_up": 0.0017744171875000003,
+        "qkv": 0.0002435873749999999,
+        "rmsnorm": 0.0001605782499999999,
+        "rope_kv": 3.790162500000004e-05,
+        "silu": 0.00011825806249999985,
+        "timing_overhead_and_loop": 2.8200000000023345e-06
       },
       "files": [
-        "results/measurements/engine-t6-c4096-simd512x4.json",
-        "results/measurements/llama-t6-c4096-baseline.json",
-        "results/measurements/eager-t6-c4096-baseline.json",
-        "results/measurements/bandwidth-t6-c0-simd256.json"
+        "results/measurements/engine-q8-f16-t6-c4096.json",
+        "results/measurements/llama-q8_0-f16-t6-c4096.json",
+        "results/measurements/bandwidth-t6-c0-neon.json"
       ]
     },
     {
       "threads": 12,
       "context": 128,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 25.49147183287796,
-        "min": 24.120071052362604,
-        "max": 28.441945193836375
+        "median": 305.3617748817267,
+        "min": 284.9195940878757,
+        "max": 305.5694287259212
       },
       "llama_tps": {
-        "median": 25.6121,
-        "min": 18.2656,
-        "max": 25.9295
+        "median": 250.364,
+        "min": 223.493,
+        "max": 256.225
       },
-      "eager_tps": {
-        "median": 7.697055339655399,
-        "min": 7.084975019279201,
-        "max": 7.767816930273344
-      },
-      "read_GB_per_s": 42.8069,
-      "bandwidth_kernel": "simd256",
-      "bandwidth_ceiling_tps": 85.70777343110079,
-      "percent_of_ceiling": 29.742310192400666,
-      "engine_over_llama": 0.9952901883437109,
+      "read_GB_per_s": 228.818,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 434.3458936638763,
+      "percent_of_ceiling": 70.30382451780113,
+      "engine_over_llama": 1.219671258175004,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 23482368.0,
-        "kv_read_min": 3354624.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 1677312.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 499451780.0
+        "scales": 30872576.0,
+        "total_min": 526810552.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.00013348525000000003,
-        "attention": 0.0015114605,
-        "attention_output": 0.0016556278125000002,
-        "embedding": 1.342625e-06,
-        "kv_write": 6.192187499999995e-06,
-        "lm_head": 0.0048890160624999995,
-        "mlp_down": 0.007939607812499997,
-        "mlp_gate_up": 0.012050214312499998,
-        "qkv": 0.009910612375000011,
-        "residual": 1.3093749999999991e-05,
-        "rmsnorm": 7.316968749999993e-05,
-        "rope": 1.1568125e-05,
-        "silu": 0.0004977070625,
-        "timing_overhead_and_loop": 1.5164062500017117e-05
+        "argmax": 6.00003125e-05,
+        "attention": 0.00015954887500000021,
+        "attention_merge": 2.7411562499999994e-05,
+        "attention_output": 0.000131322625,
+        "embedding": 1.8343750000000001e-06,
+        "lm_head": 0.0007085378750000002,
+        "mlp_down": 0.0005738078125,
+        "mlp_gate_up": 0.0011277376250000003,
+        "qkv": 0.00015489268750000002,
+        "rmsnorm": 0.00018213124999999999,
+        "rope_kv": 3.641356249999998e-05,
+        "silu": 7.262649999999997e-05,
+        "timing_overhead_and_loop": 2.379062499998936e-06
       },
       "files": [
-        "results/measurements/engine-t12-c128-simd512x4.json",
-        "results/measurements/llama-t12-c128-baseline.json",
-        "results/measurements/eager-t12-c128-baseline.json",
-        "results/measurements/bandwidth-t12-c0-simd256.json"
+        "results/measurements/engine-q8-f16-t12-c128.json",
+        "results/measurements/llama-q8_0-f16-t12-c128.json",
+        "results/measurements/bandwidth-t12-c0-neon.json"
       ]
     },
     {
       "threads": 12,
       "context": 1024,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 21.1048404277327,
-        "min": 19.01453326174393,
-        "max": 21.775318114057228
+        "median": 256.6940102474174,
+        "min": 252.30530569358146,
+        "max": 263.5555124422663
       },
       "llama_tps": {
-        "median": 20.6145,
-        "min": 20.3412,
-        "max": 21.4814
+        "median": 213.619,
+        "min": 181.605,
+        "max": 215.51
       },
-      "eager_tps": {
-        "median": 6.018488821734323,
-        "min": 5.501047047978555,
-        "max": 6.678558371348791
-      },
-      "read_GB_per_s": 42.8069,
-      "bandwidth_kernel": "simd256",
-      "bandwidth_ceiling_tps": 82.08860720995048,
-      "percent_of_ceiling": 25.709828860605214,
-      "engine_over_llama": 1.0237861906780519,
+      "read_GB_per_s": 228.818,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 425.4541384245974,
+      "percent_of_ceiling": 60.33411995895085,
+      "engine_over_llama": 1.2016440964868171,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 177623040.0,
-        "kv_read_min": 25374720.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 12687360.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 521471876.0
+        "scales": 30872576.0,
+        "total_min": 537820600.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.00010441656250000001,
-        "attention": 0.0062413305624999995,
-        "attention_output": 0.003949699500000003,
-        "embedding": 1.5453125e-06,
-        "kv_write": 7.86274999999999e-06,
-        "lm_head": 0.0051568923124999996,
-        "mlp_down": 0.007700708562500002,
-        "mlp_gate_up": 0.0150495783125,
-        "qkv": 0.010878504187500007,
-        "residual": 1.3933749999999993e-05,
-        "rmsnorm": 6.850112500000007e-05,
-        "rope": 1.4541624999999998e-05,
-        "silu": 0.0004971038749999999,
-        "timing_overhead_and_loop": 1.4621187499987143e-05
+        "argmax": 6.0101812500000005e-05,
+        "attention": 0.0005868735624999999,
+        "attention_merge": 4.2212062499999996e-05,
+        "attention_output": 0.0001401956874999999,
+        "embedding": 1.7292499999999998e-06,
+        "lm_head": 0.0007386540625,
+        "mlp_down": 0.0005866685625000003,
+        "mlp_gate_up": 0.0011967095625000001,
+        "qkv": 0.0001844927499999999,
+        "rmsnorm": 0.00017128281249999998,
+        "rope_kv": 4.5284187500000066e-05,
+        "silu": 8.47716875e-05,
+        "timing_overhead_and_loop": 2.0080437500000214e-05
       },
       "files": [
-        "results/measurements/engine-t12-c1024-simd512x4.json",
-        "results/measurements/llama-t12-c1024-baseline.json",
-        "results/measurements/eager-t12-c1024-baseline.json",
-        "results/measurements/bandwidth-t12-c0-simd256.json"
+        "results/measurements/engine-q8-f16-t12-c1024.json",
+        "results/measurements/llama-q8_0-f16-t12-c1024.json",
+        "results/measurements/bandwidth-t12-c0-neon.json"
       ]
     },
     {
       "threads": 12,
       "context": 4096,
-      "kernel": "simd512x4",
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "kernel": "neon",
+      "kv_dtype": "f16",
+      "steps": 16,
       "engine_tps": {
-        "median": 11.935310028845809,
-        "min": 10.87077174750968,
-        "max": 12.360981554611895
+        "median": 196.76561357587303,
+        "min": 114.19393824888564,
+        "max": 197.65306991845168
       },
       "llama_tps": {
-        "median": 17.8416,
-        "min": 13.3308,
-        "max": 19.6604
+        "median": 153.855,
+        "min": 153.328,
+        "max": 155.314
       },
-      "eager_tps": {
-        "median": 4.801023269455252,
-        "min": 4.748320019003442,
-        "max": 4.9517520882365655
-      },
-      "read_GB_per_s": 42.8069,
-      "bandwidth_kernel": "simd256",
-      "bandwidth_ceiling_tps": 71.70703176538974,
-      "percent_of_ceiling": 16.644546197220407,
-      "engine_over_llama": 0.6689596240721577,
+      "read_GB_per_s": 228.818,
+      "bandwidth_kernel": "neon",
+      "bandwidth_ceiling_tps": 397.55071316029944,
+      "percent_of_ceiling": 49.49446877146808,
+      "engine_over_llama": 1.2789029513234738,
       "bytes_per_token": {
-        "embedding": 900.0,
-        "kv_read_logical": 706105344.0,
-        "kv_read_min": 100872192.0,
-        "kv_write": 24576.0,
+        "embedding": 952.0,
+        "kv_read": 50436096.0,
+        "kv_write": 12288.0,
         "lm_head": 136134656.0,
-        "lm_head_scales": 607744.0,
+        "lm_head_scales": 8508416.0,
         "matrix_weights": 493961216.0,
         "norm_bias": 286208.0,
         "projection_weights": 357826560.0,
-        "scales": 1824256.0,
-        "total_min": 596969348.0
+        "scales": 30872576.0,
+        "total_min": 575569336.0
       },
       "operation_seconds_per_token": {
-        "argmax": 0.00013117775000000002,
-        "attention": 0.021927201500000004,
-        "attention_output": 0.009976557124999993,
-        "embedding": 1.438375e-06,
-        "kv_write": 1.0211874999999993e-05,
-        "lm_head": 0.0043887270625,
-        "mlp_down": 0.011922920750000007,
-        "mlp_gate_up": 0.018882181937500003,
-        "qkv": 0.016338853750000007,
-        "residual": 2.1072687499999968e-05,
-        "rmsnorm": 8.569587499999996e-05,
-        "rope": 2.36559375e-05,
-        "silu": 0.0004764514999999999,
-        "timing_overhead_and_loop": 1.9839312499977946e-05
+        "argmax": 6.01084375e-05,
+        "attention": 0.0020616238750000007,
+        "attention_merge": 4.211499999999998e-05,
+        "attention_output": 0.0001323215625000001,
+        "embedding": 1.7140625e-06,
+        "lm_head": 0.0007018308125000001,
+        "mlp_down": 0.0005575330624999997,
+        "mlp_gate_up": 0.0011031958750000001,
+        "qkv": 0.00015276025,
+        "rmsnorm": 0.0001603978124999999,
+        "rope_kv": 3.590850000000001e-05,
+        "silu": 7.211793749999993e-05,
+        "timing_overhead_and_loop": 1.8566249999985365e-06
       },
       "files": [
-        "results/measurements/engine-t12-c4096-simd512x4.json",
-        "results/measurements/llama-t12-c4096-baseline.json",
-        "results/measurements/eager-t12-c4096-baseline.json",
-        "results/measurements/bandwidth-t12-c0-simd256.json"
+        "results/measurements/engine-q8-f16-t12-c4096.json",
+        "results/measurements/llama-q8_0-f16-t12-c4096.json",
+        "results/measurements/bandwidth-t12-c0-neon.json"
+      ]
+    }
+  ],
+  "pairs": [
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 1,
+      "context": 128,
+      "engine_tps": {
+        "median": 47.2517144782549,
+        "min": 46.995042962868276,
+        "max": 48.079009052919815
+      },
+      "llama_tps": {
+        "median": 49.1372,
+        "min": 48.3168,
+        "max": 49.7094
+      },
+      "engine_over_llama": 0.9616281448323245,
+      "files": [
+        "results/measurements/engine-q8-f16-t1-c128.json",
+        "results/measurements/llama-q8_0-f16-t1-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 1,
+      "context": 1024,
+      "engine_tps": {
+        "median": 38.5296597335217,
+        "min": 38.31639677949823,
+        "max": 38.761062146710785
+      },
+      "llama_tps": {
+        "median": 38.9689,
+        "min": 37.5853,
+        "max": 39.0275
+      },
+      "engine_over_llama": 0.988728440718668,
+      "files": [
+        "results/measurements/engine-q8-f16-t1-c1024.json",
+        "results/measurements/llama-q8_0-f16-t1-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 1,
+      "context": 4096,
+      "engine_tps": {
+        "median": 24.87873807626613,
+        "min": 24.838700274769426,
+        "max": 25.03619682482158
+      },
+      "llama_tps": {
+        "median": 21.5803,
+        "min": 21.3458,
+        "max": 21.6026
+      },
+      "engine_over_llama": 1.1528448666731292,
+      "files": [
+        "results/measurements/engine-q8-f16-t1-c4096.json",
+        "results/measurements/llama-q8_0-f16-t1-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 2,
+      "context": 128,
+      "engine_tps": {
+        "median": 87.78012640820994,
+        "min": 86.1127385820698,
+        "max": 87.78663598582264
+      },
+      "llama_tps": {
+        "median": 80.5238,
+        "min": 80.1069,
+        "max": 80.6366
+      },
+      "engine_over_llama": 1.0901140583058666,
+      "files": [
+        "results/measurements/engine-q8-f16-t2-c128.json",
+        "results/measurements/llama-q8_0-f16-t2-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 2,
+      "context": 1024,
+      "engine_tps": {
+        "median": 72.76092895642451,
+        "min": 72.36069999932162,
+        "max": 72.93278272242799
+      },
+      "llama_tps": {
+        "median": 62.011,
+        "min": 60.8528,
+        "max": 62.0166
+      },
+      "engine_over_llama": 1.1733551943433342,
+      "files": [
+        "results/measurements/engine-q8-f16-t2-c1024.json",
+        "results/measurements/llama-q8_0-f16-t2-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 2,
+      "context": 4096,
+      "engine_tps": {
+        "median": 47.501108586809835,
+        "min": 47.49031141994324,
+        "max": 47.50599000801168
+      },
+      "llama_tps": {
+        "median": 37.962,
+        "min": 37.8532,
+        "max": 37.972
+      },
+      "engine_over_llama": 1.2512804537908917,
+      "files": [
+        "results/measurements/engine-q8-f16-t2-c4096.json",
+        "results/measurements/llama-q8_0-f16-t2-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 4,
+      "context": 128,
+      "engine_tps": {
+        "median": 145.35932584597742,
+        "min": 144.35677647384412,
+        "max": 145.4211977298842
+      },
+      "llama_tps": {
+        "median": 142.597,
+        "min": 142.234,
+        "max": 142.907
+      },
+      "engine_over_llama": 1.0193715565262762,
+      "files": [
+        "results/measurements/engine-q8-f16-t4-c128.json",
+        "results/measurements/llama-q8_0-f16-t4-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 4,
+      "context": 1024,
+      "engine_tps": {
+        "median": 126.59942348838032,
+        "min": 126.42292258712786,
+        "max": 126.71710487909878
+      },
+      "llama_tps": {
+        "median": 111.942,
+        "min": 111.133,
+        "max": 112.104
+      },
+      "engine_over_llama": 1.1309376595771055,
+      "files": [
+        "results/measurements/engine-q8-f16-t4-c1024.json",
+        "results/measurements/llama-q8_0-f16-t4-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 4,
+      "context": 4096,
+      "engine_tps": {
+        "median": 86.42492671193223,
+        "min": 80.17309853011243,
+        "max": 86.47814672099649
+      },
+      "llama_tps": {
+        "median": 71.828,
+        "min": 71.3999,
+        "max": 71.8737
+      },
+      "engine_over_llama": 1.2032205645699758,
+      "files": [
+        "results/measurements/engine-q8-f16-t4-c4096.json",
+        "results/measurements/llama-q8_0-f16-t4-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 6,
+      "context": 128,
+      "engine_tps": {
+        "median": 202.4450964469949,
+        "min": 202.2164924459944,
+        "max": 203.6346131191803
+      },
+      "llama_tps": {
+        "median": 184.497,
+        "min": 183.873,
+        "max": 186.186
+      },
+      "engine_over_llama": 1.097281237348005,
+      "files": [
+        "results/measurements/engine-q8-f16-t6-c128.json",
+        "results/measurements/llama-q8_0-f16-t6-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 6,
+      "context": 1024,
+      "engine_tps": {
+        "median": 173.15594920444255,
+        "min": 173.02349396268582,
+        "max": 174.41517148625022
+      },
+      "llama_tps": {
+        "median": 149.596,
+        "min": 149.46,
+        "max": 149.901
+      },
+      "engine_over_llama": 1.1574905024495477,
+      "files": [
+        "results/measurements/engine-q8-f16-t6-c1024.json",
+        "results/measurements/llama-q8_0-f16-t6-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 6,
+      "context": 4096,
+      "engine_tps": {
+        "median": 119.59982675367097,
+        "min": 117.74770107364635,
+        "max": 119.68969369701803
+      },
+      "llama_tps": {
+        "median": 99.6188,
+        "min": 98.966,
+        "max": 100.103
+      },
+      "engine_over_llama": 1.200574858898832,
+      "files": [
+        "results/measurements/engine-q8-f16-t6-c4096.json",
+        "results/measurements/llama-q8_0-f16-t6-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 12,
+      "context": 128,
+      "engine_tps": {
+        "median": 305.3617748817267,
+        "min": 284.9195940878757,
+        "max": 305.5694287259212
+      },
+      "llama_tps": {
+        "median": 250.364,
+        "min": 223.493,
+        "max": 256.225
+      },
+      "engine_over_llama": 1.219671258175004,
+      "files": [
+        "results/measurements/engine-q8-f16-t12-c128.json",
+        "results/measurements/llama-q8_0-f16-t12-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 12,
+      "context": 1024,
+      "engine_tps": {
+        "median": 256.6940102474174,
+        "min": 252.30530569358146,
+        "max": 263.5555124422663
+      },
+      "llama_tps": {
+        "median": 213.619,
+        "min": 181.605,
+        "max": 215.51
+      },
+      "engine_over_llama": 1.2016440964868171,
+      "files": [
+        "results/measurements/engine-q8-f16-t12-c1024.json",
+        "results/measurements/llama-q8_0-f16-t12-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q8-f16",
+      "llama_label": "q8_0-f16",
+      "threads": 12,
+      "context": 4096,
+      "engine_tps": {
+        "median": 196.76561357587303,
+        "min": 114.19393824888564,
+        "max": 197.65306991845168
+      },
+      "llama_tps": {
+        "median": 153.855,
+        "min": 153.328,
+        "max": 155.314
+      },
+      "engine_over_llama": 1.2789029513234738,
+      "files": [
+        "results/measurements/engine-q8-f16-t12-c4096.json",
+        "results/measurements/llama-q8_0-f16-t12-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 1,
+      "context": 128,
+      "engine_tps": {
+        "median": 46.35636615250291,
+        "min": 46.161517088334385,
+        "max": 46.574689630561906
+      },
+      "llama_tps": {
+        "median": 58.3868,
+        "min": 57.564,
+        "max": 58.5556
+      },
+      "engine_over_llama": 0.7939528481181176,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t1-c128.json",
+        "results/measurements/llama-q4_0-f16-t1-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 1,
+      "context": 1024,
+      "engine_tps": {
+        "median": 38.58228087482341,
+        "min": 38.32629638577755,
+        "max": 38.59902643074848
+      },
+      "llama_tps": {
+        "median": 42.2589,
+        "min": 41.9523,
+        "max": 42.3794
+      },
+      "engine_over_llama": 0.9129977560898039,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t1-c1024.json",
+        "results/measurements/llama-q4_0-f16-t1-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 1,
+      "context": 4096,
+      "engine_tps": {
+        "median": 24.872933007383704,
+        "min": 24.845372456442767,
+        "max": 24.88297892703438
+      },
+      "llama_tps": {
+        "median": 23.0207,
+        "min": 22.9814,
+        "max": 23.0508
+      },
+      "engine_over_llama": 1.0804594563755099,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t1-c4096.json",
+        "results/measurements/llama-q4_0-f16-t1-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 2,
+      "context": 128,
+      "engine_tps": {
+        "median": 88.34942484662471,
+        "min": 88.32247489466772,
+        "max": 88.74999219277412
+      },
+      "llama_tps": {
+        "median": 98.7519,
+        "min": 98.4786,
+        "max": 98.8772
+      },
+      "engine_over_llama": 0.8946605062446871,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t2-c128.json",
+        "results/measurements/llama-q4_0-f16-t2-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 2,
+      "context": 1024,
+      "engine_tps": {
+        "median": 72.16346905599552,
+        "min": 71.78752411169074,
+        "max": 72.55469610587971
+      },
+      "llama_tps": {
+        "median": 71.1641,
+        "min": 70.2558,
+        "max": 71.2715
+      },
+      "engine_over_llama": 1.0140431629992583,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t2-c1024.json",
+        "results/measurements/llama-q4_0-f16-t2-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 2,
+      "context": 4096,
+      "engine_tps": {
+        "median": 47.37606957621153,
+        "min": 47.35215705086314,
+        "max": 47.389862767517215
+      },
+      "llama_tps": {
+        "median": 41.607,
+        "min": 41.5478,
+        "max": 41.6135
+      },
+      "engine_over_llama": 1.1386562255440558,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t2-c4096.json",
+        "results/measurements/llama-q4_0-f16-t2-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 4,
+      "context": 128,
+      "engine_tps": {
+        "median": 158.98806797530872,
+        "min": 158.48257216184481,
+        "max": 159.37877500457492
+      },
+      "llama_tps": {
+        "median": 173.305,
+        "min": 172.502,
+        "max": 173.51
+      },
+      "engine_over_llama": 0.9173888114901977,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t4-c128.json",
+        "results/measurements/llama-q4_0-f16-t4-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 4,
+      "context": 1024,
+      "engine_tps": {
+        "median": 134.1435458178557,
+        "min": 133.78084139620708,
+        "max": 134.32265663820428
+      },
+      "llama_tps": {
+        "median": 127.591,
+        "min": 126.139,
+        "max": 128.251
+      },
+      "engine_over_llama": 1.0513558622305312,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t4-c1024.json",
+        "results/measurements/llama-q4_0-f16-t4-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 4,
+      "context": 4096,
+      "engine_tps": {
+        "median": 88.97669455127688,
+        "min": 88.90636936287845,
+        "max": 88.99518275750373
+      },
+      "llama_tps": {
+        "median": 78.0894,
+        "min": 78.0712,
+        "max": 78.3029
+      },
+      "engine_over_llama": 1.1394209015727728,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t4-c4096.json",
+        "results/measurements/llama-q4_0-f16-t4-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 6,
+      "context": 128,
+      "engine_tps": {
+        "median": 225.37937723198655,
+        "min": 224.09537319807012,
+        "max": 225.41102432348373
+      },
+      "llama_tps": {
+        "median": 228.594,
+        "min": 226.384,
+        "max": 229.116
+      },
+      "engine_over_llama": 0.9859374140703018,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t6-c128.json",
+        "results/measurements/llama-q4_0-f16-t6-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 6,
+      "context": 1024,
+      "engine_tps": {
+        "median": 188.84990948069748,
+        "min": 185.52561395034806,
+        "max": 188.98359578686114
+      },
+      "llama_tps": {
+        "median": 173.501,
+        "min": 173.366,
+        "max": 175.81
+      },
+      "engine_over_llama": 1.088465827175045,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t6-c1024.json",
+        "results/measurements/llama-q4_0-f16-t6-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 6,
+      "context": 4096,
+      "engine_tps": {
+        "median": 126.45889102033594,
+        "min": 126.4507486939396,
+        "max": 126.48091163520198
+      },
+      "llama_tps": {
+        "median": 109.761,
+        "min": 109.662,
+        "max": 110.26
+      },
+      "engine_over_llama": 1.1521295452878157,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t6-c4096.json",
+        "results/measurements/llama-q4_0-f16-t6-c4096.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 12,
+      "context": 128,
+      "engine_tps": {
+        "median": 275.08033334303565,
+        "min": 166.305503084437,
+        "max": 299.9451962633277
+      },
+      "llama_tps": {
+        "median": 276.896,
+        "min": 149.432,
+        "max": 277.174
+      },
+      "engine_over_llama": 0.9934427848110324,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t12-c128.json",
+        "results/measurements/llama-q4_0-f16-t12-c128.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 12,
+      "context": 1024,
+      "engine_tps": {
+        "median": 294.93410490061405,
+        "min": 290.21580755804314,
+        "max": 300.7294832666785
+      },
+      "llama_tps": {
+        "median": 251.614,
+        "min": 251.548,
+        "max": 255.395
+      },
+      "engine_over_llama": 1.1721688972021194,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t12-c1024.json",
+        "results/measurements/llama-q4_0-f16-t12-c1024.json"
+      ]
+    },
+    {
+      "engine_label": "q4h8-f16",
+      "llama_label": "q4_0-f16",
+      "threads": 12,
+      "context": 4096,
+      "engine_tps": {
+        "median": 206.92946242803737,
+        "min": 206.74264252036647,
+        "max": 207.20485468542236
+      },
+      "llama_tps": {
+        "median": 172.827,
+        "min": 171.995,
+        "max": 173.036
+      },
+      "engine_over_llama": 1.197321381659332,
+      "files": [
+        "results/measurements/engine-q4h8-f16-t12-c4096.json",
+        "results/measurements/llama-q4_0-f16-t12-c4096.json"
       ]
     }
   ],
@@ -989,242 +1525,818 @@
     {
       "threads": 6,
       "context": 128,
+      "steps": 16,
+      "fused_projections": false,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 197.2673539790058,
+        "min": 196.80767616851665,
+        "max": 197.4060207306426
+      },
+      "file": "results/ablations/engine-q8-f16-unfused-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "mmap",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 202.42373322120747,
+        "min": 200.4575016502977,
+        "max": 202.42534920017445
+      },
+      "file": "results/ablations/engine-q8-f16-mmap-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f32",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 199.5150462588728,
+        "min": 199.44070842137393,
+        "max": 199.5188503165192
+      },
+      "file": "results/ablations/engine-q8-f32-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
       "kernel": "scalar",
-      "weight_dtype": "bf16",
-      "rope": "cached",
       "tokens_per_second": {
-        "median": 11.680129369930512,
-        "min": 11.679747774912421,
-        "max": 11.748412303040164
+        "median": 121.11293980716412,
+        "min": 121.03999500346899,
+        "max": 121.26220801595034
       },
-      "file": "results/ablations/bf16-cached/engine-t6-c128-scalar.json"
+      "file": "results/ablations/engine-q8-f16-scalar-t6-c128.json"
     },
     {
       "threads": 6,
       "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 198.64064988963463,
+        "min": 198.07801436298345,
+        "max": 198.89428946276826
+      },
+      "file": "results/ablations/engine-q8-f16-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q4",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 225.23473048595153,
+        "min": 225.03047440038557,
+        "max": 225.34491116051515
+      },
+      "file": "results/ablations/engine-q4h8-f16-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 128,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q4",
+      "head_format": "q4",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 241.1234435538232,
+        "min": 240.184409987222,
+        "max": 241.84551343923425
+      },
+      "file": "results/ablations/engine-q4-f16-t6-c128.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": false,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 116.36051197810745,
+        "min": 116.3128385289709,
+        "max": 116.48781321971268
+      },
+      "file": "results/ablations/engine-q8-f16-unfused-t6-c4096.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "mmap",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 117.73990972836968,
+        "min": 117.27058231381955,
+        "max": 118.38038877333072
+      },
+      "file": "results/ablations/engine-q8-f16-mmap-t6-c4096.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f32",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
+      "tokens_per_second": {
+        "median": 121.27803674386452,
+        "min": 120.60814031526921,
+        "max": 121.69214509756043
+      },
+      "file": "results/ablations/engine-q8-f32-t6-c4096.json"
+    },
+    {
+      "threads": 6,
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
       "kernel": "scalar",
-      "weight_dtype": "int8",
-      "rope": "cached",
       "tokens_per_second": {
-        "median": 11.796634801564792,
-        "min": 11.789689882302568,
-        "max": 11.8136812439423
+        "median": 44.722708890702904,
+        "min": 44.60591761841245,
+        "max": 44.78375227553943
       },
-      "file": "results/ablations/int8-cached/engine-t6-c128-scalar.json"
+      "file": "results/ablations/engine-q8-f16-scalar-t6-c4096.json"
     },
     {
       "threads": 6,
-      "context": 128,
-      "kernel": "simd256",
-      "weight_dtype": "int8",
-      "rope": "cached",
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q8",
+      "head_format": "q8",
+      "kernel": "neon",
       "tokens_per_second": {
-        "median": 61.49245572120428,
-        "min": 60.44081107866468,
-        "max": 61.60184652150967
+        "median": 117.21502149181374,
+        "min": 116.97068957233498,
+        "max": 117.49634988409682
       },
-      "file": "results/ablations/int8-cached/engine-t6-c128-simd256.json"
+      "file": "results/ablations/engine-q8-f16-t6-c4096.json"
     },
     {
       "threads": 6,
-      "context": 128,
-      "kernel": "simd512",
-      "weight_dtype": "int8",
-      "rope": "cached",
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q4",
+      "head_format": "q8",
+      "kernel": "neon",
       "tokens_per_second": {
-        "median": 67.6090694862353,
-        "min": 67.4378837766154,
-        "max": 68.19987458298813
+        "median": 125.72599789922859,
+        "min": 125.46557235280798,
+        "max": 125.96746060519224
       },
-      "file": "results/ablations/int8-cached/engine-t6-c128-simd512.json"
+      "file": "results/ablations/engine-q4h8-f16-t6-c4096.json"
     },
     {
       "threads": 6,
-      "context": 128,
-      "kernel": "simd512x4",
-      "weight_dtype": "int8",
-      "rope": "cached",
+      "context": 4096,
+      "steps": 16,
+      "fused_projections": true,
+      "weight_memory": "hugepage",
+      "kv_dtype": "f16",
+      "weight_format": "q4",
+      "head_format": "q4",
+      "kernel": "neon",
       "tokens_per_second": {
-        "median": 68.40731648743309,
-        "min": 68.37299685067138,
-        "max": 68.84375252476394
+        "median": 130.88881563659965,
+        "min": 130.80607387212524,
+        "max": 131.2066549589875
       },
-      "file": "results/ablations/int8-cached/engine-t6-c128-simd512x4.json"
-    },
-    {
-      "threads": 6,
-      "context": 128,
-      "kernel": "simd512x4",
-      "weight_dtype": "int8",
-      "rope": "direct",
-      "tokens_per_second": {
-        "median": 66.64491404440972,
-        "min": 66.15813608912183,
-        "max": 67.12964246895072
-      },
-      "file": "results/ablations/int8-direct/engine-t6-c128-simd512x4.json"
+      "file": "results/ablations/engine-q4-f16-t6-c4096.json"
     }
   ],
-  "optimization_effects": [
+  "ablation_effects": [
     {
-      "change": "Int8 weights",
+      "field": "fused_projections",
+      "change": "fused_projections: False \u2192 True",
       "threads": 6,
       "context": 128,
+      "variant": {
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
       "before": {
         "threads": 6,
         "context": 128,
+        "steps": 16,
+        "fused_projections": false,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 197.2673539790058,
+          "min": 196.80767616851665,
+          "max": 197.4060207306426
+        },
+        "file": "results/ablations/engine-q8-f16-unfused-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "ratio": 1.006961597461154
+    },
+    {
+      "field": "weight_memory",
+      "change": "weight_memory: mmap \u2192 hugepage",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "mmap",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 202.42373322120747,
+          "min": 200.4575016502977,
+          "max": 202.42534920017445
+        },
+        "file": "results/ablations/engine-q8-f16-mmap-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "ratio": 0.9813110682657022
+    },
+    {
+      "field": "kv_dtype",
+      "change": "kv_dtype: f32 \u2192 f16",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f32",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 199.5150462588728,
+          "min": 199.44070842137393,
+          "max": 199.5188503165192
+        },
+        "file": "results/ablations/engine-q8-f32-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "ratio": 0.995617391341485
+    },
+    {
+      "field": "weight_format",
+      "change": "weight_format: q8 \u2192 q4",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 225.23473048595153,
+          "min": 225.03047440038557,
+          "max": 225.34491116051515
+        },
+        "file": "results/ablations/engine-q4h8-f16-t6-c128.json"
+      },
+      "ratio": 1.1338803543539182
+    },
+    {
+      "field": "head_format",
+      "change": "head_format: q8 \u2192 q4",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 225.23473048595153,
+          "min": 225.03047440038557,
+          "max": 225.34491116051515
+        },
+        "file": "results/ablations/engine-q4h8-f16-t6-c128.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q4",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 241.1234435538232,
+          "min": 240.184409987222,
+          "max": 241.84551343923425
+        },
+        "file": "results/ablations/engine-q4-f16-t6-c128.json"
+      },
+      "ratio": 1.070542908873739
+    },
+    {
+      "field": "kernel",
+      "change": "kernel: scalar \u2192 neon",
+      "threads": 6,
+      "context": 128,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8"
+      },
+      "before": {
+        "threads": 6,
+        "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
         "kernel": "scalar",
-        "weight_dtype": "bf16",
-        "rope": "cached",
         "tokens_per_second": {
-          "median": 11.680129369930512,
-          "min": 11.679747774912421,
-          "max": 11.748412303040164
+          "median": 121.11293980716412,
+          "min": 121.03999500346899,
+          "max": 121.26220801595034
         },
-        "file": "results/ablations/bf16-cached/engine-t6-c128-scalar.json"
+        "file": "results/ablations/engine-q8-f16-scalar-t6-c128.json"
       },
       "after": {
         "threads": 6,
         "context": 128,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 198.64064988963463,
+          "min": 198.07801436298345,
+          "max": 198.89428946276826
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c128.json"
+      },
+      "ratio": 1.6401273902351807
+    },
+    {
+      "field": "fused_projections",
+      "change": "fused_projections: False \u2192 True",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": false,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 116.36051197810745,
+          "min": 116.3128385289709,
+          "max": 116.48781321971268
+        },
+        "file": "results/ablations/engine-q8-f16-unfused-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+      },
+      "ratio": 1.0073436383114838
+    },
+    {
+      "field": "weight_memory",
+      "change": "weight_memory: mmap \u2192 hugepage",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "mmap",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.73990972836968,
+          "min": 117.27058231381955,
+          "max": 118.38038877333072
+        },
+        "file": "results/ablations/engine-q8-f16-mmap-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+      },
+      "ratio": 0.9955419684135407
+    },
+    {
+      "field": "kv_dtype",
+      "change": "kv_dtype: f32 \u2192 f16",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f32",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 121.27803674386452,
+          "min": 120.60814031526921,
+          "max": 121.69214509756043
+        },
+        "file": "results/ablations/engine-q8-f32-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+      },
+      "ratio": 0.9664983424770328
+    },
+    {
+      "field": "weight_format",
+      "change": "weight_format: q8 \u2192 q4",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "head_format": "q8",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
+        },
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 125.72599789922859,
+          "min": 125.46557235280798,
+          "max": 125.96746060519224
+        },
+        "file": "results/ablations/engine-q4h8-f16-t6-c4096.json"
+      },
+      "ratio": 1.0726099462261265
+    },
+    {
+      "field": "head_format",
+      "change": "head_format: q8 \u2192 q4",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "kernel": "neon"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q8",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 125.72599789922859,
+          "min": 125.46557235280798,
+          "max": 125.96746060519224
+        },
+        "file": "results/ablations/engine-q4h8-f16-t6-c4096.json"
+      },
+      "after": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q4",
+        "head_format": "q4",
+        "kernel": "neon",
+        "tokens_per_second": {
+          "median": 130.88881563659965,
+          "min": 130.80607387212524,
+          "max": 131.2066549589875
+        },
+        "file": "results/ablations/engine-q4-f16-t6-c4096.json"
+      },
+      "ratio": 1.0410640426295057
+    },
+    {
+      "field": "kernel",
+      "change": "kernel: scalar \u2192 neon",
+      "threads": 6,
+      "context": 4096,
+      "variant": {
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8"
+      },
+      "before": {
+        "threads": 6,
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
         "kernel": "scalar",
-        "weight_dtype": "int8",
-        "rope": "cached",
         "tokens_per_second": {
-          "median": 11.796634801564792,
-          "min": 11.789689882302568,
-          "max": 11.8136812439423
+          "median": 44.722708890702904,
+          "min": 44.60591761841245,
+          "max": 44.78375227553943
         },
-        "file": "results/ablations/int8-cached/engine-t6-c128-scalar.json"
-      },
-      "ratio": 1.009974669624312
-    },
-    {
-      "change": "SIMD256",
-      "threads": 6,
-      "context": 128,
-      "before": {
-        "threads": 6,
-        "context": 128,
-        "kernel": "scalar",
-        "weight_dtype": "int8",
-        "rope": "cached",
-        "tokens_per_second": {
-          "median": 11.796634801564792,
-          "min": 11.789689882302568,
-          "max": 11.8136812439423
-        },
-        "file": "results/ablations/int8-cached/engine-t6-c128-scalar.json"
+        "file": "results/ablations/engine-q8-f16-scalar-t6-c4096.json"
       },
       "after": {
         "threads": 6,
-        "context": 128,
-        "kernel": "simd256",
-        "weight_dtype": "int8",
-        "rope": "cached",
+        "context": 4096,
+        "steps": 16,
+        "fused_projections": true,
+        "weight_memory": "hugepage",
+        "kv_dtype": "f16",
+        "weight_format": "q8",
+        "head_format": "q8",
+        "kernel": "neon",
         "tokens_per_second": {
-          "median": 61.49245572120428,
-          "min": 60.44081107866468,
-          "max": 61.60184652150967
+          "median": 117.21502149181374,
+          "min": 116.97068957233498,
+          "max": 117.49634988409682
         },
-        "file": "results/ablations/int8-cached/engine-t6-c128-simd256.json"
+        "file": "results/ablations/engine-q8-f16-t6-c4096.json"
       },
-      "ratio": 5.212711655110954
-    },
-    {
-      "change": "SIMD512 instead of SIMD256",
-      "threads": 6,
-      "context": 128,
-      "before": {
-        "threads": 6,
-        "context": 128,
-        "kernel": "simd256",
-        "weight_dtype": "int8",
-        "rope": "cached",
-        "tokens_per_second": {
-          "median": 61.49245572120428,
-          "min": 60.44081107866468,
-          "max": 61.60184652150967
-        },
-        "file": "results/ablations/int8-cached/engine-t6-c128-simd256.json"
-      },
-      "after": {
-        "threads": 6,
-        "context": 128,
-        "kernel": "simd512",
-        "weight_dtype": "int8",
-        "rope": "cached",
-        "tokens_per_second": {
-          "median": 67.6090694862353,
-          "min": 67.4378837766154,
-          "max": 68.19987458298813
-        },
-        "file": "results/ablations/int8-cached/engine-t6-c128-simd512.json"
-      },
-      "ratio": 1.0994693364136023
-    },
-    {
-      "change": "Four SIMD512 accumulators",
-      "threads": 6,
-      "context": 128,
-      "before": {
-        "threads": 6,
-        "context": 128,
-        "kernel": "simd512",
-        "weight_dtype": "int8",
-        "rope": "cached",
-        "tokens_per_second": {
-          "median": 67.6090694862353,
-          "min": 67.4378837766154,
-          "max": 68.19987458298813
-        },
-        "file": "results/ablations/int8-cached/engine-t6-c128-simd512.json"
-      },
-      "after": {
-        "threads": 6,
-        "context": 128,
-        "kernel": "simd512x4",
-        "weight_dtype": "int8",
-        "rope": "cached",
-        "tokens_per_second": {
-          "median": 68.40731648743309,
-          "min": 68.37299685067138,
-          "max": 68.84375252476394
-        },
-        "file": "results/ablations/int8-cached/engine-t6-c128-simd512x4.json"
-      },
-      "ratio": 1.0118068035437215
-    },
-    {
-      "change": "Cached RoPE",
-      "threads": 6,
-      "context": 128,
-      "before": {
-        "threads": 6,
-        "context": 128,
-        "kernel": "simd512x4",
-        "weight_dtype": "int8",
-        "rope": "direct",
-        "tokens_per_second": {
-          "median": 66.64491404440972,
-          "min": 66.15813608912183,
-          "max": 67.12964246895072
-        },
-        "file": "results/ablations/int8-direct/engine-t6-c128-simd512x4.json"
-      },
-      "after": {
-        "threads": 6,
-        "context": 128,
-        "kernel": "simd512x4",
-        "weight_dtype": "int8",
-        "rope": "cached",
-        "tokens_per_second": {
-          "median": 68.40731648743309,
-          "min": 68.37299685067138,
-          "max": 68.84375252476394
-        },
-        "file": "results/ablations/int8-cached/engine-t6-c128-simd512x4.json"
-      },
-      "ratio": 1.0264446652575616
+      "ratio": 2.6209284812839404
     }
   ]
 }

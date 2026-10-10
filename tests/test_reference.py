@@ -1,10 +1,11 @@
 """Small math tests plus opt-in full pinned-model integration.
 
 Full integration after download/build:
-  CPU_DECODE_MODEL=/snapshot CPU_DECODE_QUANT_MODEL=/int8-dir \
+  CPU_DECODE_MODEL=/snapshot CPU_DECODE_QUANT_MODEL=q8=/q8-dir,q4h8=/q4h8-dir \
     nice -n 19 uv run pytest -q tests/test_reference.py
 Full-model integration is strictly opt-in: CPU_DECODE_MODEL must be set.
-The quantized integration requires CPU_DECODE_QUANT_MODEL explicitly.
+The quantized integration requires CPU_DECODE_QUANT_MODEL (comma-separated
+LABEL=DIR) explicitly.
 """
 import json
 import os
@@ -15,7 +16,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tools.reference import position_metrics
+from tools.long_context import parse_windows, window_positions
+from tools.reference import labeled_path, position_metrics
 from tools.tokenize import repeat_tokens
 
 
@@ -48,6 +50,15 @@ def test_repeat_tokens_matches_native_policy() -> None:
     assert repeat_tokens([7, 8, 9], 8) == [7, 8, 9, 7, 8, 9, 7, 8]
     with pytest.raises(ValueError):
         repeat_tokens([], 8)
+
+
+def test_long_context_windows_stay_inside_the_token_count() -> None:
+    windows = parse_windows("960-1023,4032-4095", 4096)
+    assert window_positions(windows)[::64] == [960, 4032]
+    assert len(window_positions(windows)) == 128
+    for text in ["4032-4096", "960-1023,1000-1100", "1023-960", "960", "-1-3"]:
+        with pytest.raises(ValueError):
+            parse_windows(text, 4096)
 
 
 def _check_chunked_fp32(tmp_path: Path) -> None:
@@ -93,6 +104,13 @@ def model_path() -> Path:
     return model
 
 
+def quant_models() -> list[tuple[str, Path]]:
+    text = os.environ.get("CPU_DECODE_QUANT_MODEL")
+    if not text:
+        pytest.skip("Set CPU_DECODE_QUANT_MODEL=LABEL=DIR[,LABEL=DIR...] to test offline quantized models")
+    return [labeled_path(item) for item in text.split(",")]
+
+
 def integration(tmp_path: Path, quantized: bool) -> dict:
     root = Path(__file__).resolve().parents[1]
     model = model_path()
@@ -100,12 +118,10 @@ def integration(tmp_path: Path, quantized: bool) -> dict:
     if not engine.exists():
         pytest.fail(f"Explicitly requested native engine does not exist: {engine}")
     output = tmp_path / "metrics.json"
-    command = [sys.executable, "-m", "tools.reference", "--model", str(model), "--engine", str(engine), "--steps", "8", "--threads", "1", "--kernel", os.environ.get("CPU_DECODE_KERNEL", "scalar"), "--output", str(output), "--raw-dir", str(tmp_path / "raw")]
+    command = [sys.executable, "-m", "tools.reference", "--model", str(model), "--engine", str(engine), "--steps", "8", "--threads", "1", "--kernel", os.environ.get("CPU_DECODE_KERNEL", "auto"), "--output", str(output), "--raw-dir", str(tmp_path / "raw")]
     if quantized:
-        directory = os.environ.get("CPU_DECODE_QUANT_MODEL")
-        if not directory:
-            pytest.skip("Set CPU_DECODE_QUANT_MODEL to test the offline int8 model")
-        command += ["--quant-model", directory]
+        for label, directory in quant_models():
+            command += ["--quant-model", f"{label}={directory}"]
     completed = subprocess.run(command, cwd=root, text=True, capture_output=True)
     assert completed.returncode == 0, completed.stderr + completed.stdout[-4000:]
     metrics = json.loads(output.read_text())
@@ -118,6 +134,7 @@ def integration(tmp_path: Path, quantized: bool) -> dict:
 
 def test_pinned_bf16_weights_fp32_logits_and_exact_greedy(tmp_path) -> None:
     metrics = integration(tmp_path, False)
+    assert metrics["comparisons"][0]["kv_dtype"] == "f32"
     for case in metrics["comparisons"][0]["prompts"]:
         assert len(case["reference_generated_tokens"]) == 8
         assert case["exact_greedy_match"]
@@ -125,27 +142,38 @@ def test_pinned_bf16_weights_fp32_logits_and_exact_greedy(tmp_path) -> None:
         assert len(case["positions"]) == len(case["prompt_tokens"]) + 7
 
 
-def test_pinned_int8_per_position_top1_and_kl(tmp_path) -> None:
+def test_pinned_quantized_per_position_top1_and_kl(tmp_path) -> None:
+    models = quant_models()
     metrics = integration(tmp_path, True)
-    quantized = metrics["comparisons"][1]
-    assert quantized["label"] == "int8"
-    assert quantized["quality_reporting_only"]
-    for case in quantized["prompts"]:
-        assert 0.0 <= case["top1_agreement"] <= 1.0
-        for row in case["positions"]:
-            assert np.isfinite(row["kl_reference_candidate_nats"])
-            assert row["kl_reference_candidate_nats"] >= 0.0
-            assert isinstance(row["top1_match"], bool)
-    # Cross-check the produced file with the official parser, not only our loader.
+    assert [item["label"] for item in metrics["comparisons"]] == ["bf16-fp32", *(label for label, _ in models)]
+    for quantized in metrics["comparisons"][1:]:
+        assert quantized["quality_reporting_only"]
+        assert quantized["kv_dtype"] == "f16"
+        for case in quantized["prompts"]:
+            assert 0.0 <= case["top1_agreement"] <= 1.0
+            assert case["engine_settings"]["kv_dtype"] == "f16"
+            for row in case["positions"]:
+                assert np.isfinite(row["kl_reference_candidate_nats"])
+                assert row["kl_reference_candidate_nats"] >= 0.0
+                assert isinstance(row["top1_match"], bool)
+    # Cross-check the produced files with the official parser, not only our loader.
     from safetensors import safe_open
 
-    path = Path(os.environ["CPU_DECODE_QUANT_MODEL"]) / "model.safetensors"
-    with safe_open(path, framework="numpy") as stored:
-        assert "lm_head.weight" not in stored.keys()
-        assert stored.metadata()["quantization"] == "symmetric-per-row-int8"
-        assert stored.get_slice("model.embed_tokens.weight").get_shape() == [151936, 896]
-        assert stored.get_tensor("model.layers.0.self_attn.k_proj.weight").dtype == np.int8
-        assert stored.get_tensor("model.embed_tokens.weight.scales").dtype == np.float32
+    layouts = {"q8": ("I8", 896), "q4": ("U8", 448)}
+    for _, directory in models:
+        with safe_open(directory / "model.safetensors", framework="numpy") as stored:
+            metadata = stored.metadata()
+            assert "lm_head.weight" not in stored.keys()
+            assert metadata["quantization"] == "block32"
+            for name, key in [("model.embed_tokens.weight", "head_format"), ("model.layers.0.self_attn.k_proj.weight", "weight_format")]:
+                dtype, columns = layouts[metadata[key]]
+                assert stored.get_slice(name).get_dtype() == dtype
+                assert stored.get_slice(name).get_shape()[1] == columns
+            assert stored.get_slice("model.embed_tokens.weight").get_shape()[0] == 151936
+            scales = stored.get_tensor("model.embed_tokens.weight.scales")
+            assert scales.dtype == np.float16 and list(scales.shape) == [151936, 28]
+            if metadata["weight_format"] == "q8":
+                assert stored.get_tensor("model.layers.0.self_attn.k_proj.weight").dtype == np.int8
 
 
 def test_explicit_integration_rejects_missing_engine(tmp_path, monkeypatch) -> None:

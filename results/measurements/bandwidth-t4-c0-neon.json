@@ -1,0 +1,22 @@
+{
+  "kind": "read_bandwidth",
+  "kernel": "neon",
+  "threads": 4,
+  "array_bytes": 268435456,
+  "passes": 128,
+  "samples": [
+    {
+      "seconds": 0.33299,
+      "GB_per_s": 103.186
+    },
+    {
+      "seconds": 0.331024,
+      "GB_per_s": 103.798
+    },
+    {
+      "seconds": 0.330723,
+      "GB_per_s": 103.893
+    }
+  ],
+  "checksum": 0
+}

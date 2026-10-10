@@ -27,8 +27,12 @@ def versions() -> dict:
     return {name: importlib.metadata.version(name) for name in ("torch", "transformers", "safetensors", "tokenizers", "huggingface-hub", "numpy")}
 
 
-def load_oracle(model_path: Path, threads: int, arithmetic: str = "fp32"):
-    """Use unmodified Qwen2 blocks, changing only weight storage conversion."""
+def load_oracle(model_path: Path, threads: int, arithmetic: str = "fp32", attention: str = "eager"):
+    """Use unmodified Qwen2 blocks, changing only weight storage conversion.
+
+    `attention` selects the Transformers attention implementation ("eager"
+    or "sdpa"; the latter avoids materializing long-context score matrices).
+    """
     import torch
     import torch.nn.functional as functional
     from transformers import AutoModelForCausalLM
@@ -37,7 +41,7 @@ def load_oracle(model_path: Path, threads: int, arithmetic: str = "fp32"):
     torch.set_num_interop_threads(1)
     torch.manual_seed(0)
     torch.use_deterministic_algorithms(True)
-    model = AutoModelForCausalLM.from_pretrained(str(model_path), dtype=torch.bfloat16, local_files_only=True, trust_remote_code=False, attn_implementation="eager", low_cpu_mem_usage=True).eval()
+    model = AutoModelForCausalLM.from_pretrained(str(model_path), dtype=torch.bfloat16, local_files_only=True, trust_remote_code=False, attn_implementation=attention, low_cpu_mem_usage=True).eval()
     if model.config.model_type != "qwen2" or not model.config.tie_word_embeddings:
         raise ValueError("Expected the pinned tied-head Qwen2 model")
     if model.lm_head.weight.data_ptr() != model.model.embed_tokens.weight.data_ptr():
@@ -133,17 +137,35 @@ def position_metrics(reference, candidate, atol: float, rtol: float) -> list[dic
     return metrics
 
 
-def compare_engine(args, oracle: dict, model: Path, label: str) -> dict:
+UNQUANTIZED = "bf16-fp32"
+
+
+def labeled_path(text: str) -> tuple[str, Path]:
+    """Parse LABEL=PATH; labels become file-name parts and JSON keys."""
+    label, separator, path = text.partition("=")
+    if not separator or not path or not label or not all(c.isalnum() or c in "-_" for c in label):
+        raise argparse.ArgumentTypeError(f"Expected LABEL=PATH with an alphanumeric/-/_ label, got {text!r}")
+    return label, Path(path)
+
+
+def unique_labels(pairs: list[tuple[str, Path]], reserved: set[str]) -> dict[str, Path]:
+    labels = [label for label, _ in pairs]
+    if len(set(labels)) != len(labels) or reserved & set(labels):
+        raise ValueError(f"Labels must be unique and not one of {sorted(reserved)}: {labels}")
+    return dict(pairs)
+
+
+def compare_engine(args, oracle: dict, model: Path, label: str, kv: str) -> dict:
     import numpy as np
 
     cases = []
     for case in oracle["prompts"]:
         prefix = args.raw_dir / f"{case['id']}-{label}"
-        common = [str(args.engine.resolve()), "--model", str(model.resolve()), "--threads", str(args.threads), "--kernel", args.kernel]
+        common = [str(args.engine.resolve()), "--model", str(model.resolve()), "--threads", str(args.threads), "--kernel", args.kernel, "--kv", kv]
         command = [common[0], "logits", *common[1:], "--tokens", ",".join(map(str, case["tokens"])), "--output", str(prefix)]
         subprocess.run(command, check=True)
         metadata = json.loads(prefix.with_suffix(".json").read_text())
-        if metadata["shape"] != case["shape"] or metadata["tokens"] != case["tokens"]:
+        if metadata["shape"] != case["shape"] or metadata["tokens"] != case["tokens"] or metadata["kv_dtype"] != kv:
             raise ValueError("Engine logits metadata does not match reference inputs")
         reference = np.memmap(args.raw_dir / case["logits"], dtype="<f4", mode="r", shape=tuple(case["shape"]))
         candidate = np.memmap(prefix.with_suffix(".bin"), dtype="<f4", mode="r", shape=tuple(case["shape"]))
@@ -153,18 +175,18 @@ def compare_engine(args, oracle: dict, model: Path, label: str) -> dict:
         generate_command = [common[0], "generate", *common[1:], "--tokens", ",".join(map(str, case["prompt_tokens"])), "--steps", str(args.steps), "--output", str(generated_path)]
         subprocess.run(generate_command, check=True)
         generation = json.loads(generated_path.read_text())
-        if generation["prompt_tokens"] != case["prompt_tokens"] or len(generation["generated_tokens"]) != args.steps:
-            raise ValueError("Engine generation did not execute the exact fixed token count")
+        if generation["prompt_tokens"] != case["prompt_tokens"] or len(generation["generated_tokens"]) != args.steps or generation["kv_dtype"] != kv:
+            raise ValueError("Engine generation did not execute the exact fixed token count with the requested KV cache")
         top1_fraction = sum(row["top1_match"] for row in metrics) / len(metrics)
         maximum_kl = max(row["kl_reference_candidate_nats"] for row in metrics)
         exact_greedy = generation["generated_tokens"] == case["generated_tokens"]
-        if label == "bf16-fp32":
+        if label == UNQUANTIZED:
             passed = all(row["allclose"] for row in metrics) and exact_greedy
         else:
             # Quantization quality is a measurement, not an assumed guarantee.
             passed = (args.quant_max_kl is None or maximum_kl <= args.quant_max_kl) and (args.quant_min_top1 is None or top1_fraction >= args.quant_min_top1)
         cases.append({"id": case["id"], "prompt_tokens": case["prompt_tokens"], "teacher_forced_tokens": case["tokens"], "reference_generated_tokens": case["generated_tokens"], "candidate_generated_tokens": generation["generated_tokens"], "exact_greedy_match": exact_greedy, "top1_agreement": top1_fraction, "max_kl_reference_candidate_nats": maximum_kl, "mean_kl_reference_candidate_nats": sum(row["kl_reference_candidate_nats"] for row in metrics) / len(metrics), "passed": passed, "positions": metrics, "engine_settings": metadata, "commands": [command, generate_command]})
-    return {"label": label, "model_directory": str(model.resolve()), "quality_reporting_only": label == "int8" and args.quant_max_kl is None and args.quant_min_top1 is None, "passed": all(case["passed"] for case in cases), "prompts": cases}
+    return {"label": label, "model_directory": str(model.resolve()), "kv_dtype": kv, "quality_reporting_only": label != UNQUANTIZED and args.quant_max_kl is None and args.quant_min_top1 is None, "passed": all(case["passed"] for case in cases), "prompts": cases}
 
 
 def run_comparison(args) -> dict:
@@ -176,9 +198,10 @@ def run_comparison(args) -> dict:
     worker_command = [sys.executable, "-m", "tools.reference", "--oracle-only", "--model", str(args.model.resolve()), "--tokens-file", str(args.tokens_file.resolve()), "--raw-dir", str(args.raw_dir.resolve()), "--arithmetic", args.arithmetic, "--threads", str(args.threads), "--steps", str(args.steps), "--head-chunk", str(args.head_chunk)]
     subprocess.run(worker_command, check=True, cwd=Path(__file__).resolve().parents[1])
     oracle = json.loads((args.raw_dir / "reference.json").read_text())
-    comparisons = [compare_engine(args, oracle, args.model, "bf16-fp32")]
-    if args.quant_model is not None:
-        comparisons.append(compare_engine(args, oracle, args.quant_model, "int8"))
+    # The exactness gate needs an FP32 KV cache; quantized runs use the requested cache.
+    comparisons = [compare_engine(args, oracle, args.model, UNQUANTIZED, "f32")]
+    for label, directory in args.quant_models.items():
+        comparisons.append(compare_engine(args, oracle, directory, label, args.kv))
     return {"oracle": oracle, "tolerance": {"atol": args.atol, "rtol": args.rtol, "unquantized_requires_exact_greedy": True, "quant_max_position_kl_nats": args.quant_max_kl, "quant_min_top1_agreement": args.quant_min_top1, "quant_greedy_match_is_diagnostic": True}, "passed": all(item["passed"] for item in comparisons), "comparisons": comparisons}
 
 
@@ -186,7 +209,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--engine", type=Path, default=Path("build/cpu-decode"))
-    parser.add_argument("--quant-model", type=Path)
+    parser.add_argument("--quant-model", type=labeled_path, action="append", default=[], metavar="LABEL=DIR", help="Quantized engine model directory, e.g. q8=external/q8 (repeatable)")
+    parser.add_argument("--kv", choices=("f16", "f32"), default="f16", help="Engine KV cache for quantized comparisons; the unquantized gate always uses f32")
     parser.add_argument("--prompts", type=Path, default=Path("configs/prompts.json"))
     parser.add_argument("--tokens-file", type=Path)
     parser.add_argument("--output", type=Path, default=Path("results/correctness.json"))
@@ -195,7 +219,7 @@ def main() -> None:
     parser.add_argument("--head-chunk", type=int, default=1024)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--steps", type=int, default=8)
-    parser.add_argument("--kernel", choices=("scalar", "simd256", "simd512", "simd512x4"), default="scalar")
+    parser.add_argument("--kernel", choices=("auto", "scalar", "avx512", "neon"), default="auto")
     parser.add_argument("--atol", type=float, default=None)
     parser.add_argument("--rtol", type=float, default=None)
     parser.add_argument("--quant-max-kl", type=float, help="Optional caller-chosen maximum per-position KL; otherwise reporting only")
@@ -204,6 +228,10 @@ def main() -> None:
     args = parser.parse_args()
     if args.steps < 1 or args.threads < 1 or args.head_chunk < 1:
         parser.error("steps, threads and head-chunk must be positive")
+    try:
+        args.quant_models = unique_labels(args.quant_model, {UNQUANTIZED})
+    except ValueError as error:
+        parser.error(str(error))
     args.atol = args.atol if args.atol is not None else (0.003 if args.arithmetic == "fp32" else 0.5)
     args.rtol = args.rtol if args.rtol is not None else (0.0003 if args.arithmetic == "fp32" else 0.03)
     if args.oracle_only:
@@ -213,8 +241,8 @@ def main() -> None:
         return
     result = run_comparison(args)
     locations = {args.model.resolve(): "$MODEL", args.engine.resolve(): "build/cpu-decode", args.raw_dir.resolve(): "$RAW"}
-    if args.quant_model is not None:
-        locations[args.quant_model.resolve()] = "$INT8"
+    for label, directory in args.quant_models.items():
+        locations[directory.resolve()] = f"${label.upper()}"
     result = portable(result, locations)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n")
